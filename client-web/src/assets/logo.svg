@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <radialGradient id="toplight" cx="50%" cy="8%" r="52%">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#toplight)"/>
+
+  <!--
+    Single clean lightning bolt.
+    Proportions tuned: upper blade ~55% of total height, lower blade ~45%.
+    Notch creates a crisp step, not a long ear.
+    Centered: left edge ~354, right edge ~658, center ~506 ≈ 512 ✓
+
+    Clockwise from top-left:
+    (376, 112)  top-left
+    (658, 112)  top-right
+    (556, 512)  notch top-right
+    (664, 512)  notch ear (sticks right — standard bolt shape)
+    (380, 912)  bottom tip
+    (272, 912)  bottom-left (gives the lower blade some width)
+    (460, 512)  notch bottom-left
+    (352, 512)  notch ear-left (standard)
+  -->
+  <path d="
+    M 388 112
+    L 654 112
+    L 554 510
+    L 660 510
+    L 388 912
+    L 270 912
+    L 462 510
+    L 356 510
+    Z
+  " fill="white"/>
+
+</svg>

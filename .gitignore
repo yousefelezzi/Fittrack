@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Secrets: keep .env files local (the .env.example templates are committed)
+.env
+**/.env
+!**/.env.example
+
+# Build output and caches
+dist/
+.expo/
+web-build/
+ios/
+android/
+
+# User uploads (profile photos, post images)
+server/uploads/
+
+# OS / editor / logs
+.DS_Store
+*.log

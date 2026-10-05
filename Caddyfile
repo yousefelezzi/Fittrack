@@ -1,0 +1,11 @@
+# Replace yourdomain.com with your actual domain
+yourdomain.com {
+    # Serve the React web app
+    reverse_proxy web:5173
+
+    # Proxy API calls to the server
+    reverse_proxy /api/* server:5000
+
+    # Proxy uploaded files
+    reverse_proxy /uploads/* server:5000
+}

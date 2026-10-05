@@ -1,0 +1,327 @@
+/**
+ * One-off data migrations, run once each on server start.
+ * Applied migrations are recorded in the `migrations` collection, so each one
+ * runs exactly once per database even though the server restarts often.
+ */
+const mongoose = require('mongoose');
+const splitUnilateralSets = require('../utils/splitUnilateralSets');
+const { UNILATERAL_NAME_PATTERN } = require('../utils/laterality');
+const { forearmsAreSecondary } = require('../utils/forearmRole');
+const { needsSecondaryElbowFlexors, needsSecondaryRearDelts } = require('../utils/pullHelpers');
+
+const migrations = [
+  {
+    // RIR was added after these workouts were logged. Treat their sets as taken
+    // to failure (0 RIR). Runs once, so blank RIR on later workouts stays blank.
+    name: '2026-09-set-old-workouts-rir-0',
+    async up(db) {
+      const res = await db.collection('workoutsessions').updateMany(
+        {},
+        { $set: { 'exercises.$[].sets.$[s].rir': 0 } },
+        { arrayFilters: [{ 's.rir': null }] } // matches missing or null
+      );
+      return `${res.modifiedCount} workout(s) updated`;
+    },
+  },
+  {
+    // Exercises that are now unilateral were logged before sides existed, as one
+    // entry per set. Assume both sides did the same: each old set becomes a left
+    // and a right entry with the same reps/weight/RIR, rest kept on the right.
+    name: '2026-09-split-old-unilateral-sets',
+    async up(db) {
+      const ids = await db.collection('exercises')
+        .find({ laterality: 'unilateral' }, { projection: { _id: 1 } }).map((e) => e._id).toArray();
+      return `${await splitUnilateralSets(db, ids)} workout(s) updated`;
+    },
+  },
+  {
+    // Cable lateral raises, dumbbell preacher curls and anything single/one arm
+    // or leg are done one side at a time — built-in or custom. Mark them
+    // unilateral and split their old sets into left + right like above.
+    name: '2026-09-more-unilateral-exercises',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const filter = { laterality: { $ne: 'unilateral' }, name: { $regex: UNILATERAL_NAME_PATTERN.source, $options: 'i' } };
+      const ids = await exercises.find(filter, { projection: { _id: 1 } }).map((e) => e._id).toArray();
+      if (ids.length === 0) return 'no exercises matched';
+      await exercises.updateMany({ _id: { $in: ids } }, { $set: { laterality: 'unilateral' } });
+      return `${ids.length} exercise(s) marked unilateral, ${await splitUnilateralSets(db, ids)} workout(s) updated`;
+    },
+  },
+  {
+    // The "biceps" muscle is now "elbow flexors" (biceps, brachialis and
+    // brachioradialis). The seed renames it on built-in exercises; this does
+    // the same for custom exercises.
+    name: '2026-09-biceps-to-elbow-flexors',
+    async up(db) {
+      const res = await db.collection('exercises').updateMany(
+        { muscleGroups: 'biceps' },
+        { $set: { 'muscleGroups.$[m]': 'elbow flexors' } },
+        { arrayFilters: [{ m: 'biceps' }] }
+      );
+      return `${res.modifiedCount} exercise(s) updated`;
+    },
+  },
+  {
+    // Squat, leg press and lunge patterns mostly train the vasti, not the rectus
+    // femoris, so they're tagged "vastus quads". The seed does this for built-in
+    // exercises; this does it for custom ones with those names. Sissy squats and
+    // leg extensions keep "quads" (both heads).
+    name: '2026-09-squat-patterns-vastus-quads',
+    async up(db) {
+      const res = await db.collection('exercises').updateMany(
+        {
+          isCustom: true,
+          muscleGroups: 'quads',
+          $and: [
+            { name: { $regex: 'squat|leg press|lunge|step[ -]?up', $options: 'i' } },
+            { name: { $not: /sissy/i } },
+          ],
+        },
+        { $set: { 'muscleGroups.$[m]': 'vastus quads' } },
+        { arrayFilters: [{ m: 'quads' }] }
+      );
+      return `${res.modifiedCount} custom exercise(s) updated`;
+    },
+  },
+  {
+    // "Full body" is no longer a muscle group: exercises that had it are cardio
+    // (their own section). Difficulty ratings are gone. The seed handles the
+    // built-in library; this cleans up custom exercises and old fields.
+    name: '2026-09-cardio-category-no-difficulty',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const cardio = await exercises.updateMany(
+        { muscleGroups: 'full_body' },
+        { $set: { category: 'cardio' }, $pull: { muscleGroups: 'full_body' } }
+      );
+      await exercises.updateMany({ category: { $exists: false } }, { $set: { category: 'strength' } });
+      const diff = await exercises.updateMany({ difficulty: { $exists: true } }, { $unset: { difficulty: '' } });
+      return `${cardio.modifiedCount} moved to cardio, difficulty removed from ${diff.modifiedCount}`;
+    },
+  },
+  {
+    // Back exercises (first tag lats or trapezius) no longer count for the elbow
+    // flexors, only forearms. The seed does the built-in ones; this does custom
+    // back exercises the same way.
+    name: '2026-09-back-exercises-no-elbow-flexors',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const filter = { isCustom: true, muscleGroups: 'elbow flexors', 'muscleGroups.0': { $in: ['lats', 'trapezius'] } };
+      const ids = await exercises.find(filter, { projection: { _id: 1 } }).map((e) => e._id).toArray();
+      if (!ids.length) return 'no custom back exercises with elbow flexors';
+      await exercises.updateMany({ _id: { $in: ids } }, { $pull: { muscleGroups: 'elbow flexors' } });
+      await exercises.updateMany({ _id: { $in: ids } }, { $addToSet: { muscleGroups: 'forearms' } });
+      return `${ids.length} custom exercise(s) updated`;
+    },
+  },
+  {
+    // Incline pressing and flyes train the clavicular and sternal pecs but not
+    // the costal (lower) region. Replace a plain "pecs" tag on custom incline
+    // exercises; the seed does the built-in ones.
+    name: '2026-09-incline-no-costal-pecs',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const ids = await exercises
+        .find({ isCustom: true, muscleGroups: 'pecs', name: { $regex: 'incline', $options: 'i' } }, { projection: { _id: 1 } })
+        .map((e) => e._id).toArray();
+      if (!ids.length) return 'no custom incline exercises tagged pecs';
+      for (const _id of ids) {
+        const ex = await exercises.findOne({ _id });
+        const tags = ex.muscleGroups.flatMap((m) => (m === 'pecs' ? ['clavicular pecs', 'sternal pecs'] : [m]));
+        await exercises.updateOne({ _id }, { $set: { muscleGroups: [...new Set(tags)] } });
+      }
+      return `${ids.length} custom exercise(s) updated`;
+    },
+  },
+  {
+    // The short-lived "iliopsoas" tag is gone: it's "hip flexors" again (which no
+    // longer counts for rectus femoris; use the "rectus femoris" tag for that).
+    name: '2026-09-iliopsoas-to-hip-flexors',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const res = await exercises.updateMany(
+        { muscleGroups: 'iliopsoas' },
+        { $set: { 'muscleGroups.$[m]': 'hip flexors' } },
+        { arrayFilters: [{ m: 'iliopsoas' }] }
+      );
+      // An exercise could now list hip flexors twice; keep one.
+      for await (const ex of exercises.find({ muscleGroups: 'hip flexors' })) {
+        const unique = [...new Set(ex.muscleGroups)];
+        if (unique.length !== ex.muscleGroups.length) await exercises.updateOne({ _id: ex._id }, { $set: { muscleGroups: unique } });
+      }
+      return `${res.modifiedCount} exercise(s) updated`;
+    },
+  },
+  {
+    // Hip hinges (RDL, stiff-leg deadlift, good morning) only train the two-joint
+    // hamstrings (back extensions are the exception: the short head works
+    // isometrically there, so they keep "hamstrings"); only knee flexion (leg curls) reaches the
+    // short head. Custom hinge exercises tagged "hamstrings" become
+    // "biarticular hamstrings"; the seed does the built-in ones.
+    name: '2026-09-hinges-biarticular-hamstrings',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const res = await exercises.updateMany(
+        {
+          isCustom: true,
+          muscleGroups: 'hamstrings',
+          name: { $regex: 'deadlift|\\brdl\\b|sldl|good ?morning|hip hinge|pull[- ]?through', $options: 'i' },
+        },
+        { $set: { 'muscleGroups.$[m]': 'biarticular hamstrings' } },
+        { arrayFilters: [{ m: 'hamstrings' }] }
+      );
+      return `${res.modifiedCount} custom exercise(s) updated`;
+    },
+  },
+  {
+    // Back extensions also train the short head isometrically, so they count for
+    // all hamstrings. Undo "biarticular hamstrings" on custom back extensions
+    // (in case an earlier version of the hinge update got to them first).
+    name: '2026-09-back-extension-all-hamstrings',
+    async up(db) {
+      const res = await db.collection('exercises').updateMany(
+        { isCustom: true, muscleGroups: 'biarticular hamstrings', name: { $regex: 'back extension|hyperextension', $options: 'i' } },
+        { $set: { 'muscleGroups.$[m]': 'hamstrings' } },
+        { arrayFilters: [{ m: 'biarticular hamstrings' }] }
+      );
+      return `${res.modifiedCount} custom exercise(s) updated`;
+    },
+  },
+  {
+    // Chin-ups (supinated grip) do train the elbow flexors — the one back
+    // exercise that keeps them — and dips train both triceps heads (the long
+    // head too, from the shoulder extension). The seed does the built-in ones;
+    // this does custom exercises with those names.
+    name: '2026-09-chinups-elbow-flexors-dips-all-triceps',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      const chins = await exercises.updateMany(
+        { isCustom: true, name: { $regex: 'chin[- ]?ups?', $options: 'i' }, muscleGroups: { $ne: 'elbow flexors' } },
+        { $push: { muscleGroups: 'elbow flexors' } }
+      );
+      const dips = await exercises.updateMany(
+        { isCustom: true, name: { $regex: '\\bdips?\\b', $options: 'i' }, muscleGroups: 'medial/lateral triceps' },
+        { $set: { 'muscleGroups.$[m]': 'triceps' } },
+        { arrayFilters: [{ m: 'medial/lateral triceps' }] }
+      );
+      return `${chins.modifiedCount} chin-up(s), ${dips.modifiedCount} dip(s) updated`;
+    },
+  },
+  {
+    // "anterior/middle/posterior deltoid" are now "… delt". Rename the tags on
+    // every exercise, built-in or custom, in both primary and secondary muscles.
+    name: '2026-10-deltoid-to-delt',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      let n = 0;
+      for (const field of ['muscleGroups', 'secondaryMuscles']) {
+        for (const head of ['anterior', 'middle', 'posterior']) {
+          const res = await exercises.updateMany(
+            { [field]: `${head} deltoid` },
+            { $set: { [`${field}.$[m]`]: `${head} delt` } },
+            { arrayFilters: [{ m: `${head} deltoid` }] }
+          );
+          n += res.modifiedCount;
+        }
+      }
+      return `${n} tag update(s)`;
+    },
+  },
+  {
+    // Forearms are secondary everywhere (they just hold the grip) except on
+    // wrist curls and reverse curls. The seed does the built-in exercises;
+    // this updates every exercise already in the database, custom ones included.
+    name: '2026-10-forearms-secondary-except-wrist-and-reverse-curls',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      let n = 0;
+      for await (const ex of exercises.find({ muscleGroups: 'forearms' }, { projection: { name: 1, muscleGroups: 1, secondaryMuscles: 1 } })) {
+        if (!forearmsAreSecondary(ex) || (ex.secondaryMuscles || []).includes('forearms')) continue;
+        await exercises.updateOne({ _id: ex._id }, { $addToSet: { secondaryMuscles: 'forearms' } });
+        n++;
+      }
+      return `${n} exercise(s) updated`;
+    },
+  },
+  {
+    // Pulling movements (rows, pulldowns, pull-ups…) count the elbow flexors as
+    // a secondary muscle (half a set) where they aren't listed. The seed does the
+    // built-in ones; this updates every exercise already in the database.
+    name: '2026-10-pulls-secondary-elbow-flexors',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      let n = 0;
+      for await (const ex of exercises.find({ 'muscleGroups.0': { $in: ['lats', 'trapezius', 'posterior delt'] } }, { projection: { name: 1, muscleGroups: 1 } })) {
+        if (!needsSecondaryElbowFlexors(ex)) continue;
+        await exercises.updateOne({ _id: ex._id }, { $push: { muscleGroups: 'elbow flexors' }, $addToSet: { secondaryMuscles: 'elbow flexors' } });
+        n++;
+      }
+      return `${n} exercise(s) updated`;
+    },
+  },
+  {
+    // Wide-grip pulldowns count the rear delts as a secondary muscle (half a
+    // set). The seed does the built-in ones; this updates every exercise
+    // already in the database, custom ones included.
+    name: '2026-10-wide-pulldowns-secondary-rear-delts',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      let n = 0;
+      for await (const ex of exercises.find({ name: { $regex: 'pull[- ]?down', $options: 'i' } }, { projection: { name: 1, muscleGroups: 1 } })) {
+        if (!needsSecondaryRearDelts(ex)) continue;
+        await exercises.updateOne({ _id: ex._id }, { $push: { muscleGroups: 'posterior delt' }, $addToSet: { secondaryMuscles: 'posterior delt' } });
+        n++;
+      }
+      return `${n} exercise(s) updated`;
+    },
+  },
+  {
+    // Overhead presses count a full set for the middle delts (they were
+    // secondary), except Arnold presses. The seed does the built-in ones; this
+    // updates custom overhead/shoulder/military/push presses (close-grip excluded).
+    name: '2026-10-overhead-press-middle-delt-primary',
+    async up(db) {
+      const res = await db.collection('exercises').updateMany(
+        {
+          secondaryMuscles: 'middle delt',
+          $and: [
+            { name: { $regex: '(overhead|shoulder|military|push) press', $options: 'i' } },
+            { name: { $not: /close[- ]?grip|arnold/i } },
+          ],
+        },
+        { $pull: { secondaryMuscles: 'middle delt' } }
+      );
+      return `${res.modifiedCount} exercise(s) updated`;
+    },
+  },
+  {
+    // Chats used an emoji for a shared workout in the inbox preview.
+    name: '2026-10-plain-shared-workout-preview',
+    async up(db) {
+      const res = await db.collection('conversations').updateMany(
+        { 'lastMessage.text': '🏋️ Shared a workout' },
+        { $set: { 'lastMessage.text': 'Shared a workout' } }
+      );
+      return `${res.modifiedCount} conversation(s) updated`;
+    },
+  },
+];
+
+async function runMigrations() {
+  const db = mongoose.connection.db;
+  const applied = db.collection('migrations');
+  for (const m of migrations) {
+    if (await applied.findOne({ name: m.name })) continue;
+    try {
+      const result = await m.up(db);
+      await applied.insertOne({ name: m.name, appliedAt: new Date(), result });
+      console.log(`✅ Migration ${m.name}: ${result}`);
+    } catch (err) {
+      // Don't take the server down; it'll be retried on the next start.
+      console.error(`❌ Migration ${m.name} failed:`, err.message);
+    }
+  }
+}
+
+module.exports = runMigrations;

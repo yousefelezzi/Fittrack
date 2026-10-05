@@ -1,0 +1,56 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: fittrack-mongo
+    restart: unless-stopped
+    expose:
+      - "27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  seed:
+    build: ./server
+    container_name: fittrack-seed
+    env_file:
+      - .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: sh -c "node seed/Exercises.seed.js && node seed/Foods.seed.js"
+    restart: "no"
+
+  server:
+    build: ./server
+    container_name: fittrack-server
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    env_file:
+      - .env
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./client-web
+    container_name: fittrack-web
+    restart: unless-stopped
+    ports:
+      - "3000:5173"
+    depends_on:
+      - server
+
+volumes:
+  mongo_data:
+  uploads_data:
