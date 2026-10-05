@@ -84,7 +84,9 @@ function PlanEditor({ visible, initial, editingId, exercises, onClose, onSaved }
   // A new exercise starts in the same unit as the one above it.
   const addEx = (di) => setForm((f) => ({ ...f, days: f.days.map((d, i) => (i !== di ? d : { ...d, exercises: [...d.exercises, emptyExercise(d.exercises.at(-1)?.weightUnit)] })) }));
   const removeEx = (di, ei) => setForm((f) => ({ ...f, days: f.days.map((d, i) => (i !== di ? d : { ...d, exercises: d.exercises.filter((_, j) => j !== ei) })) }));
-  const updateEx = (di, ei, field, val) => setForm((f) => ({
+  // An exercise can only be in a day once, so picking one that's already there is ignored.
+  const othersInDay = (day, ei) => (day?.exercises || []).filter((_, j) => j !== ei).map((e) => e.exercise).filter(Boolean);
+  const updateEx = (di, ei, field, val) => setForm((f) => (field === 'exercise' && val && othersInDay(f.days[di], ei).includes(val) ? f : {
     ...f,
     days: f.days.map((d, i) => (i !== di ? d : {
       ...d,
@@ -198,7 +200,7 @@ function PlanEditor({ visible, initial, editingId, exercises, onClose, onSaved }
               </View>
               {similarFor === `${di}-${ei}` && ex.exercise ? (
                 <View style={{ marginTop: 8 }}>
-                  <SimilarExercises exerciseId={ex.exercise} onPick={(p) => { updateEx(di, ei, 'exercise', p._id); setSimilarFor(null); }} onClose={() => setSimilarFor(null)} />
+                  <SimilarExercises exerciseId={ex.exercise} excludeIds={othersInDay(day, ei)} onPick={(p) => { updateEx(di, ei, 'exercise', p._id); setSimilarFor(null); }} onClose={() => setSimilarFor(null)} />
                 </View>
               ) : null}
             </View>
@@ -208,6 +210,7 @@ function PlanEditor({ visible, initial, editingId, exercises, onClose, onSaved }
       ))}
       <ExercisePicker visible={!!picking} title="Choose exercise" exercises={exercises}
         selectedIds={picking ? [form.days[picking.di]?.exercises[picking.ei]?.exercise] : []}
+        disabledIds={picking ? othersInDay(form.days[picking.di], picking.ei) : []}
         onPick={(ex) => { updateEx(picking.di, picking.ei, 'exercise', ex._id); setPicking(null); }}
         onClose={() => setPicking(null)} />
     </Sheet>

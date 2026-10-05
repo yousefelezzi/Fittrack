@@ -11,7 +11,8 @@ const short = (unit) => (unit.includes(' › ') ? unit.split(' › ')[1].toLower
  * Suggestions to replace an exercise with a similar one (same main muscle /
  * overlapping muscles), best match first. `onPick` gets the chosen exercise.
  */
-export default function SimilarExercises({ exerciseId, equipment, onPick, onClose, selectedId }) {
+// `excludeIds`: exercises not to suggest (e.g. already in the same plan day).
+export default function SimilarExercises({ exerciseId, equipment, onPick, onClose, selectedId, excludeIds = [] }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
 
@@ -21,7 +22,7 @@ export default function SimilarExercises({ exerciseId, equipment, onPick, onClos
     setList(null);
     setError('');
     exerciseAPI.similar(exerciseId, equipment?.length ? { equipment: equipment.join(',') } : undefined)
-      .then(({ data }) => { if (!cancelled) setList(data); })
+      .then(({ data }) => { if (!cancelled) setList(data.filter((e) => !excludeIds.includes(e._id))); })
       .catch(() => { if (!cancelled) setError('Could not load similar exercises'); });
     return () => { cancelled = true; };
   }, [exerciseId, equipment?.join(',')]);

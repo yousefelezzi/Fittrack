@@ -3,8 +3,9 @@ import { Search, ChevronDown, X } from 'lucide-react';
 
 // Searchable replacement for a <select> of exercises.
 // `value` is the selected exercise _id (string, '' when empty);
-// `onChange` is called with the new _id.
-export default function ExerciseCombobox({ exercises, value, onChange, placeholder = 'Pick exercise', className = '' }) {
+// `onChange` is called with the new _id. `excludeIds` are left out of the list
+// (e.g. exercises already in the same plan day).
+export default function ExerciseCombobox({ exercises: allExercises, value, onChange, placeholder = 'Pick exercise', className = '', excludeIds = [] }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
@@ -12,6 +13,11 @@ export default function ExerciseCombobox({ exercises, value, onChange, placehold
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
+  const excludeKey = excludeIds.join(',');
+  const exercises = useMemo(
+    () => allExercises.filter((e) => e._id === value || !excludeKey.split(',').includes(e._id)),
+    [allExercises, value, excludeKey],
+  );
   const selected = exercises.find((e) => e._id === value);
 
   // Match on name, muscle groups and equipment so "chest" or "dumbbell" work too.

@@ -93,7 +93,10 @@ export default function ManualPlanBuilder({ onSaved }) {
   const updateSession = (i, fn) => setSessions((list) => list.map((s, j) => (j === i ? fn(s) : s)));
   const updateExercise = (i, idx, patch) => updateSession(i, (s) => ({ ...s, exercises: s.exercises.map((e, k) => (k === idx ? { ...e, ...patch } : e)) }));
   // Swap for a similar exercise, keeping its sets, reps and RIR.
+  // An exercise can only be in a session once.
+  const inSession = (s, id, exceptIdx = -1) => s.exercises.some((e, k) => k !== exceptIdx && e.exercise._id === id);
   const replaceExercise = (i, idx, picked) => {
+    if (inSession(sessions[i], picked._id, idx)) return;
     updateExercise(i, idx, { exercise: library.find((e) => e._id === picked._id) || picked });
     setSwapping(null);
   };
@@ -101,6 +104,7 @@ export default function ManualPlanBuilder({ onSaved }) {
     const ex = library.find((e) => e._id === exerciseId);
     if (!ex) return;
     updateSession(i, (s) => {
+      if (inSession(s, ex._id)) return s;
       const room = maxSets - sessionTotals(s).sets;
       if (room <= 0 || s.exercises.length >= maxExercises) return s;
       return { ...s, exercises: [...s.exercises, { exercise: ex, sets: Math.min(MANUAL_DEFAULTS.sets, room), reps: MANUAL_DEFAULTS.reps, repsMax: MANUAL_DEFAULTS.repsMax, rir: MANUAL_DEFAULTS.rir }] };
@@ -251,10 +255,10 @@ export default function ManualPlanBuilder({ onSaved }) {
                     </div>
                     {swapping === `${i}-${idx}` && (
                       <div className="mt-1.5 space-y-1.5">
-                        <SimilarExercises exerciseId={e.exercise._id} compact
+                        <SimilarExercises exerciseId={e.exercise._id} compact excludeIds={s.exercises.map((x) => x.exercise._id)}
                           onPick={(picked) => replaceExercise(i, idx, picked)} onClose={() => setSwapping(null)} />
                         {/* …or any exercise at all */}
-                        <ExerciseSearch exercises={library} excludeIds={[e.exercise._id]} placeholder="…or pick any exercise"
+                        <ExerciseSearch exercises={library} excludeIds={s.exercises.map((x) => x.exercise._id)} placeholder="…or pick any exercise"
                           onPick={(id) => replaceExercise(i, idx, library.find((x) => x._id === id))} />
                       </div>
                     )}
@@ -268,7 +272,7 @@ export default function ManualPlanBuilder({ onSaved }) {
                   {t.exercises >= maxExercises ? 'Exercise limit reached' : 'Set limit reached'} for this session. Raise the limit above to add more.
                 </p>
               ) : (
-                <ExerciseSearch exercises={library} onPick={(id) => addExercise(i, id)} placeholder="+ Add exercise" />
+                <ExerciseSearch exercises={library} excludeIds={s.exercises.map((x) => x.exercise._id)} onPick={(id) => addExercise(i, id)} placeholder="+ Add exercise" />
               )}
             </div>
           );

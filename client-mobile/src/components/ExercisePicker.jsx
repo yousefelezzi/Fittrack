@@ -10,9 +10,10 @@ import { Check } from 'lucide-react-native';
  * Searchable exercise list in a bottom sheet. `selectedIds` get a check mark;
  * `onPick` gets the chosen exercise. `header` renders above the list (e.g.
  * similar exercises when swapping). `muscleFilter` adds a row of muscle chips
- * that narrow the list to exercises training that muscle.
+ * that narrow the list to exercises training that muscle. `disabledIds` are
+ * shown greyed out as already added and can't be picked.
  */
-export default function ExercisePicker({ visible, title = 'Add Exercise', exercises, selectedIds = [], onPick, onClose, header, muscleFilter = false }) {
+export default function ExercisePicker({ visible, title = 'Add Exercise', exercises, selectedIds = [], disabledIds = [], onPick, onClose, header, muscleFilter = false }) {
   const [q, setQ] = useState('');
   const [muscle, setMuscle] = useState('');
   const shown = useMemo(() => {
@@ -44,8 +45,10 @@ export default function ExercisePicker({ visible, title = 'Add Exercise', exerci
         keyboardShouldPersistTaps="handled"
         style={{ maxHeight: 420 }}
         initialNumToRender={20}
-        renderItem={({ item: ex }) => (
-          <TouchableOpacity style={styles.row} onPress={() => { onPick(ex); setQ(''); }}>
+        renderItem={({ item: ex }) => {
+          const added = disabledIds.includes(ex._id);
+          return (
+          <TouchableOpacity style={[styles.row, added && { opacity: 0.45 }]} disabled={added} onPress={() => { onPick(ex); setQ(''); }}>
             <ExerciseImage images={ex.images} style={styles.thumb} />
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>
@@ -53,11 +56,12 @@ export default function ExercisePicker({ visible, title = 'Add Exercise', exerci
                 {ex.laterality === 'unilateral' ? <Text style={styles.tag}>  each side</Text> : null}
                 {ex.isCustom ? <Text style={styles.tag}>  custom</Text> : null}
               </Text>
-              <Text style={styles.meta} numberOfLines={1}>{ex.muscleGroups?.join(', ')}</Text>
+              <Text style={styles.meta} numberOfLines={1}>{added ? 'Already added' : ex.muscleGroups?.join(', ')}</Text>
             </View>
-            {selectedIds.includes(ex._id) && <Check size={18} color={colors.brand} />}
+            {(added || selectedIds.includes(ex._id)) && <Check size={18} color={colors.brand} />}
           </TouchableOpacity>
-        )}
+          );
+        }}
         ListEmptyComponent={<Text style={styles.empty}>No exercises found.</Text>}
       />
     </Sheet>

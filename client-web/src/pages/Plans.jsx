@@ -186,7 +186,13 @@ export default function Plans() {
   // A new exercise starts in the same unit as the one above it.
   const addExToDay      = (di)          => setForm((f) => ({ ...f, days: f.days.map((d, i) => i !== di ? d : { ...d, exercises: [...d.exercises, emptyExercise(d.exercises.at(-1)?.weightUnit)] }) }));
   const removeExFromDay = (di, ei)      => setForm((f) => ({ ...f, days: f.days.map((d, i) => i !== di ? d : { ...d, exercises: d.exercises.filter((_, j) => j !== ei) }) }));
-  const updateDayEx     = (di, ei, field, val) => setForm((f) => ({ ...f, days: f.days.map((d, i) => i !== di ? d : { ...d, exercises: d.exercises.map((e, j) => j !== ei ? e : { ...e, [field]: field === 'exercise' || field === 'weightUnit' ? val : field === 'targetRepsMax' && val === '' ? '' : Number(val) }) }) }));
+  // An exercise can only be in a day once, so picking one that's already there is ignored.
+  const updateDayEx     = (di, ei, field, val) => setForm((f) => {
+    if (field === 'exercise' && val && f.days[di].exercises.some((e, j) => j !== ei && e.exercise === val)) return f;
+    return { ...f, days: f.days.map((d, i) => i !== di ? d : { ...d, exercises: d.exercises.map((e, j) => j !== ei ? e : { ...e, [field]: field === 'exercise' || field === 'weightUnit' ? val : field === 'targetRepsMax' && val === '' ? '' : Number(val) }) }) };
+  });
+  // The day's other exercises, which can't be picked again.
+  const othersInDay = (day, ei) => day.exercises.filter((_, j) => j !== ei).map((e) => e.exercise).filter(Boolean);
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -266,6 +272,7 @@ export default function Plans() {
                         <ExerciseCombobox
                           className="flex-1 min-w-0"
                           exercises={exercises}
+                          excludeIds={othersInDay(day, ei)}
                           value={ex.exercise}
                           onChange={(id) => updateDayEx(di, ei, 'exercise', id)}
                         />
@@ -289,7 +296,7 @@ export default function Plans() {
                       </div>
                       {similarFor === `${di}-${ei}` && ex.exercise && (
                         <div className="mt-1.5 mb-2">
-                          <SimilarExercises exerciseId={ex.exercise} compact
+                          <SimilarExercises exerciseId={ex.exercise} compact excludeIds={othersInDay(day, ei)}
                             onPick={(picked) => { updateDayEx(di, ei, 'exercise', picked._id); setSimilarFor(null); }}
                             onClose={() => setSimilarFor(null)} />
                         </div>

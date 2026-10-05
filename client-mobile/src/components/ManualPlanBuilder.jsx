@@ -85,12 +85,16 @@ export default function ManualPlanBuilder({ onSaved }) {
   const updateSession = (i, fn) => setSessions((list) => list.map((s, j) => (j === i ? fn(s) : s)));
   const updateExercise = (i, idx, patch) => updateSession(i, (s) => ({ ...s, exercises: s.exercises.map((e, k) => (k === idx ? { ...e, ...patch } : e)) }));
   // Swap for a similar exercise, keeping its sets, reps and RIR.
+  // An exercise can only be in a session once.
+  const inSession = (s, id, exceptIdx = -1) => s.exercises.some((e, k) => k !== exceptIdx && e.exercise._id === id);
   const replaceExercise = (i, idx, picked) => {
+    if (inSession(sessions[i], picked._id, idx)) return;
     updateExercise(i, idx, { exercise: library.find((e) => e._id === picked._id) || picked });
     setSwapping(null);
   };
   const addExercise = (i, ex) => {
     updateSession(i, (s) => {
+      if (inSession(s, ex._id)) return s;
       const room = maxSets - sessionTotals(s).sets;
       if (room <= 0 || s.exercises.length >= maxExercises) return s;
       return { ...s, exercises: [...s.exercises, { exercise: ex, sets: Math.min(MANUAL_DEFAULTS.sets, room), reps: MANUAL_DEFAULTS.reps, repsMax: MANUAL_DEFAULTS.repsMax, rir: MANUAL_DEFAULTS.rir }] };
@@ -207,7 +211,7 @@ export default function ManualPlanBuilder({ onSaved }) {
                 </View>
                 {swapping === `${i}-${idx}` && (
                   <View style={{ marginTop: 8 }}>
-                    <SimilarExercises exerciseId={e.exercise._id} onPick={(picked) => replaceExercise(i, idx, picked)} onClose={() => setSwapping(null)} />
+                    <SimilarExercises exerciseId={e.exercise._id} excludeIds={s.exercises.map((x) => x.exercise._id)} onPick={(picked) => replaceExercise(i, idx, picked)} onClose={() => setSwapping(null)} />
                     <LinkText style={{ marginTop: 6 }} onPress={() => setReplacingWith({ i, idx })}>…or pick any exercise</LinkText>
                   </View>
                 )}
@@ -265,10 +269,11 @@ export default function ManualPlanBuilder({ onSaved }) {
 
       <ExercisePicker visible={!!replacingWith} title="Replace with…" muscleFilter
         exercises={replacingWith ? library.filter((x) => x._id !== sessions[replacingWith.i]?.exercises[replacingWith.idx]?.exercise._id) : []}
+        disabledIds={replacingWith ? sessions[replacingWith.i]?.exercises.map((e) => e.exercise._id) || [] : []}
         onPick={(ex) => { replaceExercise(replacingWith.i, replacingWith.idx, ex); setReplacingWith(null); }}
         onClose={() => setReplacingWith(null)} />
       <ExercisePicker visible={picking != null} muscleFilter title={`Add to ${pickingSession?.label || 'session'}`} exercises={library}
-        selectedIds={pickingSession?.exercises.map((e) => e.exercise._id) || []}
+        disabledIds={pickingSession?.exercises.map((e) => e.exercise._id) || []}
         onPick={(ex) => addExercise(picking, ex)} onClose={() => setPicking(null)} />
     </View>
   );
