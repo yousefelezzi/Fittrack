@@ -409,11 +409,12 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
     setLastRest(null);
   };
 
-  // Machine taken? Push the rest of this exercise to the end and come back to it.
+  // Machine busy: do the next exercise first, then come back to the rest of this one.
   const doLater = () => {
     onChangeExercises((list) => {
       const { before, kept, remaining, after, ex } = splitAtSet(list, exIdx, setIdx);
-      return [...before, ...kept, ...after, { ...ex, sets: remaining }];
+      const [next, ...rest] = after;
+      return [...before, ...kept, ...(next ? [next] : []), { ...ex, sets: remaining }, ...rest];
     });
     setLastRest(null);
   };
@@ -428,7 +429,8 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-4">
-      <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5">
+      {/* Scrolls when the swap list makes it taller than the screen. */}
+      <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-xl p-6 space-y-5 max-h-[90vh] overflow-y-auto overscroll-contain">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
             Exercise {exIdx + 1}/{exercises.length} · Session {fmtClock(elapsed)}
@@ -521,7 +523,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
                   <Repeat size={14} /> Swap exercise
                 </button>
                 <button onClick={doLater} disabled={!canDoLater} className="btn-secondary flex-1 justify-center text-xs py-2 disabled:opacity-40"
-                  title={canDoLater ? 'Move the rest of this exercise to the end' : 'This is the last exercise'}>
+                  title={canDoLater ? 'Do the next exercise first, then come back to the rest of this one' : 'This is the last exercise'}>
                   <Clock size={14} /> Do it later
                 </button>
               </div>

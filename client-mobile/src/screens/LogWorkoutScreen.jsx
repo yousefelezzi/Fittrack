@@ -322,11 +322,12 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
     setSwapOpen(false);
     setLastRest(null);
   };
-  // Or push the rest of this exercise to the end and come back to it.
+  // Machine busy: do the next exercise first, then come back to the rest of this one.
   const doLater = () => {
     onChangeExercises((list) => {
       const { before, kept, remaining, after, ex } = splitAtSet(list, exIdx, setIdx);
-      return [...before, ...kept, ...after, { ...ex, sets: remaining }];
+      const [next, ...rest] = after;
+      return [...before, ...kept, ...(next ? [next] : []), { ...ex, sets: remaining }, ...rest];
     });
     setLastRest(null);
   };
