@@ -35,7 +35,7 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
           <p className="font-medium text-gray-900 dark:text-gray-100">{ex.name}</p>
           <div className="flex flex-wrap gap-1 mt-1">
             {ex.muscleGroups.map(m => (
-              <span key={m} title={ex.secondaryMuscles?.includes(m) ? 'Secondary: counts half a set' : undefined}
+              <span key={m} title={ex.secondaryMuscles?.includes(m) ? 'Secondary: counts up to half a set (less the more trained you are)' : undefined}
                 className={`badge capitalize ${ex.secondaryMuscles?.includes(m)
                   ? 'bg-blue-50/50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400/70'
                   : 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'}`}>
@@ -189,7 +189,7 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
             <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800 p-3 space-y-1.5">
               <p className="text-xs font-medium text-gray-600 dark:text-gray-300">How much each set counts</p>
               <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-1">
-                Primary muscles count a full set; secondary ones (helpers, like the triceps in a bench press) count half.
+                Primary muscles count a full set; secondary ones (helpers, like the triceps in a bench press) count half for beginners, a quarter for intermediates and nothing for advanced lifters (from your FFMI).
                 The first muscle is the exercise's main one.
               </p>
               {form.muscleGroups.map((m, i) => {

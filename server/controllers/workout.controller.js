@@ -1,6 +1,11 @@
 const WorkoutSession = require('../models/WorkoutSession');
 const { estimateOneRepMax } = require('../utils/oneRepMax');
 const { muscleBreakdown, muscleSessions } = require('../utils/muscleGroups');
+const User = require('../models/User');
+const { userSecondaryWeight, LEVEL_FIELDS } = require('../utils/trainingLevel');
+
+// How much a secondary muscle counts in this user's volume (0.5 − x, from their FFMI).
+const mySecondaryWeight = async (userId) => userSecondaryWeight(await User.findById(userId).select(LEVEL_FIELDS).lean());
 
 // GET /api/workouts
 exports.getWorkouts = async (req, res, next) => {
@@ -34,12 +39,15 @@ exports.getMuscleSessions = async (req, res, next) => {
   try {
     const days = Math.min(365, Math.max(7, Number(req.query.days) || 56));
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const sessions = await WorkoutSession.find({ user: req.user.id, date: { $gte: since } })
-      .select('date exercises')
-      .sort({ date: 1 })
-      .populate('exercises.exercise', 'muscleGroups secondaryMuscles')
-      .lean();
-    res.json(muscleSessions(sessions));
+    const [sessions, secondaryWeight] = await Promise.all([
+      WorkoutSession.find({ user: req.user.id, date: { $gte: since } })
+        .select('date exercises')
+        .sort({ date: 1 })
+        .populate('exercises.exercise', 'muscleGroups secondaryMuscles')
+        .lean(),
+      mySecondaryWeight(req.user.id),
+    ]);
+    res.json(muscleSessions(sessions, secondaryWeight));
   } catch (err) {
     next(err);
   }
@@ -54,6 +62,7 @@ exports.getWorkoutStats = async (req, res, next) => {
     const twelveWeeksAgo = new Date();
     twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
 
+    const secondaryWeight = await mySecondaryWeight(userId);
     const [totalWorkouts, recentWorkouts, muscleGroupStats] = await Promise.all([
       WorkoutSession.countDocuments({ user: userId }),
 
@@ -66,7 +75,7 @@ exports.getWorkoutStats = async (req, res, next) => {
         .select('exercises')
         .populate('exercises.exercise', 'muscleGroups secondaryMuscles')
         .lean()
-        .then(muscleBreakdown),
+        .then((sessions) => muscleBreakdown(sessions, secondaryWeight)),
     ]);
 
     res.json({ totalWorkouts, recentWorkouts, muscleGroupStats });

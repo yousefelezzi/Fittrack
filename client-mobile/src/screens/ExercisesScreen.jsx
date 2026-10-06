@@ -38,7 +38,7 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
           {ex.instructions.map((step, i) => <Text key={i} style={styles.step}>{i + 1}. {step}</Text>)}
         </View>
       )}
-      {open && ex.secondaryMuscles?.length > 0 && <Hint style={{ marginTop: 6 }}>Lighter tags are secondary muscles: they count half a set.</Hint>}
+      {open && ex.secondaryMuscles?.length > 0 && <Hint style={{ marginTop: 6 }}>Lighter tags are secondary muscles: they count up to half a set (less the more trained you are).</Hint>}
       {ex.isCustom && (
         <View style={styles.customRow}>
           <Text style={[styles.badge, { marginRight: 'auto' }]}>Custom</Text>
@@ -117,7 +117,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       {form.muscleGroups.length > 0 && (
         <View style={styles.weightBox}>
           <Text style={[styles.small, { fontWeight: '600' }]}>How much each set counts</Text>
-          <Hint style={{ marginBottom: 6 }}>Primary muscles count a full set; secondary ones (helpers, like the triceps in a bench press) count half. The first muscle is the exercise's main one.</Hint>
+          <Hint style={{ marginBottom: 6 }}>Primary muscles count a full set; secondary ones (helpers, like the triceps in a bench press) count half for beginners, a quarter for intermediates and nothing for advanced lifters (from your FFMI). The first muscle is the exercise's main one.</Hint>
           {form.muscleGroups.map((m, i) => (
             <View key={m} style={styles.weightRow}>
               <Text style={[styles.small, { flex: 1, textTransform: 'capitalize' }]}>{m}{i === 0 ? '  (main)' : ''}</Text>

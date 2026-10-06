@@ -20,6 +20,8 @@
  * (exercise.secondaryMuscles). Those count 0.5 per set instead of 1 — e.g. the
  * triceps on a bench press, the soleus on a squat. Everything below uses these
  * weights, so volume, the volume check and the plan generator all agree.
+ * For volume, a secondary muscle counts less as the lifter gets more trained
+ * (0.5 − x: see utils/trainingLevel.js); that's applied with volumeWeights.
  */
 const SECONDARY_WEIGHT = 0.5;
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -71,16 +73,30 @@ function unitWeights(tags = [], secondary = []) {
   return out;
 }
 
+/**
+ * unitWeights for counting volume at a training level: a secondary muscle
+ * counts `secondaryWeight` (0.5 − x) instead of 0.5; one that counts 0 is left out.
+ */
+function volumeWeights(weights, secondaryWeight = SECONDARY_WEIGHT) {
+  const out = new Map();
+  for (const [unit, w] of weights) {
+    const v = w >= 1 ? w : secondaryWeight;
+    if (v > 0) out.set(unit, v);
+  }
+  return out;
+}
+
 /** Working sets (warm-ups don't count), with a unilateral left + right pair counted once. */
 const setCount = (ex) => (ex.sets || []).filter((st) => st.side !== 'right' && !st.warmup).length;
 
 /**
  * Sets per muscle and per sub-region in one workout. Each exercise adds its
  * sets once to every muscle/sub-region it hits, even if two of its tags point
- * at the same one (e.g. "pecs" and "clavicular pecs").
+ * at the same one (e.g. "pecs" and "clavicular pecs"). Secondary muscles count
+ * `secondaryWeight` per set (the lifter's 0.5 − x).
  * @returns {{ groups: Map<string, number>, subs: Map<string, Map<string, number>> }}
  */
-function sessionMuscleSets(session) {
+function sessionMuscleSets(session, secondaryWeight = SECONDARY_WEIGHT) {
   const groups = new Map();
   const subs = new Map();
   for (const ex of session.exercises || []) {
@@ -90,7 +106,7 @@ function sessionMuscleSets(session) {
 
     // Each unit once per exercise, at its weight; a muscle with regions counts
     // at its most-trained region's weight (bench: pecs 1, triceps 0.5).
-    const weights = unitWeights(tags, ex.exercise?.secondaryMuscles);
+    const weights = volumeWeights(unitWeights(tags, ex.exercise?.secondaryMuscles), secondaryWeight);
     const groupWeight = new Map();
     for (const [unit, w] of weights) {
       const [group, sub] = unit.split(' › ');
@@ -109,11 +125,11 @@ function sessionMuscleSets(session) {
  * Totals across workouts, for the pie.
  * @returns [{ _id: muscle, count: sets, subregions?: [{ name, count }] }] biggest first
  */
-function muscleBreakdown(sessions) {
+function muscleBreakdown(sessions, secondaryWeight = SECONDARY_WEIGHT) {
   const groups = new Map();
   const subs = new Map();
   for (const session of sessions) {
-    const one = sessionMuscleSets(session);
+    const one = sessionMuscleSets(session, secondaryWeight);
     for (const [g, n] of one.groups) groups.set(g, (groups.get(g) || 0) + n);
     for (const [g, m] of one.subs) {
       if (!subs.has(g)) subs.set(g, new Map());
@@ -136,9 +152,9 @@ function muscleBreakdown(sessions) {
  * Sub-regions are keyed "muscle › sub-region", e.g. "triceps › Long head".
  * @returns [{ date, sets: { [muscle]: n } }]
  */
-function muscleSessions(sessions) {
+function muscleSessions(sessions, secondaryWeight = SECONDARY_WEIGHT) {
   return sessions.map((session) => {
-    const { groups, subs } = sessionMuscleSets(session);
+    const { groups, subs } = sessionMuscleSets(session, secondaryWeight);
     const sets = Object.fromEntries(groups);
     for (const [g, m] of subs) for (const [sub, n] of m) sets[`${g} › ${sub}`] = n;
     return { date: session.date, sets };
@@ -160,4 +176,4 @@ function unitsForTags(tags = []) {
   return units;
 }
 
-module.exports = { muscleBreakdown, muscleSessions, sessionMuscleSets, unitsForTags, unitWeights, SUB_ORDER, SECONDARY_WEIGHT };
+module.exports = { muscleBreakdown, muscleSessions, sessionMuscleSets, unitsForTags, unitWeights, volumeWeights, SUB_ORDER, SECONDARY_WEIGHT };

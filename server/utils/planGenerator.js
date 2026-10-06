@@ -28,7 +28,8 @@
  *    lats, traps, rear delts and elbow flexors at once. Caps (4 sets per
  *    exercise, 6 sets per muscle per session) keep it low volume per session.
  */
-const { unitsForTags, unitWeights } = require('./muscleGroups');
+const { unitsForTags, unitWeights, volumeWeights } = require('./muscleGroups');
+const { secondaryWeightFor } = require('./trainingLevel');
 const { weeklyNet, recoveryDemand, effectiveSets, rirValue } = require('./wns');
 
 // Units every plan should train. Others (forearms, erectors, adductors, hip
@@ -260,14 +261,20 @@ function generatePlan(exercises, opts = {}) {
   const weight = (unit) => (isPriority(unit) ? 2 : 1);
   // WNS each unit should reach: comfortably positive, more for priorities.
   const targetFor = (unit) => level.target + (isPriority(unit) ? 1 : 0);
+  // How much a secondary muscle counts toward volume at this level (0.5 − x).
+  // The plan may be for someone else, so it follows the level picked here.
+  const secondaryWeight = opts.secondaryWeight ?? secondaryWeightFor(levelKey);
 
   const pool = exercises
     .filter((ex) => (ex.category || 'strength') === 'strength' && equipment.has(ex.equipment))
     .map((ex) => ({
       ...ex,
       units: unitsForTags(ex.muscleGroups),
-      // 1 per set, or 0.5 for a secondary muscle (triceps on a bench press…).
+      // 1 per set, or 0.5 for a secondary muscle (triceps on a bench press…):
+      // used for recovery and for comparing exercises.
       weights: unitWeights(ex.muscleGroups, ex.secondaryMuscles),
+      // The same with secondary muscles at this level's 0.5 − x: used for volume and stimulus.
+      vol: volumeWeights(unitWeights(ex.muscleGroups, ex.secondaryMuscles), secondaryWeight),
       // What the exercise is mainly for: its first tag (e.g. a pullover is a triceps exercise).
       primary: unitsForTags((ex.muscleGroups || []).slice(0, 1)),
     }))
@@ -323,13 +330,13 @@ function generatePlan(exercises, opts = {}) {
 
   // Sets a muscle gets in one session, and its weekly WNS / recovery demand.
   const unitSetsIn = (t, unit) =>
-    templates[t].exercises.reduce((sum, ex, i) => sum + templates[t].sets[i] * (ex.weights.get(unit) || 0), 0);
+    templates[t].exercises.reduce((sum, ex, i) => sum + templates[t].sets[i] * (ex.vol.get(unit) || 0), 0);
   // Stimulus uses effective sets. While choosing exercises every set is planned
   // at 1–2 RIR; once each exercise's RIR is decided (priorities can go to 0–2),
   // the final numbers use that (see `effOf` before the results).
   let effOf = () => PLANNED_EFFECTIVE;
   const stimSetsIn = (t, unit) =>
-    templates[t].exercises.reduce((sum, ex, i) => sum + templates[t].sets[i] * (ex.weights.get(unit) || 0) * effOf(ex), 0);
+    templates[t].exercises.reduce((sum, ex, i) => sum + templates[t].sets[i] * (ex.vol.get(unit) || 0) * effOf(ex), 0);
   const wnsOf = (unit) =>
     weeklyNet(schedule.map((s) => ({ day: s.day, sets: stimSetsIn(s.template, unit) })), model);
   // For recovery, a muscle that's only a helper in an exercise can count for less (beginners).
@@ -952,6 +959,9 @@ function analyzePlan(days, opts = {}) {
   const model = { dataset: opts.dataset || 'S', maintenance: Number(opts.maintenance) || 3, stimHours: Number(opts.stimHours) || 48 };
   const isPriority = (unit) => priorities.has(unit) || priorities.has(unit.split(' › ')[0]);
   const baseTarget = (LEVELS[opts.level] || LEVELS.intermediate).target;
+  // Secondary muscles count 0.5 − x toward volume: the caller's weight (the
+  // user's own, from FFMI) or the picked level's.
+  const secondaryWeight = opts.secondaryWeight ?? secondaryWeightFor(LEVELS[opts.level] ? opts.level : 'intermediate');
   const targetFor = (unit) => baseTarget + (isPriority(unit) ? 1 : 0);
 
   // Build the timeline the same way as the generator: weekly = one workout per
@@ -961,6 +971,7 @@ function analyzePlan(days, opts = {}) {
     items: (d.exercises || []).map((e) => ({
       units: unitsForTags(e.exercise?.muscleGroups),
       weights: unitWeights(e.exercise?.muscleGroups, e.exercise?.secondaryMuscles),
+      vol: volumeWeights(unitWeights(e.exercise?.muscleGroups, e.exercise?.secondaryMuscles), secondaryWeight),
       primary: unitsForTags((e.exercise?.muscleGroups || []).slice(0, 1)),
       sets: Number(e.targetSets) || 0,
       eff: effectiveSets(e.targetReps, rirValue(e.targetRir)),
@@ -991,10 +1002,10 @@ function analyzePlan(days, opts = {}) {
     day: s.day,
     sets: s.items.reduce((sum, it) => sum + it.sets * Math.min(it.weights.get(unit) || 0, it.primary.has(unit) ? 1 : secondaryFactor), 0),
   }));
-  const setsIn = (s, unit) => s.items.reduce((sum, it) => sum + it.sets * (it.weights.get(unit) || 0), 0);
+  const setsIn = (s, unit) => s.items.reduce((sum, it) => sum + it.sets * (it.vol.get(unit) || 0), 0);
   const perDay = (unit) => sessions.map((s) => ({ day: s.day, sets: setsIn(s, unit) }));
   // Stimulus counts effective sets; sets/week and recovery count every set.
-  const stimIn = (s, unit) => s.items.reduce((sum, it) => sum + it.sets * it.eff * (it.weights.get(unit) || 0), 0);
+  const stimIn = (s, unit) => s.items.reduce((sum, it) => sum + it.sets * it.eff * (it.vol.get(unit) || 0), 0);
   const stimPerDay = (unit) => sessions.map((s) => ({ day: s.day, sets: stimIn(s, unit) }));
 
   const hit = new Set(sessions.flatMap((s) => s.items.flatMap((it) => [...it.units])));

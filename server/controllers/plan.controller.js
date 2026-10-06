@@ -1,5 +1,9 @@
 const WorkoutPlan = require('../models/WorkoutPlan');
 const { generatePlan, analyzePlan, planSkeleton } = require('../utils/planGenerator');
+const User = require('../models/User');
+const { userSecondaryWeight, LEVEL_FIELDS } = require('../utils/trainingLevel');
+
+const LEVEL_KEYS = ['beginner', 'intermediate', 'advanced'];
 const Exercise = require('../models/Exercise');
 const WorkoutSession = require('../models/WorkoutSession');
 
@@ -47,6 +51,10 @@ exports.generatePlan = async (req, res, next) => {
     const exercises = await Exercise.find({
       $or: [{ isCustom: false }, { isCustom: true, createdBy: req.user.id }],
     }).select('name muscleGroups secondaryMuscles equipment laterality category images isCustom').lean();
+    // The secondary-muscle weight follows the level picked (the plan may be for
+    // someone else), so a value sent in the request is ignored.
+    req.body = { ...req.body };
+    delete req.body.secondaryWeight;
     const result = generatePlan(exercises, req.body);
     if (result.plan.days.every((d) => d.exercises.length === 0)) {
       return res.status(400).json({ message: 'No exercises match that equipment.' });
@@ -114,7 +122,14 @@ exports.analyzePlan = async (req, res, next) => {
         exercise: byId.get(String(e.exercise?._id || e.exercise)), targetSets: e.targetSets, targetReps: e.targetReps, targetRir: e.targetRir,
       })),
     }));
-    res.json(analyzePlan(withMuscles, req.body));
+    // A picked level (generator, plan builder) sets how much secondary muscles
+    // count; without one, it's the user's own level from their FFMI.
+    const opts = { ...req.body };
+    delete opts.secondaryWeight;
+    if (!LEVEL_KEYS.includes(opts.level)) {
+      opts.secondaryWeight = userSecondaryWeight(await User.findById(req.user.id).select(LEVEL_FIELDS).lean());
+    }
+    res.json(analyzePlan(withMuscles, opts));
   } catch (err) {
     next(err);
   }
