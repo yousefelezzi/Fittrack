@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl, Image, TextInput, Alert, Modal, FlatList,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
@@ -136,7 +136,7 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
 
 function FollowModal({ visible, title, users, onClose, onOpen }) {
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.followModalOverlay}>
         <View style={styles.followModalBox}>
           <View style={styles.followModalHeader}>
@@ -351,7 +351,7 @@ export default function ProfileScreen({ route, navigation }) {
       </EditModal>
       <Modal visible={viewingAvatar} transparent animationType="fade" onRequestClose={() => setViewingAvatar(false)}>
         <TouchableOpacity activeOpacity={1} style={styles.avatarViewer} onPress={() => setViewingAvatar(false)}>
-          {profile.avatar ? <Image source={{ uri: uploadUrl(profile.avatar) }} style={styles.avatarFull} resizeMode="contain" /> : null}
+          {profile.avatar ? <Image source={{ uri: uploadUrl(profile.avatar) }} style={styles.avatarFull} resizeMode="cover" /> : null}
         </TouchableOpacity>
       </Modal>
       <FollowModal visible={!!followModal} title={followModal === 'followers' ? 'Followers' : 'Following'} users={followUsers}
@@ -360,12 +360,16 @@ export default function ProfileScreen({ route, navigation }) {
   );
 }
 
+// Size of the enlarged profile picture.
+const AVATAR_FULL = Math.min(Dimensions.get('window').width - 48, 380);
+
 const styles = makeStyles(() => ({
   content:      { padding: 16, paddingBottom: 40 },
   centered:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   avatarRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   avatarViewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
-  avatarFull:   { width: '100%', aspectRatio: 1 },
+  // The full-size picture is shown as a circle, like the avatar.
+  avatarFull:   { width: AVATAR_FULL, height: AVATAR_FULL, borderRadius: AVATAR_FULL / 2 },
   photoRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 },
   photoBtn:     { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   photoBtnText: { fontSize: 14, fontWeight: '600', color: colors.brand },
@@ -392,8 +396,9 @@ const styles = makeStyles(() => ({
   optionActive: { borderColor: colors.brand, backgroundColor: colors.brandLight },
   optionText:   { fontSize: 14, color: colors.textPrimary },
   hintText:     { fontSize: 11, color: colors.textMuted },
-  followModalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
-  followModalBox:     { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '60%', paddingBottom: 30 },
+  // Followers / following open in the middle of the screen.
+  followModalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: 20 },
+  followModalBox:     { backgroundColor: colors.surface, borderRadius: 20, maxHeight: '70%', paddingBottom: 8, overflow: 'hidden' },
   followModalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border },
   followModalTitle:   { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   followRow:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.subtle },

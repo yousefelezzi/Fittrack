@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { workoutAPI, exerciseAPI, planAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, Search, Check, ClipboardList, Play, X, Timer, PartyPopper, Repeat, Clock, GripVertical, Flame, SkipForward } from 'lucide-react';
+import { Plus, Trash2, Search, Check, ClipboardList, Play, X, Timer, PartyPopper, Repeat, Clock, GripVertical, Flame, SkipForward, ChevronUp, ChevronDown, ListOrdered } from 'lucide-react';
 import ExerciseCombobox from '../components/ExerciseCombobox';
 import SimilarExercises from '../components/SimilarExercises';
 import ExerciseImage from '../components/ExerciseImage';
@@ -313,6 +313,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const [, setTick]             = useState(0);
   const [swapOpen, setSwapOpen] = useState(false);
   const [endedAt, setEndedAt]   = useState(null); // session seconds when it ended
+  const [orderOpen, setOrderOpen] = useState(false);
   const [swapId, setSwapId]     = useState('');
   const [swapping, setSwapping] = useState(false);
 
@@ -420,6 +421,16 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   };
   // Only useful if some other exercise is still to come.
   const canDoLater = steps.slice(stepIdx).some((st) => st.exIdx !== exIdx);
+  // Change the order of exercises not started yet: the current one (until its
+  // first set is done) and everything after it. Sets already done stay put.
+  const firstMovable = phase === 'active' && setIdx === 0 ? exIdx : exIdx + 1;
+  const moveExercise = (i, dir) => onChangeExercises((list) => {
+    const j = i + dir;
+    if (i < firstMovable || j < firstMovable || j >= list.length) return list;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
 
   // Closing mid-rest still keeps the rest taken so far.
   const close = () => {
@@ -544,6 +555,31 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
               <Timer size={16} /> End rest — start next set
             </button>
           </>
+        )}
+
+        {exercises.length - firstMovable > 1 && (
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <button onClick={() => setOrderOpen(!orderOpen)}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-brand-600">
+              <ListOrdered size={14} /> {orderOpen ? 'Done reordering' : 'Change exercise order'}
+            </button>
+            {orderOpen && (
+              <ol className="mt-2 space-y-1">
+                {exercises.map((ex, i) => (i < firstMovable ? null : (
+                  <li key={ex.uid || `${ex.exercise._id}-${i}`}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${i === exIdx && phase === 'active' ? 'bg-brand-50 dark:bg-brand-900/30' : 'bg-gray-50 dark:bg-gray-800'}`}>
+                    <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}</span>
+                    <span className="flex-1 min-w-0 truncate text-gray-800 dark:text-gray-200">{ex.exercise.name}</span>
+                    <span className="text-xs text-gray-400">{ex.sets.length} set{ex.sets.length !== 1 ? 's' : ''}</span>
+                    <button onClick={() => moveExercise(i, -1)} disabled={i === firstMovable} aria-label={`Move ${ex.exercise.name} up`}
+                      className="p-0.5 text-gray-400 hover:text-brand-600 disabled:opacity-25"><ChevronUp size={16} /></button>
+                    <button onClick={() => moveExercise(i, 1)} disabled={i === exercises.length - 1} aria-label={`Move ${ex.exercise.name} down`}
+                      className="p-0.5 text-gray-400 hover:text-brand-600 disabled:opacity-25"><ChevronDown size={16} /></button>
+                  </li>
+                )))}
+              </ol>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -13,7 +13,7 @@ import { buildSessionReport, pickPreviousWorkout, formatChange, changeTone } fro
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../../../client-web/src/utils/logSets';
-import { X, Flame, SkipForward, PartyPopper, ArrowLeftRight, Clock, ChevronUp, ChevronDown, ClipboardList, Plus, Play, Check } from 'lucide-react-native';
+import { X, Flame, SkipForward, PartyPopper, ArrowLeftRight, Clock, ChevronUp, ChevronDown, ClipboardList, Plus, Play, Check, ListOrdered } from 'lucide-react-native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // rir (reps in reserve) and restTime are optional. In a live session the rest
@@ -244,6 +244,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [endedAt, setEndedAt]   = useState(null); // session seconds when it ended
+  const [orderOpen, setOrderOpen] = useState(false);
 
   // Times come from timestamps, so they stay right even if the app was in the background.
   useEffect(() => {
@@ -332,6 +333,16 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
     setLastRest(null);
   };
   const canDoLater = steps.slice(stepIdx).some((st) => st.exIdx !== exIdx);
+  // Change the order of exercises not started yet: the current one (until its
+  // first set is done) and everything after it. Sets already done stay put.
+  const firstMovable = phase === 'active' && setIdx === 0 ? exIdx : exIdx + 1;
+  const moveExercise = (i, dir) => onChangeExercises((list) => {
+    const j = i + dir;
+    if (i < firstMovable || j < firstMovable || j >= list.length) return list;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
   const close = () => { if (phase === 'resting') recordRest(); onClose(elapsed); };
 
   const fields = (values, side) => (
@@ -412,6 +423,28 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
             </Text>
           )}
           <Button title="End rest — start next set" onPress={endRest} style={{ alignSelf: 'stretch', marginTop: 28 }} />
+        </View>
+      )}
+
+      {exercises.length - firstMovable > 1 && (
+        <View style={styles.orderBox}>
+          <TouchableOpacity onPress={() => setOrderOpen(!orderOpen)} style={styles.quietBtn} hitSlop={6}>
+            <ListOrdered size={14} color={colors.textSecondary} />
+            <Text style={styles.quietText}>{orderOpen ? 'Done reordering' : 'Change exercise order'}</Text>
+          </TouchableOpacity>
+          {orderOpen && exercises.map((ex, i) => (i < firstMovable ? null : (
+            <View key={`${ex.exercise._id}-${i}`} style={[styles.orderRow, i === exIdx && phase === 'active' && { backgroundColor: colors.brandLight }]}>
+              <Text style={[styles.small, { width: 20 }]}>{i + 1}</Text>
+              <Text style={[styles.small, { flex: 1, color: colors.textPrimary }]} numberOfLines={1}>{ex.exercise.name}</Text>
+              <Text style={styles.small}>{ex.sets.length} set{ex.sets.length !== 1 ? 's' : ''}</Text>
+              <TouchableOpacity onPress={() => moveExercise(i, -1)} disabled={i === firstMovable} hitSlop={6} style={i === firstMovable && { opacity: 0.25 }}>
+                <ChevronUp size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => moveExercise(i, 1)} disabled={i === exercises.length - 1} hitSlop={6} style={i === exercises.length - 1 && { opacity: 0.25 }}>
+                <ChevronDown size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          )))}
         </View>
       )}
     </ScrollView>
@@ -815,6 +848,8 @@ const styles = makeStyles(() => ({
   warmupNo:    { color: colors.warning, fontWeight: '700' },
   warmupLink:  { fontSize: 14, fontWeight: '600', color: colors.warning },
   setLine:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 4 },
+  orderBox:    { marginTop: 20, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.subtle, gap: 6 },
+  orderRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.inset, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   quietBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 6 },
   quietText:   { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   setHead:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 4 },

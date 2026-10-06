@@ -423,7 +423,7 @@ export default function Profile() {
       )}
       {viewingAvatar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 cursor-zoom-out" onClick={() => setViewingAvatar(false)}>
-          <img src={profile.avatar} alt={profile.name} className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl" />
+          <img src={profile.avatar} alt={profile.name} className="w-[min(80vw,80vh,28rem)] aspect-square rounded-full object-cover shadow-2xl" />
           <button className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close"><X size={20} /></button>
         </div>
       )}
