@@ -4,19 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { userAPI, authAPI } from '../api';
 import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented } from '../components';
-import { Lock, MessageCircle, ChartColumn, KeyRound, LogOut, Moon } from 'lucide-react-native';
+import { Lock, MessageCircle, KeyRound, LogOut, Moon } from 'lucide-react-native';
 
 const MESSAGE_OPTIONS = [
   ['connections', 'People I follow or who follow me'],
   ['following', 'Only people I follow'],
   ['nobody', 'No one'],
-];
-const STATS = [
-  ['avgCalories', 'Average calories'],
-  ['avgSteps', 'Average steps'],
-  ['ffmi', 'FFMI'],
-  ['split', 'Workout split'],
-  ['oneRepMaxes', '1 rep maxes'],
 ];
 
 function SectionHead({ icon: Icon, children }) {
@@ -82,7 +75,7 @@ function ChangePassword() {
   );
 }
 
-/** Settings: appearance; privacy (private account, who can message you, search, stat visibility); password; sign out. */
+/** Settings: appearance; privacy (private account, who can message you, search); password; sign out. */
 export default function SettingsScreen() {
   const { user, updateUser, logout } = useAuth();
   const { preference, setPreference } = useTheme();
@@ -90,7 +83,6 @@ export default function SettingsScreen() {
   const [error, setError] = useState('');
 
   const privacy = { privateAccount: false, messages: 'connections', discoverable: true, ...(user?.privacy || {}) };
-  const stats = user?.statsVisibility || {};
 
 
   // Saves one setting; the server sends the updated user back.
@@ -146,16 +138,6 @@ export default function SettingsScreen() {
         ))}
       </Card>
       <Hint style={{ marginTop: -4, marginBottom: 8 }}>Applies to new chats and to sending in existing ones.</Hint>
-
-      <SectionHead icon={ChartColumn}>Profile stats</SectionHead>
-      <Card style={{ paddingVertical: 4 }}>
-        <Hint style={{ paddingTop: 10 }}>Public stats show on your profile{privacy.privateAccount ? ' to your followers' : ' to everyone'}. Private ones only you can see.</Hint>
-        {STATS.map(([key, label], i) => (
-          <Row key={key} title={label} hint={stats[key] ? 'Public' : 'Private'} last={i === STATS.length - 1}>
-            {toggle(key, !!stats[key], (v) => ({ statsVisibility: { [key]: v } }))}
-          </Row>
-        ))}
-      </Card>
 
       <SectionHead icon={KeyRound}>Password</SectionHead>
       <Card>

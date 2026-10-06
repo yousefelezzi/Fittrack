@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, MessageSquare, Search, BarChart2, KeyRound, LogOut } from 'lucide-react';
+import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, authAPI } from '../api';
 
@@ -8,13 +8,6 @@ const MESSAGE_OPTIONS = [
   ['connections', 'People I follow or who follow me'],
   ['following', 'Only people I follow'],
   ['nobody', 'No one'],
-];
-const STATS = [
-  ['avgCalories', 'Average calories'],
-  ['avgSteps', 'Average steps'],
-  ['ffmi', 'FFMI'],
-  ['split', 'Workout split'],
-  ['oneRepMaxes', '1 rep maxes'],
 ];
 
 function Toggle({ checked, onChange, disabled }) {
@@ -91,7 +84,7 @@ function ChangePassword() {
   );
 }
 
-/** Privacy settings: private account, who can message you, search, stat visibility, password; sign out. */
+/** Privacy settings: private account, who can message you, search, password; sign out. */
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -99,7 +92,6 @@ export default function Settings() {
   const [error, setError] = useState('');
 
   const privacy = { privateAccount: false, messages: 'connections', discoverable: true, ...(user?.privacy || {}) };
-  const stats = user?.statsVisibility || {};
 
 
   // Saves one setting; the server sends the updated user back.
@@ -145,21 +137,6 @@ export default function Settings() {
           ))}
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500">Applies to new chats and to sending in existing ones.</p>
-      </Section>
-
-      <Section icon={BarChart2} title="Profile stats">
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">
-          Public stats show on your profile{privacy.privateAccount ? ' to your followers' : ' to everyone'}. Private ones only you can see.
-        </p>
-        {STATS.map(([key, label]) => (
-          <Row key={key} title={label}>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">{stats[key] ? 'Public' : 'Private'}</span>
-              <Toggle checked={!!stats[key]} disabled={busy === key}
-                onChange={(v) => save(key, { statsVisibility: { [key]: v } })} />
-            </div>
-          </Row>
-        ))}
       </Section>
 
       <Section icon={KeyRound} title="Password">
