@@ -30,13 +30,14 @@ function Avatar({ user, size = 'lg' }) {
 function StatPill({ label, value, onClick }) {
   const base = 'text-center px-4 py-2';
   return onClick
-    ? <button onClick={onClick} className={`${base} hover:bg-gray-50 dark:bg-gray-800 rounded-xl transition-colors`}>
+    // Hover tint only; the focus ring shows for keyboard use, not after a click.
+    ? <button onClick={onClick} className={`${base} flex-1 hover:bg-gray-50 dark:hover:bg-gray-800/60 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500`}>
         <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{value}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{label}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       </button>
-    : <div className={base}>
+    : <div className={`${base} flex-1`}>
         <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{value}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{label}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       </div>;
 }
 
