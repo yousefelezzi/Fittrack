@@ -43,7 +43,8 @@ export default function ProgressScreen({ navigation }) {
   const [expandedMuscle, setExpandedMuscle] = useState(null);
 
   const load = () => Promise.all([workoutAPI.getStats(), exerciseAPI.getAll()])
-    .then(([s, e]) => { setStats(s.data); setExercises(e.data); })
+    // Overcoming isometrics have no load or reps to track, so they aren't listed.
+    .then(([s, e]) => { setStats(s.data); setExercises(e.data.filter((x) => x.type !== 'overcoming')); })
     .catch(console.error)
     .finally(() => { setLoading(false); setRefreshing(false); });
   useEffect(() => { load(); }, []);
@@ -105,6 +106,7 @@ export default function ProgressScreen({ navigation }) {
           <Text style={[styles.pickerText, !selected && { color: colors.textMuted }]}>{selected?.name || 'Choose an exercise…'}</Text>
           {selected ? <TouchableOpacity onPress={() => { setSelected(null); setProgress([]); }} hitSlop={8}><X size={16} color={colors.textMuted} /></TouchableOpacity> : <ChevronDown size={16} color={colors.textMuted} />}
         </TouchableOpacity>
+        {selected?.type === 'yielding' ? <Hint style={{ marginBottom: 6 }}>Holds are tracked as reps: every 2 seconds held counts as 1 rep, and every 2 seconds in reserve as 1 RIR (16s @ 2s in reserve = 8 reps @ 1 RIR).</Hint> : null}
         {selected && progress.length > 0 ? (
           <LineChart
             data={progress.map((p) => ({ label: format(new Date(p.date), 'MMM d'), oneRM: p.oneRM, maxWeight: p.maxWeight }))}

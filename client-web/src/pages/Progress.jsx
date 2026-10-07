@@ -58,7 +58,8 @@ export default function Progress() {
 
   useEffect(() => {
     Promise.all([workoutAPI.getStats(), exerciseAPI.getAll()])
-      .then(([s, e]) => { setStats(s.data); setExercises(e.data); })
+      // Overcoming isometrics have no load or reps to track, so they aren't listed.
+      .then(([s, e]) => { setStats(s.data); setExercises(e.data.filter((x) => x.type !== 'overcoming')); })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -245,6 +246,9 @@ export default function Progress() {
               </ul>
             )}
           </div>
+          {exercises.find((x) => x._id === selectedEx)?.type === 'yielding' && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">Holds are tracked as reps: every 2 seconds held counts as 1 rep, and every 2 seconds in reserve as 1 RIR (16s @ 2s in reserve = 8 reps @ 1 RIR).</p>
+          )}
           {selectedEx && progress.length > 0
             ? <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={progress.map(p => ({ ...p, date: format(new Date(p.date), 'MMM d') }))}>

@@ -266,7 +266,8 @@ function generatePlan(exercises, opts = {}) {
   const secondaryWeight = opts.secondaryWeight ?? secondaryWeightFor(levelKey);
 
   const pool = exercises
-    .filter((ex) => (ex.category || 'strength') === 'strength' && equipment.has(ex.equipment))
+    // Plans are built from dynamic exercises (reps × weight); isometrics are added by hand.
+    .filter((ex) => (ex.category || 'strength') === 'strength' && (ex.type || 'dynamic') === 'dynamic' && equipment.has(ex.equipment))
     .map((ex) => ({
       ...ex,
       units: unitsForTags(ex.muscleGroups),

@@ -12,7 +12,7 @@ const same = (a, b) => String(a?._id ?? a) === String(b?._id ?? b);
 const workoutPopulate = {
   path: 'workoutSession',
   select: 'name duration date exercises',
-  populate: { path: 'exercises.exercise', select: 'name images' },
+  populate: { path: 'exercises.exercise', select: 'name images type' },
 };
 
 // A conversation the current user is part of, or null.

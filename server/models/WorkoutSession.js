@@ -2,9 +2,18 @@ const mongoose = require('mongoose');
 
 const setSchema = new mongoose.Schema(
   {
-    reps: { type: Number, required: true, min: 0 },
+    // What's recorded depends on the exercise's type (see the Exercise model):
+    //   dynamic    — reps, weight, rir
+    //   yielding   — duration (seconds held), weight, sir (seconds in reserve)
+    //   overcoming — bursts, burstSeconds, burstRest
+    reps: { type: Number, default: 0, min: 0 },
     weight: { type: Number, default: 0, min: 0 }, // kg; 0 = bodyweight
     rir: { type: Number, min: 0, max: 10, default: null }, // reps in reserve; null = not recorded
+    duration: { type: Number, min: 0, default: null },     // seconds held
+    sir: { type: Number, min: 0, max: 600, default: null }, // seconds in reserve; null = not recorded
+    bursts: { type: Number, min: 0, default: null },
+    burstSeconds: { type: Number, min: 0, default: null }, // length of each burst
+    burstRest: { type: Number, min: 0, default: null },    // seconds between bursts
     // Warm-up sets are logged but don't count toward volume, 1RMs or muscle stats.
     warmup: { type: Boolean, default: false },
     // Unilateral exercises: each set is saved as a left entry then a right entry

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, Alert,
+  View, Text, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, Alert, Vibration,
 } from 'react-native';
 import { exerciseAPI, workoutAPI, planAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -8,12 +8,15 @@ import {
   Card, Button, Spinner, colors, makeStyles, Sheet, Segmented, Chip, ChipRow, Stepper, Label, Hint, ErrorText, LinkText, ExerciseImage, ExercisePicker, SimilarExercises, confirm,
 } from '../components';
 import { setsFromLastWorkout } from '../../../client-web/src/utils/lastSets';
-import { UNITS, toKg, fromKg } from '../../../client-web/src/utils/weightUnits';
-import { buildSessionReport, pickPreviousWorkout, formatChange, changeTone } from '../../../client-web/src/utils/sessionReport';
+import { UNITS, fromKg } from '../../../client-web/src/utils/weightUnits';
+import { typeOf, fieldsOf, amountKey, toSavedFields, TYPE_LABEL } from '../../../client-web/src/utils/exerciseTypes';
+import {
+  buildSessionReport, pickPreviousWorkout, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
+} from '../../../client-web/src/utils/sessionReport';
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../../../client-web/src/utils/logSets';
-import { X, Flame, SkipForward, PartyPopper, ArrowLeftRight, Clock, ChevronUp, ChevronDown, ClipboardList, Plus, Play, Check, ListOrdered } from 'lucide-react-native';
+import { X, Flame, SkipForward, PartyPopper, ArrowLeftRight, Clock, ChevronUp, ChevronDown, ClipboardList, Plus, Play, Check, ListOrdered, Square } from 'lucide-react-native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // rir (reps in reserve) and restTime are optional. In a live session the rest
@@ -211,9 +214,9 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
                       {e.setRows.some((r) => r.entries.some((x) => x.side)) ? (
                         <Text style={[styles.small, { width: 14, fontWeight: '700' }]}>{en.side ? (en.side === 'left' ? 'L' : 'R') : ''}</Text>
                       ) : null}
-                      <Text style={[styles.small, { flex: 1, color: colors.textPrimary }]}>{en.weight}{e.unit} × {en.reps}</Text>
+                      <Text style={[styles.small, { flex: 1, color: colors.textPrimary }]}>{reportEntryText(e, en)}</Text>
                       {en.change ? (
-                        <Text style={styles.small}><Change value={en.change.weight} suffix={e.unit} />  <Change value={en.change.reps} suffix=" reps" /></Text>
+                        <Text style={styles.small}>{showsWeight(e) ? <Change value={en.change.weight} suffix={e.unit} /> : null}  <Change value={en.change.amount} suffix={amountSuffix(e)} /></Text>
                       ) : !e.isFirst ? <Text style={[styles.small, { fontStyle: 'italic' }]}>new set</Text> : null}
                     </View>
                   )))}
@@ -225,6 +228,87 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
       )}
       <Button title="Back to Save Workout" onPress={onDone} style={{ marginTop: 20 }} />
     </ScrollView>
+  );
+}
+
+// ── Isometric timers ─────────────────────────────────────────────────────────
+// In a live session these replace "Complete Set" for isometric exercises:
+//   yielding   — a stopwatch: start, hold, stop; the time held is recorded
+//   overcoming — a guided interval timer: each burst counts down, then the rest
+//                between bursts; the number of bursts done is recorded
+// Unilateral exercises run once per side. Times come from timestamps, so they
+// stay right if the app was in the background.
+const buzz = () => Vibration.vibrate(150);
+
+function IsometricTimer({ exercise, set, onRecord, onFinish }) {
+  const type = typeOf(exercise);
+  const sides = set.left ? SIDES : [null];
+  const [sideIdx, setSideIdx] = useState(0);
+  const [run, setRun] = useState(null); // { startedAt } (yielding) or { startedAt, burst, resting } (overcoming)
+  const [, setTick] = useState(0);
+  const side = sides[sideIdx];
+  const values = side ? set[side] : set;
+
+  useEffect(() => {
+    if (!run) return undefined;
+    const id = setInterval(() => setTick((t) => t + 1), 100);
+    return () => clearInterval(id);
+  }, [run]);
+
+  const nextSideOrFinish = () => {
+    setRun(null);
+    if (sideIdx < sides.length - 1) setSideIdx(sideIdx + 1);
+    else onFinish();
+  };
+  const elapsed = run ? (Date.now() - run.startedAt) / 1000 : 0;
+
+  // Overcoming: move through bursts and rests as time passes.
+  const bursts = Math.max(1, Number(values.bursts) || 1);
+  const burstLen = Math.max(1, Number(values.burstSeconds) || 1);
+  const restLen = Math.max(0, Number(values.burstRest) || 0);
+  useEffect(() => {
+    if (type !== 'overcoming' || !run) return;
+    if (elapsed < (run.resting ? restLen : burstLen)) return;
+    buzz();
+    if (!run.resting && run.burst >= bursts) { onRecord(side, 'bursts', bursts); nextSideOrFinish(); return; }
+    if (!run.resting && restLen > 0) setRun({ startedAt: Date.now(), burst: run.burst, resting: true });
+    else setRun({ startedAt: Date.now(), burst: run.burst + 1, resting: false });
+  });
+
+  const sideLabel = side ? ` — ${side} side` : '';
+
+  if (type === 'yielding') {
+    const target = Number(values.seconds) || 0;
+    const stop = () => { onRecord(side, 'seconds', Math.round(elapsed)); buzz(); nextSideOrFinish(); };
+    return run ? (
+      <View style={{ alignItems: 'center' }}>
+        <Text style={styles.restLabel}>HOLDING{sideLabel.toUpperCase()}</Text>
+        <Text style={[styles.timerClock, target && elapsed >= target && { color: colors.success }]}>{fmtClock(Math.floor(elapsed))}</Text>
+        {target > 0 ? <Text style={styles.small}>Target {target}s</Text> : null}
+        <Button icon={Square} title="Stop" variant="danger" onPress={stop} style={{ alignSelf: 'stretch', marginTop: 12 }} />
+      </View>
+    ) : (
+      <Button icon={Play} title={`Start hold${sideLabel}`} onPress={() => { buzz(); setRun({ startedAt: Date.now() }); }} />
+    );
+  }
+
+  // Overcoming. Stopping early counts the bursts started (the current one included).
+  const done = () => { onRecord(side, 'bursts', run ? run.burst : 0); nextSideOrFinish(); };
+  return run ? (
+    <View style={{ alignItems: 'center' }}>
+      <Text style={[styles.restLabel, !run.resting && { color: colors.warning }]}>
+        {run.resting ? 'REST' : 'PUSH!'} · BURST {run.burst} OF {bursts}{sideLabel.toUpperCase()}
+      </Text>
+      <Text style={[styles.timerClock, { color: run.resting ? colors.textMuted : colors.warning }]}>
+        {Math.max(0, Math.ceil((run.resting ? restLen : burstLen) - elapsed))}
+      </Text>
+      <Button icon={Square} title="Stop early" variant="secondary" onPress={done} style={{ alignSelf: 'stretch', marginTop: 12 }} />
+    </View>
+  ) : (
+    <View style={{ gap: 6 }}>
+      <Text style={[styles.small, { textAlign: 'center' }]}>{bursts} × {burstLen}s bursts, {restLen}s rest between</Text>
+      <Button icon={Play} title={`Start bursts${sideLabel}`} onPress={() => { buzz(); setRun({ startedAt: Date.now(), burst: 1, resting: false }); }} />
+    </View>
   );
 }
 
@@ -271,7 +355,8 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const warmupCount  = currentEx.sets.filter((st) => st.warmup).length;
   const workingCount = currentEx.sets.length - warmupCount;
   // Warm-ups can be added until the first working set of the exercise is done.
-  const canAddWarmup = !isWarmup && currentEx.sets.slice(0, setIdx).every((st) => st.warmup);
+  const isometric = typeOf(currentEx.exercise) !== 'dynamic';
+  const canAddWarmup = !isometric && !isWarmup && currentEx.sets.slice(0, setIdx).every((st) => st.warmup);
   const warmupsLeft = currentEx.sets.slice(setIdx).filter((st) => st.warmup).length;
 
   // Skip the rest of this exercise's warm-ups (they're removed, not logged).
@@ -348,11 +433,13 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const fields = (values, side) => (
     <View style={styles.playerFields}>
       {side ? <Text style={styles.sideLabel}>{side}</Text> : null}
-      {[['reps', 'Reps'], ['weight', unit], ...(isWarmup ? [] : [['rir', 'RIR']])].map(([f, l]) => (
-        <View key={f} style={{ alignItems: 'center' }}>
-          <Text style={styles.fieldCap}>{l}</Text>
-          <NumBox big width={f === 'rir' ? 60 : 78} value={values[f] ?? ''} placeholder={f === 'rir' ? (currentEx.targetRir || '–') : undefined}
-            onChange={(v) => onUpdateSet(exIdx, setIdx, f, v, side || undefined)} />
+      {/* The fields depend on the exercise type (reps, seconds held or bursts). */}
+      {fieldsOf(currentEx.exercise).filter((f) => !(f.effort && isWarmup)).map((f) => (
+        <View key={f.key} style={{ alignItems: 'center' }}>
+          <Text style={styles.fieldCap}>{f.weight ? unit : f.short || f.label}</Text>
+          <NumBox big width={f.effort ? 60 : 78} value={values[f.key] ?? ''}
+            placeholder={f.effort ? (f.key === 'rir' && currentEx.targetRir) || '–' : undefined}
+            onChange={(v) => onUpdateSet(exIdx, setIdx, f.key, v, side || undefined)} />
         </View>
       ))}
     </View>
@@ -376,7 +463,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
                 <Text style={[styles.small, { color: colors.warning, fontWeight: '600' }]}>Warm-up {setIdx + 1} of {warmupCount}</Text>
               </View>
             ) : <Text style={styles.small}>Set {setNumber(currentEx.sets, setIdx)} of {workingCount}</Text>}
-            <UnitToggle value={unit} onChange={(u) => onSetUnit(exIdx, u)} />
+            {typeOf(currentEx.exercise) !== 'overcoming' && <UnitToggle value={unit} onChange={(u) => onSetUnit(exIdx, u)} />}
           </View>
           {lastRest != null && <Text style={[styles.small, { textAlign: 'center' }]}>Rested {fmtClock(lastRest)}</Text>}
 
@@ -384,7 +471,19 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
             {currentSet.left ? SIDES.map((side) => <View key={side}>{fields(currentSet[side], side)}</View>) : fields(currentSet)}
           </View>
 
-          <Button title={stepIdx === steps.length - 1 ? 'Finish Workout' : isWarmup ? 'Complete Warm-up' : 'Complete Set'} onPress={completeSet} />
+          {isometric ? (
+            // A stopwatch (holds) or burst timer instead of "Complete Set".
+            <>
+              <IsometricTimer key={`${exIdx}-${setIdx}`} exercise={currentEx.exercise} set={currentSet}
+                onRecord={(side, field, value) => onUpdateSet(exIdx, setIdx, field, value, side || undefined)}
+                onFinish={completeSet} />
+              <TouchableOpacity onPress={completeSet} style={styles.quietBtn} hitSlop={6}>
+                <Text style={styles.quietText}>Log the numbers above without the timer</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Button title={stepIdx === steps.length - 1 ? 'Finish Workout' : isWarmup ? 'Complete Warm-up' : 'Complete Set'} onPress={completeSet} />
+          )}
           {/* Warm-ups are optional: skip them, or add one before the first working set. */}
           {isWarmup ? (
             <TouchableOpacity onPress={skipWarmups} style={styles.quietBtn} hitSlop={6}>
@@ -533,7 +632,8 @@ export default function LogWorkoutScreen({ navigation, route }) {
           unit,
           targetRir: e.targetRir || '',
           sets: Array.from({ length: e.targetSets || 1 }, () => makeSet(e.exercise, {
-            reps: e.targetReps ?? 10,
+            // A plan's "reps" target is seconds held or bursts for isometric exercises.
+            [amountKey(e.exercise)]: e.targetReps ?? undefined,
             weight: lastWeights[i] != null ? fromKg(lastWeights[i], unit) : Number(e.targetWeight) || 0,
           })),
         };
@@ -598,27 +698,36 @@ export default function LogWorkoutScreen({ navigation, route }) {
   })));
 
   // One entry per performed set; unilateral sets become a left and a right entry.
-  const flattenSets = (sets) => sets.flatMap((s) => {
-    if (!s.left) return Number(s.reps) > 0 ? [s] : [];
-    const sides = SIDES.filter((side) => Number(s[side].reps) > 0).map((side) => ({ ...s[side], side, warmup: s.warmup }));
+  // A set counts if its reps / seconds / bursts are above 0.
+  const flattenSets = (ex) => ex.sets.flatMap((s) => {
+    const key = amountKey(ex.exercise);
+    if (!s.left) return Number(s[key]) > 0 ? [s] : [];
+    const sides = SIDES.filter((side) => Number(s[side][key]) > 0).map((side) => ({ ...s[side], side, warmup: s.warmup }));
     if (sides.length) sides[sides.length - 1].restTime = s.restTime;
     return sides;
   });
 
   const handleSave = async () => {
     if (exercises.length === 0) { setError('Add at least one exercise.'); return; }
-    const cleaned = exercises.map((e) => ({ ...e, sets: flattenSets(e.sets) })).filter((e) => e.sets.length > 0);
-    if (cleaned.length === 0) { setError('Every set has 0 reps — enter the reps you did before saving.'); return; }
+    const cleaned = exercises.map((e) => ({ ...e, sets: flattenSets(e) })).filter((e) => e.sets.length > 0);
+    if (cleaned.length === 0) { setError('Every set is empty — enter the reps, seconds or bursts you did before saving.'); return; }
 
     for (const ex of cleaned) {
       let setNo = 0;
       for (const set of ex.sets) {
         if (set.side !== 'right' && !set.warmup) setNo++;
         const where = `${ex.exercise.name}, ${set.warmup ? 'warm-up' : `set ${setNo}`}${set.side ? ` (${set.side})` : ''}`;
-        if (!Number.isInteger(Number(set.reps))) { setError(`${where}: reps must be a whole number.`); return; }
-        if (!Number.isFinite(Number(set.weight)) || Number(set.weight) < 0) { setError(`${where}: weight can't be negative.`); return; }
-        if (!set.warmup && set.rir !== '' && set.rir != null && !(Number.isInteger(Number(set.rir)) && Number(set.rir) >= 0 && Number(set.rir) <= 10)) {
-          setError(`${where}: RIR must be a whole number from 0 to 10.`); return;
+        for (const f of fieldsOf(ex.exercise)) {
+          const v = set[f.key];
+          if (f.effort) {
+            if (!set.warmup && v !== '' && v != null && !(Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= f.max)) {
+              setError(`${where}: ${f.label} must be a whole number from 0 to ${f.max}.`); return;
+            }
+          } else if (f.weight) {
+            if (!Number.isFinite(Number(v)) || Number(v) < 0) { setError(`${where}: weight can't be negative.`); return; }
+          } else if (v !== '' && v != null && !(Number.isInteger(Number(v)) && Number(v) >= 0)) {
+            setError(`${where}: ${f.label.toLowerCase()} must be a whole number.`); return;
+          }
         }
       }
     }
@@ -638,10 +747,8 @@ export default function LogWorkoutScreen({ navigation, route }) {
           sets: e.sets.map((s) => ({
             ...(s.side && { side: s.side }),
             ...(s.warmup && { warmup: true }),
-            reps: Number(s.reps),
-            weight: toKg(s.weight, e.unit), // stored in kg
-            // Warm-ups have no RIR.
-            ...(!s.warmup && s.rir !== '' && s.rir != null && Number.isFinite(Number(s.rir)) ? { rir: Number(s.rir) } : {}),
+            // reps/weight/RIR, or seconds/weight/SIR, or bursts (weights stored in kg). Warm-ups have no RIR.
+            ...toSavedFields(e.exercise, s.warmup ? { ...s, rir: '' } : s, e.unit),
             ...(s.restTime !== '' && s.restTime != null && Number.isFinite(Number(s.restTime)) ? { restTime: Math.round(Number(s.restTime)) } : {}),
           })),
         })),
@@ -691,6 +798,7 @@ export default function LogWorkoutScreen({ navigation, route }) {
                 <Text style={styles.exName}>{ex.exercise.name}</Text>
                 <Text style={styles.exMeta} numberOfLines={2}>
                   {ex.exercise.muscleGroups?.join(', ')}{isUnilateral(ex.exercise) ? ' · each side' : ''}
+                  {typeOf(ex.exercise) !== 'dynamic' ? ` · ${TYPE_LABEL[typeOf(ex.exercise)].toLowerCase()}` : ''}
                   {ex.lastDate ? ` · last time ${new Date(ex.lastDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
                 </Text>
               </View>
@@ -705,19 +813,18 @@ export default function LogWorkoutScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => removeExercise(exIdx)} hitSlop={6} style={styles.icon}><X size={18} color={colors.danger} /></TouchableOpacity>
             </View>
-            <View style={styles.unitLine}>
-              <Text style={styles.small}>Weight in</Text>
-              <UnitToggle value={ex.unit || 'kg'} onChange={(u) => setUnit(exIdx, u)} />
-            </View>
             {replacing === exIdx && (
               <SimilarExercises exerciseId={ex.exercise._id} onPick={(p) => replaceExercise(exIdx, p)} onClose={() => setReplacing(null)} />
             )}
 
             <View style={styles.setHead}>
               <Text style={[styles.headCell, { width: 34 }]}>Set</Text>
-              <Text style={styles.headCellFlex}>Reps</Text>
-              <Text style={styles.headCellFlex}>{ex.unit || 'kg'}</Text>
-              <Text style={[styles.headCell, { width: 46 }]}>RIR</Text>
+              {/* Columns follow the exercise type; kg/lb sits right above the weights. */}
+              {fieldsOf(ex.exercise).map((f) => (f.weight ? (
+                <View key={f.key} style={{ flex: 1, alignItems: 'center' }}><UnitToggle value={ex.unit || 'kg'} onChange={(u) => setUnit(exIdx, u)} /></View>
+              ) : (
+                <Text key={f.key} style={f.effort ? [styles.headCell, { width: 46 }] : styles.headCellFlex}>{f.short || f.label}</Text>
+              )))}
               <Text style={[styles.headCell, { width: 56 }]}>Rest</Text>
               <View style={{ width: 22 }} />
             </View>
@@ -733,11 +840,15 @@ export default function LogWorkoutScreen({ navigation, route }) {
                           <Text style={[styles.setNo, set.warmup && styles.warmupNo]}>{side === 'right' ? '' : setNumber(ex.sets, setIdx)}</Text>
                           {side ? <Text style={styles.sideTag}>{side === 'left' ? 'L' : 'R'}</Text> : null}
                         </View>
-                        <View style={{ flex: 1 }}><NumBox value={values.reps} onChange={(v) => updateSet(exIdx, setIdx, 'reps', v, side || undefined)} /></View>
-                        <View style={{ flex: 1 }}><NumBox value={values.weight} onChange={(v) => updateSet(exIdx, setIdx, 'weight', v, side || undefined)} /></View>
-                        {set.warmup
-                          ? <Text style={[styles.small, { width: 46, textAlign: 'center' }]}>—</Text>
-                          : <NumBox width={46} value={values.rir ?? ''} placeholder={ex.targetRir || '–'} onChange={(v) => updateSet(exIdx, setIdx, 'rir', v, side || undefined)} />}
+                        {fieldsOf(ex.exercise).map((f) => (f.effort ? (set.warmup
+                          ? <Text key={f.key} style={[styles.small, { width: 46, textAlign: 'center' }]}>—</Text>
+                          : <NumBox key={f.key} width={46} value={values[f.key] ?? ''} placeholder={(f.key === 'rir' && ex.targetRir) || '–'}
+                            onChange={(v) => updateSet(exIdx, setIdx, f.key, v, side || undefined)} />
+                        ) : (
+                          <View key={f.key} style={{ flex: 1 }}>
+                            <NumBox value={values[f.key] ?? ''} onChange={(v) => updateSet(exIdx, setIdx, f.key, v, side || undefined)} />
+                          </View>
+                        )))}
                       </View>
                     ))}
                   </View>
@@ -752,10 +863,12 @@ export default function LogWorkoutScreen({ navigation, route }) {
             })}
             <View style={[styles.row, { gap: 18, marginTop: 8 }]}>
               <LinkText onPress={() => addSet(exIdx)}>+ Add set</LinkText>
-              <TouchableOpacity onPress={() => addWarmup(exIdx)} style={styles.row} hitSlop={8}>
-                <Flame size={14} color={colors.warning} />
-                <Text style={styles.warmupLink}>Add warm-up</Text>
-              </TouchableOpacity>
+              {typeOf(ex.exercise) === 'dynamic' ? (
+                <TouchableOpacity onPress={() => addWarmup(exIdx)} style={styles.row} hitSlop={8}>
+                  <Flame size={14} color={colors.warning} />
+                  <Text style={styles.warmupLink}>Add warm-up</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
             {ex.sets.some((st) => st.warmup) ? <Hint style={{ marginTop: 4 }}>W = warm-up. Not counted in your stats.</Hint> : null}
           </Card>
@@ -839,7 +952,6 @@ const styles = makeStyles(() => ({
   reportHead:  { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 },
   reportRow:   { paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.subtle, gap: 2 },
   setReportRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 1 },
-  unitLine:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   unitToggle:  { flexDirection: 'row', backgroundColor: colors.subtle, borderRadius: 8, padding: 2 },
   unitBtn:     { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6 },
   unitBtnOn:   { backgroundColor: colors.surface, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
@@ -873,5 +985,6 @@ const styles = makeStyles(() => ({
   sideLabel:   { width: 44, fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', paddingBottom: 16 },
   fieldCap:    { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   restLabel:   { fontSize: 12, fontWeight: '700', color: colors.textMuted, letterSpacing: 1 },
+  timerClock:  { fontSize: 56, fontWeight: '700', color: colors.brand, marginVertical: 8, fontVariant: ['tabular-nums'] },
   restClock:   { fontSize: 64, fontWeight: '700', color: colors.brand, marginVertical: 12, fontVariant: ['tabular-nums'] },
 }));

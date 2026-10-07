@@ -29,6 +29,7 @@ router.post(
     body('equipment').optional().isString(),
     body('secondaryMuscles').optional().isArray().withMessage('Secondary muscles must be a list'),
     body('laterality').optional().isIn(['bilateral', 'unilateral']).withMessage('Type must be bilateral or unilateral'),
+    body('type').optional().isIn(['dynamic', 'yielding', 'overcoming']).withMessage('Type must be dynamic, yielding or overcoming'),
   ],
   validate,
   createCustomExercise
@@ -46,6 +47,7 @@ router.put(
     body('equipment').optional().isString(),
     body('secondaryMuscles').optional().isArray().withMessage('Secondary muscles must be a list'),
     body('laterality').optional().isIn(['bilateral', 'unilateral']).withMessage('Type must be bilateral or unilateral'),
+    body('type').optional().isIn(['dynamic', 'yielding', 'overcoming']).withMessage('Type must be dynamic, yielding or overcoming'),
   ],
   validate,
   updateExercise

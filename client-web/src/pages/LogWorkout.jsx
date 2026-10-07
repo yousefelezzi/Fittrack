@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { workoutAPI, exerciseAPI, planAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, Search, Check, ClipboardList, Play, X, Timer, PartyPopper, Repeat, Clock, GripVertical, Flame, SkipForward, ChevronUp, ChevronDown, ListOrdered } from 'lucide-react';
+import { Plus, Trash2, Search, Check, ClipboardList, Play, X, Timer, PartyPopper, Repeat, Clock, GripVertical, Flame, SkipForward, ChevronUp, ChevronDown, ListOrdered, Square } from 'lucide-react';
 import ExerciseCombobox from '../components/ExerciseCombobox';
 import SimilarExercises from '../components/SimilarExercises';
 import ExerciseImage from '../components/ExerciseImage';
 import { setsFromLastWorkout } from '../utils/lastSets';
-import { UNITS, toKg, fromKg } from '../utils/weightUnits';
-import { buildSessionReport, pickPreviousWorkout, formatChange, changeTone } from '../utils/sessionReport';
+import { UNITS, fromKg } from '../utils/weightUnits';
+import { typeOf, fieldsOf, amountKey, OPTIONAL_FIELDS, toSavedFields, TYPE_LABEL } from '../utils/exerciseTypes';
+import {
+  buildSessionReport, pickPreviousWorkout, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
+} from '../utils/sessionReport';
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../utils/logSets';
@@ -174,13 +177,12 @@ function UnitToggle({ value, onChange, title = 'Weight unit' }) {
   );
 }
 
-function SessionField({ label, value, onChange, small, placeholder }) {
+function SessionField({ label, value, onChange, small, placeholder, hint, max }) {
   return (
     <div className="text-center">
-      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
-        title={label === 'RIR' ? 'Reps in reserve: how many more reps you could have done' : undefined}>{label}</label>
+      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1" title={hint}>{label}</label>
       <input
-        type="number" min={0} max={label === 'RIR' ? 10 : undefined} placeholder={label === 'RIR' ? (placeholder || '–') : undefined}
+        type="number" min={0} max={max} placeholder={placeholder}
         className={`${small ? 'w-16' : 'w-20'} text-center text-lg font-semibold border border-gray-200 dark:border-gray-700 rounded-lg py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -275,12 +277,12 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
                           <tr key={`${row.number}-${k}`} className="text-gray-600 dark:text-gray-300">
                             <td className="py-0.5 w-12 text-gray-400 dark:text-gray-500">{k === 0 ? `Set ${row.number}` : ''}</td>
                             <td className="py-0.5 w-5 text-gray-400 dark:text-gray-500 font-semibold">{en.side ? (en.side === 'left' ? 'L' : 'R') : ''}</td>
-                            <td className="py-0.5">{en.weight}{e.unit} × {en.reps}</td>
+                            <td className="py-0.5">{reportEntryText(e, en)}</td>
                             <td className="py-0.5 text-right">
                               {en.change ? (
                                 <span className="inline-flex gap-2">
-                                  <span><Change value={en.change.weight} suffix={e.unit} /></span>
-                                  <span><Change value={en.change.reps} suffix=" reps" /></span>
+                                  {showsWeight(e) && <span><Change value={en.change.weight} suffix={e.unit} /></span>}
+                                  <span><Change value={en.change.amount} suffix={amountSuffix(e)} /></span>
                                 </span>
                               ) : !e.isFirst && <span className="italic text-gray-400">new set</span>}
                             </td>
@@ -297,6 +299,101 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
 
         <button onClick={onDone} className="btn-primary w-full justify-center">Back to Save Workout</button>
       </div>
+    </div>
+  );
+}
+
+// ── Isometric timers ─────────────────────────────────────────────────────────
+// In a live session these replace "Complete Set" for isometric exercises:
+//   yielding   — a stopwatch: start, hold, stop; the time held is recorded
+//   overcoming — a guided interval timer: each burst counts down, then the rest
+//                between bursts; the number of bursts done is recorded
+// Unilateral exercises run once per side. Times come from timestamps, so they
+// stay right if the tab is in the background.
+const buzz = () => { try { navigator.vibrate?.(150); } catch { /* not supported */ } };
+
+function IsometricTimer({ exercise, set, onRecord, onFinish }) {
+  const type = typeOf(exercise);
+  const sides = set.left ? SIDES : [null];
+  const [sideIdx, setSideIdx] = useState(0);
+  const [run, setRun] = useState(null); // { startedAt } (yielding) or { startedAt, burst, resting } (overcoming)
+  const [, setTick] = useState(0);
+  const side = sides[sideIdx];
+  const values = side ? set[side] : set;
+
+  useEffect(() => {
+    if (!run) return undefined;
+    const id = setInterval(() => setTick((t) => t + 1), 100);
+    return () => clearInterval(id);
+  }, [run]);
+
+  const nextSideOrFinish = () => {
+    setRun(null);
+    if (sideIdx < sides.length - 1) setSideIdx(sideIdx + 1);
+    else onFinish();
+  };
+  const elapsed = run ? (Date.now() - run.startedAt) / 1000 : 0;
+
+  // Overcoming: move through bursts and rests as time passes.
+  const bursts = Math.max(1, Number(values.bursts) || 1);
+  const burstLen = Math.max(1, Number(values.burstSeconds) || 1);
+  const restLen = Math.max(0, Number(values.burstRest) || 0);
+  useEffect(() => {
+    if (type !== 'overcoming' || !run) return;
+    const limit = run.resting ? restLen : burstLen;
+    if (elapsed < limit) return;
+    buzz();
+    if (!run.resting && run.burst >= bursts) { onRecord(side, 'bursts', bursts); nextSideOrFinish(); return; }
+    if (!run.resting && restLen > 0) setRun({ startedAt: Date.now(), burst: run.burst, resting: true });
+    else setRun({ startedAt: Date.now(), burst: run.burst + 1, resting: false });
+  });
+
+  const sideLabel = side ? ` — ${side} side` : '';
+  const big = 'text-5xl font-bold tabular-nums my-2';
+
+  if (type === 'yielding') {
+    const target = Number(values.seconds) || 0;
+    const stop = () => { onRecord(side, 'seconds', Math.round(elapsed)); buzz(); nextSideOrFinish(); };
+    return (
+      <div className="text-center space-y-2">
+        {run ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Holding{sideLabel}</p>
+            <p className={`${big} ${target && elapsed >= target ? 'text-emerald-500' : 'text-brand-500'}`}>{fmtClock(Math.floor(elapsed))}</p>
+            {target > 0 && <p className="text-xs text-gray-400">Target {target}s</p>}
+            <button onClick={stop} className="btn-primary w-full justify-center py-3 !bg-red-500 hover:!bg-red-600"><Square size={16} /> Stop</button>
+          </>
+        ) : (
+          <button onClick={() => { buzz(); setRun({ startedAt: Date.now() }); }} className="btn-primary w-full justify-center py-3">
+            <Play size={16} /> Start hold{sideLabel}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Overcoming. Stopping early counts the bursts started (the current one included).
+  const done = () => { onRecord(side, 'bursts', run ? run.burst : 0); nextSideOrFinish(); };
+  return (
+    <div className="text-center space-y-2">
+      {run ? (
+        <>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${run.resting ? 'text-gray-400' : 'text-amber-500'}`}>
+            {run.resting ? 'Rest' : 'Push!'} · burst {run.burst} of {bursts}{sideLabel}
+          </p>
+          <p className={`${big} ${run.resting ? 'text-gray-400' : 'text-amber-500'}`}>
+            {Math.max(0, Math.ceil((run.resting ? restLen : burstLen) - elapsed))}
+          </p>
+          <button onClick={done} className="btn-secondary w-full justify-center py-2.5"><Square size={14} /> Stop early</button>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-gray-400">{bursts} × {burstLen}s bursts, {restLen}s rest between</p>
+          <button onClick={() => { buzz(); setRun({ startedAt: Date.now(), burst: 1, resting: false }); }} className="btn-primary w-full justify-center py-3">
+            <Play size={16} /> Start bursts{sideLabel}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -344,7 +441,8 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const warmupCount  = currentEx.sets.filter((st) => st.warmup).length;
   const workingCount = currentEx.sets.length - warmupCount;
   // Warm-ups can be added until the first working set of the exercise is done.
-  const canAddWarmup = !isWarmup && currentEx.sets.slice(0, setIdx).every((st) => st.warmup);
+  const isometric = typeOf(currentEx.exercise) !== 'dynamic';
+  const canAddWarmup = !isometric && !isWarmup && currentEx.sets.slice(0, setIdx).every((st) => st.warmup);
 
   // Skip the rest of this exercise's warm-ups (they're removed, not logged).
   const skipWarmups = () => {
@@ -466,36 +564,44 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
                 ) : (
                   <span className="text-sm text-gray-400 dark:text-gray-500">Set {setNumber(currentEx.sets, setIdx)} of {workingCount}</span>
                 )}
-                <UnitToggle value={unit} onChange={(u) => onSetUnit(exIdx, u)} />
+                {typeOf(currentEx.exercise) !== 'overcoming' && <UnitToggle value={unit} onChange={(u) => onSetUnit(exIdx, u)} />}
               </div>
               {lastRest != null && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Rested {fmtClock(lastRest)}</p>
               )}
             </div>
 
-            {currentSet.left ? (
-              // Unilateral: a row of inputs per side.
-              <div className="space-y-3">
-                {SIDES.map((side) => (
-                  <div key={side} className="flex items-end gap-2 justify-center">
-                    <span className="w-12 pb-2.5 text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">{side}</span>
-                    <SessionField label="Reps" value={currentSet[side].reps} onChange={(v) => onUpdateSet(exIdx, setIdx, 'reps', v, side)} />
-                    <SessionField label={`Weight (${unit})`} value={currentSet[side].weight} onChange={(v) => onUpdateSet(exIdx, setIdx, 'weight', v, side)} />
-                    {!isWarmup && <SessionField label="RIR" small placeholder={currentEx.targetRir} value={currentSet[side].rir ?? ''} onChange={(v) => onUpdateSet(exIdx, setIdx, 'rir', v, side)} />}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex gap-3 justify-center">
-                <SessionField label="Reps" value={currentSet.reps} onChange={(v) => onUpdateSet(exIdx, setIdx, 'reps', v)} />
-                <SessionField label={`Weight (${unit})`} value={currentSet.weight} onChange={(v) => onUpdateSet(exIdx, setIdx, 'weight', v)} />
-                {!isWarmup && <SessionField label="RIR" small placeholder={currentEx.targetRir} value={currentSet.rir ?? ''} onChange={(v) => onUpdateSet(exIdx, setIdx, 'rir', v)} />}
-              </div>
-            )}
+            {(currentSet.left ? SIDES : [null]).map((side) => {
+              // The fields depend on the exercise type; unilateral sets get a row per side.
+              const values = side ? currentSet[side] : currentSet;
+              return (
+                <div key={side || 'both'} className="flex items-end gap-2 justify-center">
+                  {side && <span className="w-12 pb-2.5 text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">{side}</span>}
+                  {fieldsOf(currentEx.exercise).map((f) => (f.effort && isWarmup ? null : (
+                    <SessionField key={f.key} small={f.effort} hint={f.hint} max={f.max}
+                      label={f.weight ? `Weight (${unit})` : f.short || f.label}
+                      placeholder={f.effort ? (f.key === 'rir' && currentEx.targetRir) || '–' : undefined}
+                      value={values[f.key] ?? ''} onChange={(v) => onUpdateSet(exIdx, setIdx, f.key, v, side || undefined)} />
+                  )))}
+                </div>
+              );
+            })}
 
-            <button onClick={completeSet} className="btn-primary w-full justify-center py-3">
-              {stepIdx === steps.length - 1 ? 'Finish Workout' : isWarmup ? 'Complete Warm-up' : 'Complete Set'}
-            </button>
+            {isometric ? (
+              // A stopwatch (holds) or burst timer instead of "Complete Set".
+              <>
+                <IsometricTimer key={`${exIdx}-${setIdx}`} exercise={currentEx.exercise} set={currentSet}
+                  onRecord={(side, field, value) => onUpdateSet(exIdx, setIdx, field, value, side || undefined)}
+                  onFinish={completeSet} />
+                <button onClick={completeSet} className="w-full text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-brand-600 -mt-2">
+                  Log the numbers above without the timer
+                </button>
+              </>
+            ) : (
+              <button onClick={completeSet} className="btn-primary w-full justify-center py-3">
+                {stepIdx === steps.length - 1 ? 'Finish Workout' : isWarmup ? 'Complete Warm-up' : 'Complete Set'}
+              </button>
+            )}
             {/* Warm-ups are optional: skip them, or add one before the first working set. */}
             {isWarmup ? (
               <button onClick={skipWarmups} className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-brand-600 -mt-2">
@@ -688,8 +794,9 @@ export default function LogWorkout() {
           exercise: e.exercise,
           unit,
           targetRir: e.targetRir || '', // shown as the RIR placeholder
+          // A plan's "reps" target is seconds held or bursts for isometric exercises.
           sets: Array.from({ length: e.targetSets || 1 }, () => makeSet(e.exercise, {
-            reps: e.targetReps ?? 10,
+            [amountKey(e.exercise)]: e.targetReps ?? undefined,
             weight: lastWeights[i] != null ? fromKg(lastWeights[i], unit) : Number(e.targetWeight) || 0,
           })),
         };
@@ -763,8 +870,8 @@ export default function LogWorkout() {
       ...ex,
       sets: ex.sets.map((s, si) => {
         if (si !== setIdx) return s;
-        // rir/restTime can be left blank (= not recorded); everything else is a number.
-        const v = (field === 'rir' || field === 'restTime') && (value === '' || value == null) ? '' : Number(value);
+        // RIR/SIR and rest can be left blank (= not recorded); everything else is a number.
+        const v = OPTIONAL_FIELDS.has(field) && (value === '' || value == null) ? '' : Number(value);
         return side ? { ...s, [side]: { ...s[side], [field]: v } } : { ...s, [field]: v };
       }),
     })
@@ -772,9 +879,11 @@ export default function LogWorkout() {
 
   // One entry per performed set; unilateral sets become a left and a right entry
   // (a side with 0 reps is left out). Rest goes on the last entry of the set.
-  const flattenSets = (sets) => sets.flatMap((s) => {
-    if (!s.left) return Number(s.reps) > 0 ? [s] : [];
-    const sides = SIDES.filter((side) => Number(s[side].reps) > 0).map((side) => ({ ...s[side], side, warmup: s.warmup }));
+  // A set counts if its reps / seconds / bursts are above 0.
+  const flattenSets = (ex) => ex.sets.flatMap((s) => {
+    const key = amountKey(ex.exercise);
+    if (!s.left) return Number(s[key]) > 0 ? [s] : [];
+    const sides = SIDES.filter((side) => Number(s[side][key]) > 0).map((side) => ({ ...s[side], side, warmup: s.warmup }));
     if (sides.length) sides[sides.length - 1].restTime = s.restTime;
     return sides;
   });
@@ -786,11 +895,11 @@ export default function LogWorkout() {
     // wasn't actually performed, so leave it out rather than sending it —
     // the API requires reps ≥ 1 and would reject the whole workout.
     const cleaned = exercises
-      .map(e => ({ ...e, sets: flattenSets(e.sets) }))
+      .map(e => ({ ...e, sets: flattenSets(e) }))
       .filter(e => e.sets.length > 0);
 
     if (cleaned.length === 0) {
-      setError('Every set has 0 reps — enter the reps you did before saving.');
+      setError('Every set is empty — enter the reps, seconds or bursts you did before saving.');
       return;
     }
 
@@ -799,17 +908,19 @@ export default function LogWorkout() {
       for (const set of ex.sets) {
         if (set.side !== 'right' && !set.warmup) setNo++;
         const where = `${ex.exercise.name}, ${set.warmup ? 'warm-up' : `set ${setNo}`}${set.side ? ` (${set.side})` : ''}`;
-        if (!Number.isInteger(Number(set.reps))) {
-          setError(`${where}: reps must be a whole number.`);
-          return;
-        }
-        if (!Number.isFinite(Number(set.weight)) || Number(set.weight) < 0) {
-          setError(`${where}: weight can't be negative.`);
-          return;
-        }
-        if (!set.warmup && set.rir !== '' && set.rir != null && !(Number.isInteger(Number(set.rir)) && Number(set.rir) >= 0 && Number(set.rir) <= 10)) {
-          setError(`${where}: RIR must be a whole number from 0 to 10.`);
-          return;
+        for (const f of fieldsOf(ex.exercise)) {
+          const v = set[f.key];
+          if (f.effort) {
+            if (!set.warmup && v !== '' && v != null && !(Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= f.max)) {
+              setError(`${where}: ${f.label} must be a whole number from 0 to ${f.max}.`);
+              return;
+            }
+          } else if (f.weight) {
+            if (!Number.isFinite(Number(v)) || Number(v) < 0) { setError(`${where}: weight can't be negative.`); return; }
+          } else if (v !== '' && v != null && !(Number.isInteger(Number(v)) && Number(v) >= 0)) {
+            setError(`${where}: ${f.label.toLowerCase()} must be a whole number.`);
+            return;
+          }
         }
       }
     }
@@ -832,10 +943,9 @@ export default function LogWorkout() {
           sets: e.sets.map(s => ({
             ...(s.side && { side: s.side }),
             ...(s.warmup && { warmup: true }),
-            reps: Number(s.reps),
-            weight: toKg(s.weight, e.unit), // stored in kg
-            // Optional: only sent when recorded. Warm-ups have none.
-            ...(!s.warmup && s.rir !== '' && s.rir != null && Number.isFinite(Number(s.rir)) ? { rir: Number(s.rir) } : {}),
+            // reps/weight/RIR, or seconds/weight/SIR, or bursts (weights stored in kg).
+            // Warm-ups have no RIR.
+            ...toSavedFields(e.exercise, s.warmup ? { ...s, rir: '' } : s, e.unit),
             ...(Number.isFinite(Number(s.restTime)) && s.restTime !== '' && s.restTime != null
               ? { restTime: Math.round(Number(s.restTime)) } : {}),
           })),
@@ -914,10 +1024,10 @@ export default function LogWorkout() {
               <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">
                 {ex.exercise.muscleGroups?.join(', ')}
                 {isUnilateral(ex.exercise) && <span className="ml-1.5 normal-case text-brand-600 dark:text-brand-400">· each side</span>}
+                {typeOf(ex.exercise) !== 'dynamic' && <span className="ml-1.5 normal-case text-amber-600 dark:text-amber-400">· {TYPE_LABEL[typeOf(ex.exercise)].toLowerCase()}</span>}
                 {ex.lastDate && <span className="ml-1.5 normal-case" title="Sets, reps and weight copied from your last workout with this exercise">· last time {format(new Date(ex.lastDate), 'MMM d')}</span>}
               </p>
             </div>
-            <UnitToggle value={ex.unit || 'kg'} onChange={(u) => setUnit(exIdx, u)} />
             <button onClick={() => setReplacing(replacing === exIdx ? null : exIdx)} title="Replace with a similar exercise"
               className={`p-1 hover:text-brand-600 ${replacing === exIdx ? 'text-brand-600' : 'text-gray-400'}`}>
               <Repeat size={16} />
@@ -935,9 +1045,18 @@ export default function LogWorkout() {
             <thead>
               <tr className="text-xs text-gray-400 dark:text-gray-500 uppercase">
                 <th className="text-left pb-1">Set</th>
-                <th className="pb-1">Reps</th>
-                <th className="pb-1">Weight ({ex.unit || 'kg'})</th>
-                <th className="pb-1" title="Reps in reserve: how many more reps you could have done">RIR</th>
+                {/* The columns depend on the exercise type (reps, seconds held or bursts). */}
+                {fieldsOf(ex.exercise).map((f) => (
+                  <th key={f.key} className="pb-1 font-semibold" title={f.hint}>
+                    {f.weight ? (
+                      // kg/lb right where weights are typed, in both modes.
+                      <span className="inline-flex items-center gap-1.5 normal-case">
+                        <span className="uppercase">Weight</span>
+                        <UnitToggle value={ex.unit || 'kg'} onChange={(u) => setUnit(exIdx, u)} />
+                      </span>
+                    ) : f.label}
+                  </th>
+                ))}
                 <th className="pb-1" title="Rest after this set">Rest</th>
                 <th className="pb-1"></th>
               </tr>
@@ -956,23 +1075,20 @@ export default function LogWorkout() {
                       </span>
                       {side && <span className="font-semibold text-[10px] uppercase">{side === 'left' ? 'L' : 'R'}</span>}
                     </td>
-                    {['reps', 'weight'].map(field => (
-                      <td key={field} className="py-1 px-1">
-                        <input
-                          type="number" min={0}
-                          className={cellInput}
-                          value={values[field]}
-                          onChange={e => updateSet(exIdx, setIdx, field, e.target.value, side || undefined)}
-                        />
+                    {fieldsOf(ex.exercise).map((f) => (
+                      <td key={f.key} className={`py-1 px-1 ${f.effort ? 'w-14' : ''}`}>
+                        {f.effort && set.warmup ? <span className="block text-center text-xs text-gray-300 dark:text-gray-600">—</span> : (
+                          <input
+                            type="number" min={0} max={f.max}
+                            placeholder={f.effort ? (f.key === 'rir' && ex.targetRir) || '–' : undefined}
+                            title={f.key === 'rir' && ex.targetRir ? `Target: ${ex.targetRir} reps in reserve` : f.hint}
+                            className={cellInput}
+                            value={values[f.key] ?? ''}
+                            onChange={e => updateSet(exIdx, setIdx, f.key, e.target.value, side || undefined)}
+                          />
+                        )}
                       </td>
                     ))}
-                    <td className="py-1 px-1 w-14">
-                      {set.warmup ? <span className="block text-center text-xs text-gray-300 dark:text-gray-600">—</span> : (
-                        <input type="number" min={0} max={10} placeholder={ex.targetRir || '–'} className={cellInput}
-                          title={ex.targetRir ? `Target: ${ex.targetRir} reps in reserve` : undefined}
-                          value={values.rir ?? ''} onChange={e => updateSet(exIdx, setIdx, 'rir', e.target.value, side || undefined)} />
-                      )}
-                    </td>
                     {rowIdx === 0 && (<>
                       {/* Live: measured by the rest timer. Already done: typed in. */}
                       <td rowSpan={rows.length} className="py-1 px-1 w-16 text-center text-xs text-gray-400 dark:text-gray-500 tabular-nums align-middle">
@@ -996,9 +1112,11 @@ export default function LogWorkout() {
             <button onClick={() => addSet(exIdx)} className="btn-secondary text-xs py-1">
               <Plus size={13} /> Add set
             </button>
-            <button onClick={() => addWarmup(exIdx)} className="btn-secondary text-xs py-1" title="Optional lighter sets before your working sets. They aren't counted in your stats.">
-              <Flame size={13} /> Add warm-up
-            </button>
+            {typeOf(ex.exercise) === 'dynamic' && (
+              <button onClick={() => addWarmup(exIdx)} className="btn-secondary text-xs py-1" title="Optional lighter sets before your working sets. They aren't counted in your stats.">
+                <Flame size={13} /> Add warm-up
+              </button>
+            )}
           </div>
           </>)}
         </SortableCard>

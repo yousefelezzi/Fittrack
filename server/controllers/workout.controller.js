@@ -1,5 +1,6 @@
 const WorkoutSession = require('../models/WorkoutSession');
-const { estimateOneRepMax } = require('../utils/oneRepMax');
+const { estimateOneRepMax, asRepSet } = require('../utils/oneRepMax');
+const Exercise = require('../models/Exercise');
 const { muscleBreakdown, muscleSessions } = require('../utils/muscleGroups');
 const User = require('../models/User');
 const { userSecondaryWeight, LEVEL_FIELDS } = require('../utils/trainingLevel');
@@ -20,7 +21,7 @@ exports.getWorkouts = async (req, res, next) => {
 
     const [workouts, total] = await Promise.all([
       WorkoutSession.find(filter)
-        .populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images')
+        .populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images')
         .sort({ date: -1 })
         .skip((page - 1) * limit)
         .limit(Number(limit)),
@@ -100,6 +101,7 @@ exports.getLastSets = async (req, res, next) => {
     const entries = session.exercises.filter((e) => String(e.exercise) === req.params.exerciseId);
     const sets = entries.flatMap((e) => e.sets.map((s) => ({
       reps: s.reps, weight: s.weight, rir: s.rir ?? null, side: s.side ?? null, warmup: !!s.warmup,
+      duration: s.duration ?? null, sir: s.sir ?? null, bursts: s.bursts ?? null, burstSeconds: s.burstSeconds ?? null, burstRest: s.burstRest ?? null,
     })));
     // Weights are in kg; weightUnit is what they were entered in.
     res.json({ date: session.date, sets, weightUnit: entries[0]?.weightUnit || 'kg' });
@@ -110,6 +112,11 @@ exports.getLastSets = async (req, res, next) => {
 
 exports.getExerciseProgress = async (req, res, next) => {
   try {
+    // Holds are tracked as reps (2 seconds = 1 rep); overcoming isometrics aren't tracked.
+    if (!require('mongoose').isValidObjectId(req.params.exerciseId)) return res.json([]);
+    const type = (await Exercise.findById(req.params.exerciseId).select('type').lean())?.type || 'dynamic';
+    if (type === 'overcoming') return res.json([]);
+
     // Latest 30 sessions, returned oldest → newest for the chart.
     const sessions = (await WorkoutSession.find({
       user: req.user.id,
@@ -124,7 +131,7 @@ exports.getExerciseProgress = async (req, res, next) => {
         (e) => e.exercise.toString() === req.params.exerciseId
       );
       // Warm-ups aren't progress; a session of only warm-ups is skipped below.
-      const sets = ex.sets.filter((s) => !s.warmup);
+      const sets = ex.sets.filter((s) => !s.warmup).map((s) => asRepSet(s.toObject ? s.toObject() : s, type));
       if (!sets.length) return null;
       const maxWeight = Math.max(...sets.map((s) => s.weight));
       const totalVolume = sets.reduce((sum, s) => sum + s.reps * s.weight, 0);
@@ -162,7 +169,7 @@ exports.createWorkout = async (req, res, next) => {
       sets: (ex.sets || []).map((s) => (s.warmup ? { ...s, rir: null } : s)),
     }));
     const workout = await WorkoutSession.create({ ...req.body, exercises, user: req.user.id });
-    await workout.populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images');
+    await workout.populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
     res.status(201).json(workout);
   } catch (err) {
     next(err);
@@ -176,7 +183,7 @@ exports.updateWorkout = async (req, res, next) => {
       { _id: req.params.id, user: req.user.id },
       req.body,
       { new: true, runValidators: true }
-    ).populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images');
+    ).populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
     if (!workout) return res.status(404).json({ message: 'Workout not found' });
     res.json(workout);
   } catch (err) {

@@ -306,6 +306,21 @@ const migrations = [
       return `${res.modifiedCount} conversation(s) updated`;
     },
   },
+  {
+    // Exercises got a type (dynamic / yielding / overcoming isometric). Holds
+    // like planks and wall sits are yielding isometrics, logged in seconds;
+    // everything else stays dynamic. Built-in ones are also set by the seed.
+    name: '2026-10-exercise-types',
+    async up(db) {
+      const ex = db.collection('exercises');
+      const holds = await ex.updateMany(
+        { type: { $exists: false }, name: { $regex: '\\b(plank|wall sit|dead hang|hollow (body )?hold|l-sit|isometric hold|static hold)\\b', $options: 'i' } },
+        { $set: { type: 'yielding' } }
+      );
+      const rest = await ex.updateMany({ type: { $exists: false } }, { $set: { type: 'dynamic' } });
+      return `${holds.modifiedCount} hold(s) set to yielding, ${rest.modifiedCount} set to dynamic`;
+    },
+  },
 ];
 
 async function runMigrations() {

@@ -5,6 +5,7 @@ import { userAPI } from '../api';
 import { colors, makeStyles, cardSurface } from './tokens';
 import { Hint, LinkText, ErrorText } from './ui';
 import { Flame, Footprints, Ruler, CalendarDays, Trophy, Globe, Lock } from 'lucide-react-native';
+import { oneRepMaxSourceLabel } from '../../../client-web/src/utils/workoutSummary';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FIELD_LABELS = { height: 'height', weight: 'weight', bodyFat: 'body fat %' };
@@ -152,7 +153,7 @@ export default function ProfileStats({ userId, refreshKey, onEditProfile, onNavi
                   <View style={{ flex: 1 }}>
                     <Text style={styles.small} numberOfLines={1}>{m.name}</Text>
                     <Hint>
-                      {m.isEstimate ? `Est. from ${m.fromSet.weight}kg × ${m.fromSet.reps}${m.fromSet.rir ? ` @ ${m.fromSet.rir} RIR` : ''}` : 'Actual single'}
+                      {m.isEstimate ? `Est. from ${oneRepMaxSourceLabel(m.fromSet)}` : 'Actual single'}
                       {m.fromSet.side ? ` (${m.fromSet.side})` : ''} · {format(new Date(m.date), 'MMM d, yyyy')}
                     </Hint>
                   </View>

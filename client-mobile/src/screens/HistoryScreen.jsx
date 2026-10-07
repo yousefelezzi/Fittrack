@@ -117,7 +117,7 @@ function WorkoutRow({ workout, onDelete, onShare }) {
             <View key={i} style={{ marginBottom: 6 }}>
               <Text style={styles.exName}>{ex.exercise?.name ?? 'Deleted exercise'}</Text>
               <Text style={styles.meta}>
-                {ex.sets.map((s) => `${setLabel(s, ex.weightUnit)}${s.restTime != null ? ` (rest ${fmtRest(s.restTime)})` : ''}`).join(' · ')}
+                {ex.sets.map((s) => `${setLabel(s, ex.weightUnit, ex.exercise)}${s.restTime != null ? ` (rest ${fmtRest(s.restTime)})` : ''}`).join(' · ')}
               </Text>
             </View>
           ))}

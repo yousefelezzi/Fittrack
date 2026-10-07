@@ -4,30 +4,41 @@
  *
  * A set is { reps, weight, rir } or, for unilateral exercises (one arm/leg at a
  * time), { left: { reps, weight, rir }, right: { reps, weight, rir } }; either
- * can have restTime. Warm-up sets have `warmup: true` and no RIR — they don't
- * count toward stats. Each exercise has a unit (ex.unit, 'kg' | 'lb'); weights
- * are typed in it and converted to kg when saved.
+ * can have restTime. Isometric exercises use other values in place of reps,
+ * weight and RIR (seconds held / bursts: see exerciseTypes.js). Warm-up sets
+ * have `warmup: true` and no RIR — they don't count toward stats. Each exercise
+ * has a unit (ex.unit, 'kg' | 'lb'); weights are typed in it and converted to
+ * kg when saved.
  */
 import { convertWeight } from './weightUnits';
+import { typeOf, SET_FIELDS, DEFAULT_VALUES } from './exerciseTypes';
 
 export const SIDES = ['left', 'right'];
 export const isUnilateral = (exercise) => exercise?.laterality === 'unilateral';
 
-export const makeSet = (exercise, { reps = 10, weight = 0, rir = '', warmup = false } = {}) => {
-  const set = isUnilateral(exercise)
-    ? { left: { reps, weight, rir }, right: { reps, weight, rir } }
-    : { reps, weight, rir };
-  return warmup ? { ...set, warmup: true } : set;
+/**
+ * A new set for an exercise. `values` can hold any of the exercise type's
+ * fields (reps/weight/rir, seconds/weight/sir, or bursts/burstSeconds/burstRest);
+ * the rest take their defaults.
+ */
+export const makeSet = (exercise, { warmup = false, ...values } = {}) => {
+  const type = typeOf(exercise);
+  const one = {};
+  for (const { key } of SET_FIELDS[type]) one[key] = values[key] !== undefined ? values[key] : DEFAULT_VALUES[type][key];
+  const set = isUnilateral(exercise) ? { left: { ...one }, right: { ...one } } : one;
+  return warmup && type === 'dynamic' ? { ...set, warmup: true } : set;
 };
 
-/** Reps/weight to carry over when a set changes exercise (e.g. swapping). */
-export const setBasics = (set) => (set.left ? { reps: set.left.reps, weight: set.left.weight } : { reps: set.reps, weight: set.weight });
+/** The values to carry over when a set changes exercise (e.g. swapping): all but the effort. */
+const NOT_CARRIED = new Set(['rir', 'sir', 'left', 'right', 'warmup', 'restTime', 'side']);
+export const setBasics = (set) => Object.fromEntries(Object.entries(set.left || set).filter(([k]) => !NOT_CARRIED.has(k)));
 
 /**
  * A warm-up for an exercise ({ exercise, unit, sets }): about half the first
  * working set's weight, rounded to a plate step (2.5kg / 5lb).
  */
 export const makeWarmup = (ex) => {
+  // Only dynamic exercises have warm-ups.
   const first = ex.sets.find((st) => !st.warmup);
   const step = ex.unit === 'lb' ? 5 : 2.5;
   const weight = first ? Math.round(((Number(setBasics(first).weight) || 0) * 0.5) / step) * step : 0;

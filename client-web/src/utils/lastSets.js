@@ -10,8 +10,9 @@
  * `warmup: true` for warm-up sets.
  * RIR is left blank: how close to failure a set was is decided on the day.
  * Logged weights are kg; they're filled in `unit` (what was used last time).
+ * Isometric exercises fill seconds held or bursts instead (exerciseTypes.js).
  */
-import { fromKg } from './weightUnits';
+import { fromSavedFields } from './exerciseTypes';
 
 /**
  * The last workout's sets in Log Workout's shape for `exercise`, or [] if
@@ -20,7 +21,7 @@ import { fromKg } from './weightUnits';
  */
 export function setsFromLastWorkout(exercise, logged = [], unit = 'kg') {
   if (!logged.length) return [];
-  const side = ({ reps, weight }) => ({ reps, weight: fromKg(weight, unit), rir: '' });
+  const side = (s) => fromSavedFields(exercise, s, unit);
   const tag = (set, s) => (s.warmup ? { ...set, warmup: true } : set);
   const unilateral = exercise?.laterality === 'unilateral';
 

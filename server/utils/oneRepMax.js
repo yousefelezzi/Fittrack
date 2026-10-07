@@ -20,4 +20,23 @@ function estimateOneRepMax(set) {
 const countsForOneRepMax = (set) =>
   Number(set.weight) > 0 && Number(set.reps) > 0 && effectiveReps(set) <= MAX_EFFECTIVE_REPS;
 
-module.exports = { estimateOneRepMax, effectiveReps, countsForOneRepMax, MAX_EFFECTIVE_REPS };
+/**
+ * A logged set as reps for progress tracking, by exercise type:
+ *   dynamic    — as logged
+ *   yielding   — 2 seconds held = 1 rep and 2 seconds in reserve = 1 RIR, so a
+ *                16s hold @ 2s in reserve counts like 8 reps @ 1 RIR
+ *   overcoming — null: bursts against something that doesn't move have no
+ *                load or reps to track, so they're left out of progress
+ */
+const SECONDS_PER_REP = 2;
+function asRepSet(set, type) {
+  if (type === 'overcoming') return null;
+  if (type !== 'yielding') return set;
+  return {
+    ...set,
+    reps: (Number(set.duration) || 0) / SECONDS_PER_REP,
+    rir: set.sir == null ? null : Number(set.sir) / SECONDS_PER_REP,
+  };
+}
+
+module.exports = { estimateOneRepMax, effectiveReps, countsForOneRepMax, asRepSet, MAX_EFFECTIVE_REPS, SECONDS_PER_REP };

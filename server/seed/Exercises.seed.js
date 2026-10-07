@@ -806,6 +806,9 @@ const exercises = [
 ];
 
 // Exercises done one arm or leg at a time — logged per side.
+// Isometric holds: logged in seconds, not reps (see the Exercise model's `type`).
+const YIELDING_ISOMETRIC = new Set(['Plank', 'Side Plank']);
+
 const UNILATERAL = new Set([
   'Single-Arm Dumbbell Row', 'Bulgarian Split Squat', 'Lunge', 'Walking Lunge',
   'Glute Kickback (Cable)', 'Donkey Kick', 'Side Plank', 'Single Leg Extension',
@@ -821,6 +824,7 @@ const RENAMES = [
 const { UNILATERAL_NAME_PATTERN } = require('../utils/laterality');
 for (const ex of exercises) {
   ex.laterality = UNILATERAL.has(ex.name) || UNILATERAL_NAME_PATTERN.test(ex.name) ? 'unilateral' : 'bilateral';
+  ex.type = YIELDING_ISOMETRIC.has(ex.name) ? 'yielding' : 'dynamic';
 }
 
 // Conditioning work lives in its own Cardio section rather than under a muscle.

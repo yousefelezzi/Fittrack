@@ -55,7 +55,7 @@ exports.getSimilarExercises = async (req, res, next) => {
     const scope = { $or: [{ isCustom: false }, { isCustom: true, createdBy: req.user.id }] };
     const target = await Exercise.findOne({ _id: req.params.id, ...scope }).lean();
     if (!target) return res.status(404).json({ message: 'Exercise not found' });
-    const candidates = await Exercise.find(scope).select('name muscleGroups secondaryMuscles equipment laterality category isCustom images').lean();
+    const candidates = await Exercise.find(scope).select('name muscleGroups secondaryMuscles equipment laterality type category isCustom images').lean();
     const equipment = req.query.equipment ? String(req.query.equipment).split(',').filter(Boolean) : undefined;
     res.json(similarExercises(target, candidates, { equipment, limit: Math.min(20, Number(req.query.limit) || 8) }));
   } catch (err) {
@@ -70,7 +70,7 @@ exports.updateExercise = async (req, res, next) => {
     if (!exercise) return res.status(404).json({ message: 'Exercise not found or not yours to edit' });
 
     // Only the exercise's own fields can change (not ownership or isCustom).
-    const FIELDS = ['name', 'muscleGroups', 'secondaryMuscles', 'equipment', 'category', 'instructions', 'laterality', 'gifUrl'];
+    const FIELDS = ['name', 'muscleGroups', 'secondaryMuscles', 'equipment', 'category', 'instructions', 'laterality', 'type', 'gifUrl'];
     for (const key of FIELDS) if (req.body[key] !== undefined) exercise[key] = req.body[key];
 
     // Secondary muscles must still be among the muscle groups.

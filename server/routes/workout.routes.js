@@ -32,7 +32,15 @@ router.post(
     body('exercises').isArray({ min: 1 }).withMessage('At least one exercise is required'),
     body('exercises.*.exercise').notEmpty().withMessage('Exercise ID is required'),
     body('exercises.*.sets').isArray({ min: 1 }).withMessage('At least one set is required'),
-    body('exercises.*.sets.*.reps').isInt({ min: 1 }).withMessage('Reps must be a positive integer'),
+    // Each set needs what was done: reps, seconds held, or bursts (by exercise type).
+    body('exercises.*.sets.*').custom((s) => Number(s?.reps) > 0 || Number(s?.duration) > 0 || Number(s?.bursts) > 0)
+      .withMessage('Each set needs reps, seconds held, or bursts'),
+    body('exercises.*.sets.*.reps').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Reps must be a whole number'),
+    body('exercises.*.sets.*.duration').optional({ nullable: true }).isInt({ min: 0, max: 3600 }).withMessage('Seconds held must be between 0 and 3600'),
+    body('exercises.*.sets.*.sir').optional({ nullable: true }).isInt({ min: 0, max: 600 }).withMessage('Seconds in reserve must be between 0 and 600'),
+    body('exercises.*.sets.*.bursts').optional({ nullable: true }).isInt({ min: 0, max: 100 }).withMessage('Bursts must be between 0 and 100'),
+    body('exercises.*.sets.*.burstSeconds').optional({ nullable: true }).isInt({ min: 0, max: 120 }).withMessage('Seconds per burst must be between 0 and 120'),
+    body('exercises.*.sets.*.burstRest').optional({ nullable: true }).isInt({ min: 0, max: 600 }).withMessage('Rest between bursts must be between 0 and 600 seconds'),
     body('exercises.*.sets.*.weight').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Weight must be 0 or more'),
     body('exercises.*.sets.*.side').optional({ nullable: true }).isIn(['left', 'right']).withMessage('Side must be left or right'),
     body('exercises.*.sets.*.rir').optional({ nullable: true }).isInt({ min: 0, max: 10 }).withMessage('RIR must be a whole number from 0 to 10'),

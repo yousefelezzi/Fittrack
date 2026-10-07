@@ -5,11 +5,13 @@ import {
   Card, Button, Spinner, colors, makeStyles, Sheet, Chip, ChipRow, Segmented, Label, Hint, ErrorText, LinkText, ExerciseImage, confirm,
 } from '../components';
 import { X } from 'lucide-react-native';
+import { EXERCISE_TYPES, TYPE_LABEL, typeOf } from '../../../client-web/src/utils/exerciseTypes';
+import { coveringMuscle, toggleMuscleTag } from '../../../client-web/src/utils/exerciseFilters';
 
 const MUSCLES = ['pecs','clavicular pecs','sternal pecs','costal pecs','lats','trapezius','posterior delt','middle delt','anterior delt','elbow flexors','biceps','brachialis/brachioradialis','triceps','medial/lateral triceps','triceps long head','forearms','abs','erectors','glutes','adductors','hip flexors','quads','vastus quads','rectus femoris','hamstrings','biarticular hamstrings','hamstrings short head','calves','soleus'];
 const EQUIPMENT = ['barbell','dumbbell','machine','cable','bodyweight','kettlebell','resistance_band','other'];
 const CATEGORIES = [['strength', 'Strength'], ['cardio', 'Cardio']];
-const EMPTY_FORM = { name: '', muscleGroups: [], secondaryMuscles: [], equipment: 'bodyweight', category: 'strength', laterality: 'bilateral', instructions: [''] };
+const EMPTY_FORM = { name: '', muscleGroups: [], secondaryMuscles: [], equipment: 'bodyweight', category: 'strength', laterality: 'bilateral', type: 'dynamic', instructions: [''] };
 // Names that mean one arm/leg at a time (same as server/utils/laterality.js).
 const UNILATERAL_NAME_PATTERN = /\b(single|one)[\s-]*(arm|leg|hand)\b|\bunilateral\b|\bcable lateral raise\b|\bdumbbell preacher curl\b/i;
 const pretty = (s) => s.replace('_', ' ');
@@ -28,6 +30,7 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
             ))}
             <Text style={[styles.badge, styles.badgeGray]}>{pretty(ex.equipment)}</Text>
             {ex.laterality === 'unilateral' && <Text style={[styles.badge, styles.badgePurple]}>Unilateral</Text>}
+            {typeOf(ex) !== 'dynamic' && <Text style={[styles.badge, styles.badgeAmber]}>{TYPE_LABEL[typeOf(ex)]}</Text>}
           </View>
         </View>
         <Text style={styles.chev}>{open ? '▴' : '▾'}</Text>
@@ -69,15 +72,15 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       equipment: exercise.equipment || 'bodyweight',
       category: exercise.category || 'strength',
       laterality: exercise.laterality || 'bilateral',
+      type: typeOf(exercise),
       instructions: exercise.instructions?.length ? exercise.instructions : [''],
     } : { ...EMPTY_FORM, category: exercise?.category || 'strength' });
   }, [visible, exercise]);
 
   // Until the user picks a type themselves, suggest one from the name.
   const setName = (name) => setForm((f) => ({ ...f, name, ...(!typeChosen && { laterality: UNILATERAL_NAME_PATTERN.test(name) ? 'unilateral' : 'bilateral' }) }));
-  const toggleMuscle = (m) => setForm((f) => (f.muscleGroups.includes(m)
-    ? { ...f, muscleGroups: f.muscleGroups.filter((x) => x !== m), secondaryMuscles: f.secondaryMuscles.filter((x) => x !== m) }
-    : { ...f, muscleGroups: [...f.muscleGroups, m] }));
+  // A whole muscle replaces its regions, which then can't be picked.
+  const toggleMuscle = (m) => setForm((f) => toggleMuscleTag(f, m));
   const setSecondary = (m, sec) => setForm((f) => ({
     ...f, secondaryMuscles: sec ? [...new Set([...f.secondaryMuscles, m])] : f.secondaryMuscles.filter((x) => x !== m),
   }));
@@ -112,8 +115,9 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
 
       <Label>Muscle groups {form.category === 'cardio' ? '· optional' : '*'}</Label>
       <ChipRow style={{ gap: 6 }}>
-        {MUSCLES.map((m) => <Chip key={m} small label={m} active={form.muscleGroups.includes(m)} onPress={() => toggleMuscle(m)} />)}
+        {MUSCLES.map((m) => <Chip key={m} small label={m} active={form.muscleGroups.includes(m)} disabled={!!coveringMuscle(m, form.muscleGroups)} onPress={() => toggleMuscle(m)} />)}
       </ChipRow>
+      {MUSCLES.some((m) => coveringMuscle(m, form.muscleGroups)) ? <Hint style={{ marginTop: 4 }}>Greyed-out regions are already included in a whole muscle you picked.</Hint> : null}
       {form.muscleGroups.length > 0 && (
         <View style={styles.weightBox}>
           <Text style={[styles.small, { fontWeight: '600' }]}>How much each set counts</Text>
@@ -133,7 +137,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
         {EQUIPMENT.map((e) => <Chip key={e} small label={pretty(e)} active={form.equipment === e} onPress={() => setForm((f) => ({ ...f, equipment: e }))} />)}
       </ChipRow>
 
-      <Label>Type</Label>
+      <Label>Sides</Label>
       <Segmented value={form.laterality} onChange={(v) => { setTypeChosen(true); setForm((f) => ({ ...f, laterality: v })); }}
         options={[['bilateral', 'Bilateral', 'Both sides together'], ['unilateral', 'Unilateral', 'One arm or leg at a time']]} />
       {form.laterality === 'unilateral' && (
@@ -144,6 +148,25 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       )}
       {isEdit && exercise.laterality === 'unilateral' && form.laterality === 'bilateral' && (
         <Hint style={{ marginTop: 4 }}>Sets you already logged per side stay as left and right.</Hint>
+      )}
+
+      {form.category !== 'cardio' && (
+        <>
+          <Label>Exercise type</Label>
+          <View style={{ gap: 6 }}>
+            {EXERCISE_TYPES.map(([v, label, hint]) => (
+              <TouchableOpacity key={v} onPress={() => setForm((f) => ({ ...f, type: v }))} style={[styles.typeOption, form.type === v && styles.typeOptionOn]}>
+                <Text style={[styles.typeLabel, form.type === v && { color: colors.brand }]}>{label}</Text>
+                <Text style={styles.typeHint}>{hint}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Hint style={{ marginTop: 4 }}>
+            {form.type === 'yielding' ? 'Sets are logged as seconds held, weight and seconds in reserve. Live sessions use a stopwatch.'
+              : form.type === 'overcoming' ? 'Sets are logged as bursts, seconds per burst and rest between bursts. Live sessions guide each burst with a timer.'
+                : 'Sets are logged as reps, weight and reps in reserve.'}
+          </Hint>
+        </>
       )}
 
       <Label>Instructions (optional)</Label>
@@ -264,6 +287,11 @@ const styles = makeStyles(() => ({
   badgeSecondary: { color: colors.brand, backgroundColor: colors.inset },
   badgeGray:  { color: colors.textSecondary, backgroundColor: colors.subtle },
   badgePurple:{ color: '#7e22ce', backgroundColor: '#faf5ff' },
+  badgeAmber: { color: colors.warning, backgroundColor: colors.warningLight },
+  typeOption: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  typeOptionOn: { borderColor: colors.brand, backgroundColor: colors.brandLight },
+  typeLabel:  { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  typeHint:   { fontSize: 11, color: colors.textMuted, marginTop: 1 },
   steps:      { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, gap: 4 },
   step:       { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   customRow:  { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },

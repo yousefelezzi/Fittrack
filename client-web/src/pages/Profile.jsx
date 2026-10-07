@@ -21,8 +21,8 @@ const GOAL_LABELS = {
 function Avatar({ user, size = 'lg' }) {
   const dim = size === 'lg' ? 'w-24 h-24 text-2xl' : 'w-8 h-8 text-xs';
   return user?.avatar
-    ? <img src={user.avatar} alt="" className={`${dim} rounded-full object-cover ring-4 ring-white`} />
-    : <div className={`${dim} rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold ring-4 ring-white`}>
+    ? <img src={user.avatar} alt="" className={`${dim} rounded-full object-cover`} />
+    : <div className={`${dim} rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold`}>
         {user?.name?.[0] ?? '?'}
       </div>;
 }

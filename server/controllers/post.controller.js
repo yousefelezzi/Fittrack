@@ -21,7 +21,7 @@ const populatePost = (query) =>
     .populate({
       path: 'workoutSession',
       select: 'name exercises duration date',
-      populate: { path: 'exercises.exercise', select: 'name images' },
+      populate: { path: 'exercises.exercise', select: 'name images type' },
     })
     .populate('comments.user', 'name avatar');
 

@@ -11,7 +11,7 @@ const WorkoutSession = require('../models/WorkoutSession');
 exports.getPlans = async (req, res, next) => {
   try {
     const plans = await WorkoutPlan.find({ user: req.user.id })
-      .populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images')
+      .populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images')
       .sort({ createdAt: -1 });
     res.json(plans);
   } catch (err) {
@@ -36,7 +36,7 @@ exports.getPlanById = async (req, res, next) => {
 exports.createPlan = async (req, res, next) => {
   try {
     const plan = await WorkoutPlan.create({ ...req.body, user: req.user.id });
-    await plan.populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images');
+    await plan.populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
     res.status(201).json(plan);
   } catch (err) {
     next(err);
@@ -50,7 +50,7 @@ exports.generatePlan = async (req, res, next) => {
   try {
     const exercises = await Exercise.find({
       $or: [{ isCustom: false }, { isCustom: true, createdBy: req.user.id }],
-    }).select('name muscleGroups secondaryMuscles equipment laterality category images isCustom').lean();
+    }).select('name muscleGroups secondaryMuscles equipment laterality type category images isCustom').lean();
     // The secondary-muscle weight follows the level picked (the plan may be for
     // someone else), so a value sent in the request is ignored.
     req.body = { ...req.body };
@@ -144,7 +144,7 @@ exports.updatePlan = async (req, res, next) => {
       { new: true, runValidators: true }
     );
     if (!plan) return res.status(404).json({ message: 'Plan not found' });
-    await plan.populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images');
+    await plan.populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
     res.json(plan);
   } catch (err) {
     next(err);
@@ -203,7 +203,7 @@ exports.startPlan = async (req, res, next) => {
       exercises,
     });
 
-    await session.populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality images');
+    await session.populate('exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
     res.status(201).json(session);
   } catch (err) {
     next(err);

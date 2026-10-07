@@ -4,7 +4,7 @@ const WorkoutSession = require('../models/WorkoutSession');
 const NutritionLog = require('../models/NutritionLog');
 const StepLog = require('../models/StepLog');
 const WorkoutPlan = require('../models/WorkoutPlan');
-const { estimateOneRepMax, effectiveReps, countsForOneRepMax } = require('../utils/oneRepMax');
+const { estimateOneRepMax, effectiveReps, countsForOneRepMax, asRepSet } = require('../utils/oneRepMax');
 const { canViewContent } = require('../utils/privacy');
 
 const STAT_KEYS = ['avgCalories', 'avgSteps', 'ffmi', 'split', 'oneRepMaxes'];
@@ -129,14 +129,17 @@ async function split(userId) {
 async function oneRepMaxes(userId) {
   const sessions = await WorkoutSession.find({ user: userId })
     .select('date exercises')
-    .populate('exercises.exercise', 'name')
+    .populate('exercises.exercise', 'name type')
     .lean();
 
   const best = new Map();
   for (const session of sessions) {
     for (const ex of session.exercises) {
       if (!ex.exercise) continue; // exercise was deleted from the library
-      for (const set of ex.sets) {
+      // Holds count 2 seconds as 1 rep; overcoming isometrics have no 1RM.
+      if (ex.exercise.type === 'overcoming') continue;
+      for (const logged of ex.sets) {
+        const set = asRepSet(logged, ex.exercise.type);
         // Skips warm-ups, 0 kg sets and ones too far from failure to estimate well.
         if (set.warmup || !countsForOneRepMax(set)) continue;
         // Reps in reserve count as reps (5 @ 1 RIR = 6-rep max). Same as the Progress page.
@@ -148,7 +151,11 @@ async function oneRepMaxes(userId) {
             name: ex.exercise.name,
             oneRepMax: round1(e1rm),
             isEstimate: effectiveReps(set) !== 1,
-            fromSet: { weight: set.weight, reps: set.reps, rir: set.rir ?? null, side: set.side ?? null },
+            fromSet: {
+              weight: set.weight, reps: set.reps, rir: set.rir ?? null, side: set.side ?? null,
+              // A hold, shown as held (16s @ 2s in reserve) rather than as reps.
+              ...(ex.exercise.type === 'yielding' && { duration: logged.duration ?? 0, sir: logged.sir ?? null }),
+            },
             date: session.date,
           });
         }

@@ -27,6 +27,13 @@ const exerciseSchema = new mongoose.Schema(
     // Strength exercises are logged as sets; cardio ones (jump rope, sleds…) are
     // listed separately and don't need muscle groups.
     category: { type: String, enum: ['strength', 'cardio'], default: 'strength' },
+    // How a set is done and logged:
+    //   dynamic    — reps × weight, with reps in reserve (most exercises)
+    //   yielding   — an isometric hold against a load (plank, wall sit): seconds
+    //                held × weight, with seconds in reserve
+    //   overcoming — an isometric push/pull against something that doesn't move:
+    //                a number of bursts, seconds per burst, rest between bursts
+    type: { type: String, enum: ['dynamic', 'yielding', 'overcoming'], default: 'dynamic' },
     // Unilateral exercises (one arm/leg at a time) are logged per side.
     laterality: { type: String, enum: ['bilateral', 'unilateral'], default: 'bilateral' },
     instructions: [{ type: String }], // step-by-step

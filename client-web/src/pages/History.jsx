@@ -135,7 +135,7 @@ function WorkoutRow({ workout, onDelete, deleting }) {
             <div key={i}>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{ex.exercise?.name ?? 'Deleted exercise'}</p>
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                {ex.sets.map((s) => `${setLabel(s, ex.weightUnit)}${s.restTime != null ? ` (rest ${fmtRest(s.restTime)})` : ''}`).join(' · ')}
+                {ex.sets.map((s) => `${setLabel(s, ex.weightUnit, ex.exercise)}${s.restTime != null ? ` (rest ${fmtRest(s.restTime)})` : ''}`).join(' · ')}
               </p>
             </div>
           ))}

@@ -3,6 +3,8 @@ import { exerciseAPI } from '../api';
 import Modal from '../components/Modal';
 import { Search, Plus, ChevronDown, ChevronUp, X, Pencil, Trash2 } from 'lucide-react';
 import ExerciseImage from '../components/ExerciseImage';
+import { EXERCISE_TYPES, TYPE_LABEL, typeOf } from '../utils/exerciseTypes';
+import { coveringMuscle, toggleMuscleTag } from '../utils/exerciseFilters';
 
 const MUSCLES = ['pecs','clavicular pecs','sternal pecs','costal pecs','lats','trapezius','posterior delt','middle delt','anterior delt','elbow flexors','biceps','brachialis/brachioradialis','triceps','medial/lateral triceps','triceps long head','forearms','abs','erectors','glutes','adductors','hip flexors','quads','vastus quads','rectus femoris','hamstrings','biarticular hamstrings','hamstrings short head','calves','soleus'];
 const EQUIPMENT = ['barbell','dumbbell','machine','cable','bodyweight','kettlebell','resistance_band','other'];
@@ -18,6 +20,7 @@ const EMPTY_FORM = {
   equipment: 'bodyweight',
   category: 'strength',
   laterality: 'bilateral',
+  type: 'dynamic',
   instructions: [''],
 };
 
@@ -45,6 +48,9 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
             <span className="badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 capitalize">{ex.equipment}</span>
             {ex.laterality === 'unilateral' && (
               <span className="badge bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400">Unilateral</span>
+            )}
+            {typeOf(ex) !== 'dynamic' && (
+              <span className="badge bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">{TYPE_LABEL[typeOf(ex)]}</span>
             )}
           </div>
         </div>
@@ -101,6 +107,7 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
           equipment: exercise.equipment || 'bodyweight',
           category: exercise.category || 'strength',
           laterality: exercise.laterality || 'bilateral',
+          type: typeOf(exercise),
           instructions: exercise.instructions?.length ? exercise.instructions : [''],
         }
       : EMPTY_FORM);
@@ -111,11 +118,9 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
     ...(!typeChosen && { laterality: UNILATERAL_NAME_PATTERN.test(name) ? 'unilateral' : 'bilateral' }),
   }));
 
-  // Clicking a muscle adds it (as primary); removing it also drops it from secondary.
-  const toggleMuscle = (m) =>
-    setForm(f => (f.muscleGroups.includes(m)
-      ? { ...f, muscleGroups: f.muscleGroups.filter(x => x !== m), secondaryMuscles: (f.secondaryMuscles || []).filter(x => x !== m) }
-      : { ...f, muscleGroups: [...f.muscleGroups, m] }));
+  // Clicking a muscle adds it (as primary); removing it also drops it from
+  // secondary. A whole muscle replaces its regions, which then can't be picked.
+  const toggleMuscle = (m) => setForm(f => toggleMuscleTag(f, m));
   const toggleSecondary = (m) =>
     setForm(f => ({
       ...f,
@@ -174,16 +179,20 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
             Muscle Groups {form.category === 'cardio' ? <span className="font-normal text-gray-400">· optional</span> : '*'}
           </label>
           <div className="flex flex-wrap gap-2">
-            {MUSCLES.map(m => (
-              <button key={m} type="button" onClick={() => toggleMuscle(m)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  form.muscleGroups.includes(m)
-                    ? 'bg-brand-600 text-white border-brand-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-brand-400'
-                }`}>
-                {m.replace('_', ' ')}
-              </button>
-            ))}
+            {MUSCLES.map(m => {
+              const coveredBy = coveringMuscle(m, form.muscleGroups);
+              return (
+                <button key={m} type="button" onClick={() => toggleMuscle(m)} disabled={!!coveredBy}
+                  title={coveredBy ? `Already included in ${coveredBy}` : undefined}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${
+                    form.muscleGroups.includes(m)
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-brand-400'
+                  }`}>
+                  {m.replace('_', ' ')}
+                </button>
+              );
+            })}
           </div>
           {form.muscleGroups.length > 0 && (
             <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800 p-3 space-y-1.5">
@@ -221,7 +230,7 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sides</label>
           <div className="grid grid-cols-2 gap-2">
             {[['bilateral', 'Bilateral', 'Both sides together'], ['unilateral', 'Unilateral', 'One arm or leg at a time']].map(([v, label, hint]) => (
               <button key={v} type="button" onClick={() => { setTypeChosen(true); setForm(f => ({ ...f, laterality: v })); }}
@@ -243,6 +252,28 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Sets you already logged per side stay as left and right.</p>
           )}
         </div>
+
+        {form.category !== 'cardio' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Exercise type</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {EXERCISE_TYPES.map(([v, label, hint]) => (
+                <button key={v} type="button" onClick={() => setForm(f => ({ ...f, type: v }))}
+                  className={`px-3 py-2 rounded-lg border text-left transition-colors ${form.type === v
+                    ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/30'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-brand-400'}`}>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">{hint}</p>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+              {form.type === 'yielding' ? 'Sets are logged as seconds held, weight and seconds in reserve. Live sessions use a stopwatch.'
+                : form.type === 'overcoming' ? 'Sets are logged as bursts, seconds per burst and rest between bursts. Live sessions guide each burst with a timer.'
+                  : 'Sets are logged as reps, weight and reps in reserve.'}
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

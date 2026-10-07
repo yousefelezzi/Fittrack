@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { userAPI } from '../api';
 import { Flame, Gauge, CalendarDays, Trophy, Lock, Globe, Footprints } from 'lucide-react';
+import { oneRepMaxSourceLabel } from '../utils/workoutSummary';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FIELD_LABELS = { height: 'height', weight: 'weight', bodyFat: 'body fat %' };
@@ -135,7 +136,7 @@ function MaxesBody({ data, isOwner }) {
             <div className="min-w-0">
               <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{m.name}</p>
               <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                {m.isEstimate ? `Est. from ${m.fromSet.weight}kg × ${m.fromSet.reps}${m.fromSet.rir ? ` @ ${m.fromSet.rir} RIR` : ''}` : 'Actual single'}{m.fromSet.side ? ` (${m.fromSet.side})` : ''} · {format(new Date(m.date), 'MMM d, yyyy')}
+                {m.isEstimate ? `Est. from ${oneRepMaxSourceLabel(m.fromSet)}` : 'Actual single'}{m.fromSet.side ? ` (${m.fromSet.side})` : ''} · {format(new Date(m.date), 'MMM d, yyyy')}
               </p>
             </div>
             <p className="text-sm font-bold text-gray-900 dark:text-gray-100 shrink-0">{m.oneRepMax} kg</p>
