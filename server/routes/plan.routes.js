@@ -14,9 +14,16 @@ const {
   generatePlan,
   analyzePlan,
   planSkeleton,
+  saveWorkoutAsPlan,
 } = require('../controllers/plan.controller');
 
 router.get('/', protect, getPlans);
+// Save a workout (yours, or one shared with you in a post or message) as a template.
+router.post('/from-workout', protect, [
+  body('workoutId').isMongoId().withMessage('Invalid workout'),
+  body('postId').optional().isMongoId().withMessage('Invalid post'),
+  body('messageId').optional().isMongoId().withMessage('Invalid message'),
+], validate, saveWorkoutAsPlan);
 router.post(
   '/generate',
   protect,

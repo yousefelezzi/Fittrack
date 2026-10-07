@@ -442,7 +442,7 @@ export default function NutritionScreen({ navigation }) {
   const today = ymd(new Date());
   const isPast = date < today;
   const shift = (n) => setDate(ymd(addDays(parseISO(date), n)));
-  const toProfile = () => navigation.navigate('Profile');
+  const toProfile = () => navigation.navigate('Tabs', { screen: 'Profile' });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

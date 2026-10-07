@@ -8,13 +8,14 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { format, isToday, formatDistanceToNow, formatDistanceToNowStrict } from 'date-fns';
-import { messageAPI, workoutAPI, userAPI, postAPI, uploadUrl } from '../api';
+import { messageAPI, workoutAPI, userAPI, postAPI, planAPI, uploadUrl } from '../api';
 import { summarizeWorkout } from '../../../client-web/src/utils/workoutSummary';
 import { colors, makeStyles, cardSurface } from './tokens';
 import { Hint, ErrorText, LinkText, Chip, ChipRow, confirm } from './ui';
 import ExerciseImage from './ExerciseImage';
 import {
   Heart, MessageCircle, Pencil, Trash2, Send, Dumbbell, Check, ChevronLeft, Users, UserPlus, LogOut, Image as ImageIcon,
+  BookmarkPlus,
 } from 'lucide-react-native';
 
 const idOf = (x) => String(x?._id ?? x);
@@ -37,7 +38,43 @@ function SmallBtn({ title, onPress, primary, disabled }) {
 }
 
 /** A shared workout: name, date, duration, sets and volume; tap to see each exercise. */
-export function WorkoutSummary({ workout }) {
+/**
+ * "Save as template": copies the workout into your plans. `source` says where
+ * you saw it ({ postId } or { messageId }) so the server can check you may.
+ */
+function SaveAsTemplate({ workout, source }) {
+  const [state, setState] = useState('idle'); // idle | saving | saved | error
+  const [error, setError] = useState('');
+  const save = async () => {
+    setState('saving');
+    try {
+      await planAPI.fromWorkout({ workoutId: workout._id, ...source });
+      setState('saved');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save it');
+      setState('error');
+    }
+  };
+  return (
+    <View style={styles.workoutRow}>
+      {state === 'saved' ? (
+        <><Check size={14} color={colors.success} /><Text style={[styles.small, { color: colors.success }]}>Saved to your templates (Train → Plans)</Text></>
+      ) : (
+        <TouchableOpacity onPress={save} disabled={state === 'saving'} style={styles.row} hitSlop={6}>
+          <BookmarkPlus size={15} color={colors.brand} />
+          <Text style={styles.linkText}>{state === 'saving' ? 'Saving…' : 'Save as template'}</Text>
+        </TouchableOpacity>
+      )}
+      {state === 'error' ? <Text style={[styles.small, { color: colors.danger }]}>{error}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * A shared workout: name, date, duration, sets and volume; tap to see each
+ * exercise. With `source` ({ postId } / { messageId }) it can be saved as a template.
+ */
+export function WorkoutSummary({ workout, source }) {
   const [open, setOpen] = useState(false);
   if (!workout) return null;
   const { exercises, volume, sets } = summarizeWorkout(workout);
@@ -61,6 +98,7 @@ export function WorkoutSummary({ workout }) {
           <Text style={styles.muted}>{e.sets} set{e.sets !== 1 ? 's' : ''}{e.bestLabel ? ` · ${e.bestLabel}` : ''}</Text>
         </View>
       ))}
+      {source && workout._id ? <SaveAsTemplate workout={workout} source={source} /> : null}
     </View>
   );
 }
@@ -171,7 +209,7 @@ export function PostCard({ post, me, following, requested, onFollow, onLike, onU
             onSave={async (caption) => { await onEdit(post._id, caption); setEditing(false); }} />
         </View>
       ) : post.caption ? <Text style={styles.caption}>{post.caption}</Text> : null}
-      {post.workoutSession ? <View style={{ marginTop: 8 }}><WorkoutSummary workout={post.workoutSession} /></View> : null}
+      {post.workoutSession ? <View style={{ marginTop: 8 }}><WorkoutSummary workout={post.workoutSession} source={{ postId: post._id }} /></View> : null}
       {post.image ? <Image source={{ uri: uploadUrl(post.image) }} style={styles.postImage} resizeMode="cover" /> : null}
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => (liked ? onUnlike(post._id) : onLike(post._id))} style={styles.row} hitSlop={6}>
@@ -664,7 +702,7 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
                   <Text style={styles.tiny}>{sender?.name ?? 'Former member'}</Text>
                 </View>
               ) : null}
-              {m.workoutSession ? <View style={{ width: 260 }}><WorkoutSummary workout={m.workoutSession} /></View> : null}
+              {m.workoutSession ? <View style={{ width: 260 }}><WorkoutSummary workout={m.workoutSession} source={{ messageId: m._id }} /></View> : null}
               {m.text ? <Text style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>{m.text}</Text> : null}
               <Text style={styles.tiny}>
                 {format(new Date(m.createdAt), isToday(new Date(m.createdAt)) ? 'HH:mm' : 'MMM d, HH:mm')}

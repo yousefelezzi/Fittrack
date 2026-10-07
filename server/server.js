@@ -21,6 +21,7 @@ const postRoutes      = require('./routes/post.routes');
 const foodRoutes      = require('./routes/food.routes');
 const messageRoutes   = require('./routes/message.routes');
 const stepsRoutes     = require('./routes/steps.routes');
+const supplementRoutes = require('./routes/supplement.routes');
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use('/api/posts',     postRoutes);
 app.use('/api/foods',     foodRoutes);
 app.use('/api/messages',  messageRoutes);
 app.use('/api/steps',     stepsRoutes);
+app.use('/api/supplements', supplementRoutes);
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use(errorHandler);

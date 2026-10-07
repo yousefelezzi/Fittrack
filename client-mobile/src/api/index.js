@@ -172,9 +172,18 @@ export const planAPI = {
   generate: (opts)      => api.post('/plans/generate', opts),
   analyze:  (body)      => api.post('/plans/analyze', body),
   skeleton: (opts)      => api.post('/plans/skeleton', opts),
+  // Save a workout (yours, or shared with you: { postId } or { messageId }) as a template.
+  fromWorkout: (body) => api.post('/plans/from-workout', body),
 };
 
 // ── Nutrition ─────────────────────────────────────────────────────────────────
+export const supplementAPI = {
+  getAll: ()         => api.get('/supplements'),
+  create: (data)     => api.post('/supplements', data),
+  update: (id, data) => api.put(`/supplements/${id}`, data),
+  delete: (id)       => api.delete(`/supplements/${id}`),
+};
+
 export const nutritionAPI = {
   getByDate:   (date)             => api.get('/nutrition', { params: { date } }),
   getRange:    (from, to)         => api.get('/nutrition/range', { params: { from, to } }),
@@ -190,6 +199,10 @@ export const nutritionAPI = {
   applyPlan:   (body)             => api.post('/nutrition/meal-plan/apply', body),
   deleteLog:   (id)               => api.delete(`/nutrition/${id}`),
   deleteAll:   ()                 => api.delete('/nutrition'),
+  summary:     (from, to)         => api.get('/nutrition/summary', { params: { from, to } }),
+  addWater:    (date, amount)     => api.post('/nutrition/water', { date, amount }),
+  deleteWater: (entryId)          => api.delete(`/nutrition/water/${entryId}`),
+  toggleSupplement: (date, supplementId) => api.post('/nutrition/supplements/toggle', { date, supplementId }),
 };
 
 // ── Foods ─────────────────────────────────────────────────────────────────────

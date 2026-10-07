@@ -5,6 +5,8 @@ const { nutritionTargets } = require('../utils/nutritionTargets');
 const { generateMealPlan, catalogFoodNames } = require('../utils/mealPlan');
 const { MACRO_KEYS } = require('../utils/nutritionConstants');
 const Food = require('../models/Food');
+const Supplement = require('../models/Supplement');
+const { waterGoal } = require('../utils/hydration');
 const { per100gFor, portionNutrition, resolveState, nameInState } = require('../utils/foodState');
 
 // Lazy require: food.controller is only needed for recipe meals.
@@ -392,6 +394,91 @@ exports.updateGoals = async (req, res, next) => {
     );
     if (!log) return res.status(404).json({ message: 'Log not found' });
     res.json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Hydration & supplements ─────────────────────────────────────────────────
+
+// The log for a day, created if there isn't one yet.
+const logForDay = (userId, date, update) => NutritionLog.findOneAndUpdate(
+  { user: userId, date: sameDay(date) },
+  { ...update, $setOnInsert: { user: userId, date: startOfDay(date) } },
+  { upsert: true, new: true }
+);
+
+// POST /api/nutrition/water { date, amount }  — log a drink (ml)
+exports.addWater = async (req, res, next) => {
+  try {
+    const log = await logForDay(req.user.id, req.body.date, { $push: { water: { amount: Math.round(Number(req.body.amount)), at: new Date() } } });
+    res.status(201).json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/nutrition/water/:entryId  — remove a drink
+exports.deleteWater = async (req, res, next) => {
+  try {
+    const log = await NutritionLog.findOneAndUpdate(
+      { user: req.user.id, 'water._id': req.params.entryId },
+      { $pull: { water: { _id: req.params.entryId } } },
+      { new: true }
+    );
+    if (!log) return res.status(404).json({ message: 'Entry not found' });
+    res.json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/nutrition/supplements/toggle { date, supplementId }  — tick a supplement off (or undo)
+exports.toggleSupplement = async (req, res, next) => {
+  try {
+    const { date, supplementId } = req.body;
+    const supplement = await Supplement.findOne({ _id: supplementId, user: req.user.id }).select('_id').lean();
+    if (!supplement) return res.status(404).json({ message: 'Supplement not found' });
+    const existing = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date), 'supplementsTaken.supplement': supplementId }).select('_id').lean();
+    const log = existing
+      ? await NutritionLog.findByIdAndUpdate(existing._id, { $pull: { supplementsTaken: { supplement: supplementId } } }, { new: true })
+      : await logForDay(req.user.id, date, { $push: { supplementsTaken: { supplement: supplementId, at: new Date() } } });
+    res.json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/nutrition/summary?from=2026-09-01&to=2026-10-01
+// Per-day totals for the Progress charts (days with nothing logged are left
+// out) plus the daily water goal: { days: [{ date, calories, protein, carbs,
+// fat, fiber, water, supplements, goals }], waterGoal }.
+exports.getSummary = async (req, res, next) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ message: 'from and to dates are required' });
+    const [logs, user] = await Promise.all([
+      NutritionLog.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } })
+        .select('date meals.calories meals.protein meals.carbs meals.fat meals.micros.fiber water supplementsTaken dailyGoals')
+        .sort({ date: 1 })
+        .lean(),
+      User.findById(req.user.id).select('weight waterGoal').lean(),
+    ]);
+    const sum = (list, f) => Math.round(list.reduce((n, x) => n + (Number(f(x)) || 0), 0));
+    const days = logs
+      .map((l) => ({
+        date: l.date.toISOString().slice(0, 10),
+        calories: sum(l.meals, (m) => m.calories),
+        protein: sum(l.meals, (m) => m.protein),
+        carbs: sum(l.meals, (m) => m.carbs),
+        fat: sum(l.meals, (m) => m.fat),
+        fiber: sum(l.meals, (m) => m.micros?.fiber),
+        water: sum(l.water || [], (w) => w.amount),
+        supplements: (l.supplementsTaken || []).length,
+        goals: l.dailyGoals || null,
+      }))
+      .filter((d) => d.calories || d.water || d.supplements);
+    res.json({ days, waterGoal: waterGoal(user) });
   } catch (err) {
     next(err);
   }

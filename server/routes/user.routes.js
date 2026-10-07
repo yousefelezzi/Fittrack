@@ -41,6 +41,7 @@ router.put(
     body('bodyFat').optional({ nullable: true }).isFloat({ min: 3, max: 70 }).withMessage('Body fat must be between 3 and 70%'),
     body('sex').optional({ nullable: true }).isIn(['male', 'female']).withMessage('Sex must be male or female'),
     body('activityLevel').optional({ nullable: true }).isIn([1.2, 1.375, 1.55, 1.725, 1.9]).withMessage('Invalid activity level'),
+    body('waterGoal').optional({ nullable: true }).isInt({ min: 500, max: 8000 }).withMessage('Water goal must be between 500 and 8000 ml'),
     body('weightUnit').optional().isIn(['kg', 'lb']).withMessage('Unit must be kg or lb'),
     body('stepGoal').optional().isInt({ min: 1000, max: 50000 }).withMessage('Step goal must be between 1,000 and 50,000'),
     body('statsVisibility').optional().isObject().withMessage('Invalid visibility settings'),

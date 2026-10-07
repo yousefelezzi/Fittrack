@@ -13,6 +13,9 @@ import Plans       from './pages/Plans';
 import History     from './pages/History';
 import Progress    from './pages/Progress';
 import Nutrition   from './pages/Nutrition';
+import Hydration from './pages/Hydration';
+import Supplements from './pages/Supplements';
+import NutritionProgress from './pages/NutritionProgress';
 import Steps       from './pages/Steps';
 import Feed        from './pages/Feed';
 import Profile     from './pages/Profile';
@@ -55,6 +58,9 @@ export default function App() {
               <Route path="history"   element={<History />} />
               <Route path="progress"  element={<Progress />} />
               <Route path="nutrition" element={<Nutrition />} />
+              <Route path="nutrition/hydration" element={<Hydration />} />
+              <Route path="nutrition/supplements" element={<Supplements />} />
+              <Route path="nutrition/progress" element={<NutritionProgress />} />
               <Route path="steps"     element={<Steps />} />
               <Route path="feed"      element={<Feed />} />
               <Route path="profile"   element={<Profile />} />

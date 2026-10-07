@@ -68,6 +68,17 @@ const nutritionLogSchema = new mongoose.Schema(
       fat:       { type: Number, default: 65 },
     },
     notes: { type: String, default: '' },
+    // Water drunk that day, one entry per drink (ml).
+    water: [{
+      amount: { type: Number, min: 1, max: 5000, required: true },
+      at: { type: Date, default: Date.now },
+    }],
+    // Supplements ticked off that day.
+    supplementsTaken: [{
+      supplement: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplement', required: true },
+      at: { type: Date, default: Date.now },
+      _id: false,
+    }],
   },
   { timestamps: true }
 );

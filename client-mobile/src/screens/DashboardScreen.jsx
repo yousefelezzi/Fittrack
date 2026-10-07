@@ -133,7 +133,7 @@ export default function DashboardScreen({ navigation }) {
             <TouchableOpacity onPress={() => navigation.navigate('History', { tab: 'nutrition' })}>
               <Text style={[styles.cardAction, { color: colors.textSecondary }]}>History</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Nutrition')}>
+            <TouchableOpacity onPress={() => navigation.navigate('FoodLog')}>
               <Text style={styles.cardAction}>Track</Text>
             </TouchableOpacity>
           </View>

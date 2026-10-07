@@ -1,0 +1,92 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { format } from 'date-fns';
+import { Utensils, GlassWater, Pill, ChartLine, History } from 'lucide-react-native';
+import { nutritionAPI, supplementAPI } from '../api';
+import { Card, ListRow, colors, makeStyles, Title } from '../components';
+import { WATER_PRESETS, formatMl } from '../../../client-web/src/utils/nutritionProgress';
+
+const today = () => format(new Date(), 'yyyy-MM-dd');
+
+/** Everything about nutrition in one place, like Train: today at a glance, then the sections. */
+export default function NutritionHubScreen({ navigation }) {
+  const [log, setLog] = useState(null);
+  const [waterGoal, setWaterGoal] = useState(2500);
+  const [supplements, setSupplements] = useState([]);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    const d = today();
+    nutritionAPI.getByDate(d).then(({ data }) => setLog(data)).catch(() => {});
+    nutritionAPI.summary(d, d).then(({ data }) => setWaterGoal(data.waterGoal)).catch(() => {});
+    supplementAPI.getAll().then(({ data }) => setSupplements(data)).catch(() => {});
+  }, []);
+  useEffect(() => navigation.addListener('focus', load), [navigation, load]);
+
+  const totals = (log?.meals || []).reduce((t, m) => ({ calories: t.calories + (m.calories || 0), protein: t.protein + (m.protein || 0) }), { calories: 0, protein: 0 });
+  const goals = log?.dailyGoals || {};
+  const water = (log?.water || []).reduce((n, w) => n + w.amount, 0);
+  const takenIds = new Set((log?.supplementsTaken || []).map((t) => String(t.supplement)));
+  const taken = supplements.filter((s) => takenIds.has(String(s._id))).length;
+
+  const drink = async (ml) => {
+    setBusy(true);
+    try { setLog((await nutritionAPI.addWater(today(), ml)).data); } catch { /* shown on next load */ } finally { setBusy(false); }
+  };
+  const bar = (value, goal, color) => (
+    <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, goal ? (value / goal) * 100 : 0)}%`, backgroundColor: color }]} /></View>
+  );
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16 }}>
+      <Title>Nutrition</Title>
+      <Card>
+        <Text style={styles.cap}>TODAY</Text>
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Calories</Text>
+          <Text style={styles.statValue}>{Math.round(totals.calories)} / {Math.round(goals.calories || 0)} kcal</Text>
+        </View>
+        {bar(totals.calories, goals.calories, '#f97316')}
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Protein</Text>
+          <Text style={styles.statValue}>{Math.round(totals.protein)} / {Math.round(goals.protein || 0)} g</Text>
+        </View>
+        {bar(totals.protein, goals.protein, colors.brand)}
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Water</Text>
+          <Text style={styles.statValue}>{formatMl(water)} / {formatMl(waterGoal)}</Text>
+        </View>
+        {bar(water, waterGoal, '#06b6d4')}
+        <View style={[styles.statRow, { marginTop: 4 }]}>
+          {WATER_PRESETS.slice(0, 3).map((ml) => (
+            <TouchableOpacity key={ml} disabled={busy} onPress={() => drink(ml)} style={styles.quick}>
+              <GlassWater size={13} color={colors.brand} /><Text style={styles.quickText}>+{formatMl(ml)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {supplements.length > 0 ? (
+          <Text style={[styles.statLabel, { marginTop: 10 }]}>Supplements: <Text style={styles.statValue}>{taken} of {supplements.length} taken</Text></Text>
+        ) : null}
+      </Card>
+
+      <Card style={{ paddingVertical: 4 }}>
+        <ListRow icon={Utensils} title="Food Log" subtitle="Meals, macros, the meal planner and recipes" onPress={() => navigation.navigate('FoodLog')} />
+        <ListRow icon={GlassWater} title="Hydration" subtitle="Water through the day against your goal" onPress={() => navigation.navigate('Hydration')} />
+        <ListRow icon={Pill} title="Supplements" subtitle="Your supplements, ticked off each day" onPress={() => navigation.navigate('Supplements')} />
+        <ListRow icon={ChartLine} title="Progress" subtitle="Daily calories, macros and water over time" onPress={() => navigation.navigate('NutritionProgress')} />
+        <ListRow icon={History} title="History" subtitle="Past days' meals" onPress={() => navigation.navigate('History', { tab: 'nutrition' })} last />
+      </Card>
+    </ScrollView>
+  );
+}
+
+const styles = makeStyles(() => ({
+  cap:       { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, marginBottom: 6 },
+  statRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6 },
+  statLabel: { fontSize: 13, color: colors.textSecondary },
+  statValue: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  track:     { height: 7, backgroundColor: colors.subtle, borderRadius: 999, overflow: 'hidden', marginTop: 4 },
+  fill:      { height: '100%', borderRadius: 999 },
+  quick:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingVertical: 6 },
+  quickText: { fontSize: 12, fontWeight: '600', color: colors.brand },
+}));

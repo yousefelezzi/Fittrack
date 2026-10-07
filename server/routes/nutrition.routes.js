@@ -22,6 +22,10 @@ const {
   copyMeals,
   createMealPlan,
   applyMealPlan,
+  addWater,
+  deleteWater,
+  toggleSupplement,
+  getSummary,
 } = require('../controllers/nutrition.controller');
 
 // GET /api/nutrition?date=2024-01-15
@@ -35,6 +39,20 @@ router.get('/targets', protect, getTargets);
 
 // GET /api/nutrition/history?page=1&limit=10
 router.get('/history', protect, getHistory);
+
+// GET /api/nutrition/summary?from=…&to=…  — per-day totals for the Progress charts
+router.get('/summary', protect, getSummary);
+
+// Hydration and supplements, kept on the day's log.
+router.post('/water', protect, [
+  body('date').isISO8601().withMessage('Valid date is required'),
+  body('amount').isInt({ min: 1, max: 5000 }).withMessage('Amount must be between 1 and 5000 ml'),
+], validate, addWater);
+router.delete('/water/:entryId', protect, deleteWater);
+router.post('/supplements/toggle', protect, [
+  body('date').isISO8601().withMessage('Valid date is required'),
+  body('supplementId').isMongoId().withMessage('Invalid supplement'),
+], validate, toggleSupplement);
 
 router.delete('/', protect, deleteAllLogs);
 router.delete('/:id', protect, deleteLog);

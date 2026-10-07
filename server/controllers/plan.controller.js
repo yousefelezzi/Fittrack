@@ -226,3 +226,68 @@ exports.setActivePlan = async (req, res, next) => {
     next(err);
   }
 };
+
+// POST /api/plans/from-workout { workoutId, postId?, messageId? }
+// Save a workout as a template (a one-workout plan). It can be your own, or one
+// shared with you: in a post you can see (postId) or a message in one of your
+// chats (messageId). Someone else's custom exercises are copied into yours.
+exports.saveWorkoutAsPlan = async (req, res, next) => {
+  try {
+    const me = String(req.user.id);
+    const { workoutId, postId, messageId } = req.body;
+    const notFound = () => res.status(404).json({ message: 'Workout not found' });
+
+    const workout = await WorkoutSession.findById(workoutId)
+      .populate('exercises.exercise')
+      .populate('user', 'name privacy followers following')
+      .lean();
+    if (!workout) return notFound();
+
+    // You can save it if it's yours, or it reached you through a post or a message.
+    let allowed = String(workout.user?._id) === me;
+    if (!allowed && postId) {
+      const Post = require('../models/Post');
+      const { canViewContent } = require('../utils/privacy');
+      const post = await Post.findOne({ _id: postId, workoutSession: workoutId }).select('_id').lean();
+      allowed = !!post && canViewContent(workout.user, me);
+    }
+    if (!allowed && messageId) {
+      const Message = require('../models/Message');
+      const Conversation = require('../models/Conversation');
+      const msg = await Message.findOne({ _id: messageId, workoutSession: workoutId }).select('conversation').lean();
+      allowed = !!msg && !!(await Conversation.exists({ _id: msg.conversation, participants: me }));
+    }
+    if (!allowed) return notFound();
+
+    // Custom exercises you can't use (someone else's) get a copy of your own,
+    // or your existing custom exercise with the same name.
+    for (const ex of workout.exercises) {
+      const e = ex.exercise;
+      if (!e || !e.isCustom || String(e.createdBy) === me) continue;
+      const nameRe = new RegExp(`^${e.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      const mine = await Exercise.findOne({ isCustom: true, createdBy: me, name: nameRe });
+      ex.exercise = mine || await Exercise.create({
+        name: e.name, muscleGroups: e.muscleGroups, secondaryMuscles: e.secondaryMuscles, equipment: e.equipment,
+        category: e.category, laterality: e.laterality, type: e.type, instructions: e.instructions, images: e.images,
+        isCustom: true, createdBy: me,
+      });
+    }
+
+    const { planExercisesFromWorkout } = require('../utils/planFromWorkout');
+    const exercises = planExercisesFromWorkout(workout);
+    if (!exercises.length) return res.status(400).json({ message: 'That workout has no exercises to save' });
+
+    const from = String(workout.user?._id) === me ? '' : ` (from ${workout.user?.name || 'someone'})`;
+    const plan = await WorkoutPlan.create({
+      user: me,
+      name: `${workout.name}${from}`.slice(0, 100),
+      description: from ? `Saved from ${workout.user?.name}'s workout.` : 'Saved from one of your workouts.',
+      schedule: 'rotation',
+      days: [{ dayOfWeek: 0, label: workout.name, exercises }],
+    });
+    await plan.populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
+    res.status(201).json(plan);
+  } catch (err) {
+    next(err);
+  }
+};

@@ -125,7 +125,7 @@ export default function PostCard({ post, me, following, requested, onFollow, onL
         <InlineEditor initial={post.caption} rows={3} placeholder="Write something…" onCancel={() => setEditing(false)}
           onSave={async (caption) => { await onEdit(post._id, caption); setEditing(false); }} />
       ) : post.caption && <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-line">{post.caption}</p>}
-      {post.workoutSession && <WorkoutSummary workout={post.workoutSession} />}
+      {post.workoutSession && <WorkoutSummary workout={post.workoutSession} source={{ postId: post._id }} />}
       {post.image && <img src={post.image} alt="" className="w-full rounded-xl object-cover max-h-96" />}
 
       <div className="flex items-center gap-4 pt-1 border-t border-gray-50 dark:border-gray-800">

@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Dumbbell, ClipboardList, BarChart2,
   Apple, Users, LogOut, Menu, X, Moon, Sun,
   Calculator, History, Dumbbell as WorkoutsIcon, ChevronDown, PlusCircle, Footprints,
+  Utensils, GlassWater, Pill, TrendingUp,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { messageAPI } from '../api';
@@ -19,19 +20,26 @@ const workoutNav = [
   { to: '/progress',  label: 'Progress',    icon: BarChart2 },
 ];
 
+// Nutrition has the same kind of group: the food log, hydration, supplements, progress.
+const nutritionNav = [
+  { to: '/nutrition',             label: 'Food Log',    icon: Utensils, end: true },
+  { to: '/nutrition/hydration',   label: 'Hydration',   icon: GlassWater },
+  { to: '/nutrition/supplements', label: 'Supplements', icon: Pill },
+  { to: '/nutrition/progress',    label: 'Progress',    icon: TrendingUp },
+];
+
 const nav = [
   { to: '/history',   label: 'History',     icon: History },
-  { to: '/nutrition', label: 'Nutrition',   icon: Apple },
   { to: '/steps',     label: 'Steps',       icon: Footprints },
   { to: '/feed',      label: 'Community',   icon: Users },
 ];
 
 
 
-const NavItem = ({ to, label, Icon, onClick, nested, badge }) => (
+const NavItem = ({ to, label, Icon, onClick, nested, badge, end }) => (
   <NavLink
     to={to}
-    end={to === '/'}
+    end={end || to === '/'}
     onClick={onClick}
     className={({ isActive }) =>
       `flex items-center gap-3 ${nested ? 'pl-9 pr-3 py-1.5' : 'px-3 py-2'} rounded-lg text-sm font-medium transition-colors ${
@@ -65,9 +73,32 @@ export default function Layout() {
     const id = setInterval(check, 60000);
     return () => clearInterval(id);
   }, [location.pathname, location.search]);
-  const inWorkouts = workoutNav.some(({ to }) => location.pathname.startsWith(to));
-  // Open by default. When collapsed, the group header lights up if you're on one of its pages.
-  const [workoutsOpen, setWorkoutsOpen] = useState(true);
+  // Groups are open by default. When collapsed, the header lights up if you're on one of its pages.
+  const [groupsOpen, setGroupsOpen] = useState({ workouts: true, nutrition: true });
+  const NavGroup = ({ id, label, Icon, items }) => {
+    const isOpen = groupsOpen[id];
+    const inGroup = items.some(({ to }) => location.pathname.startsWith(to));
+    return (
+      <>
+        <button
+          onClick={() => setGroupsOpen((g) => ({ ...g, [id]: !g[id] }))}
+          aria-expanded={isOpen}
+          className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            inGroup && !isOpen
+              ? 'bg-brand-600 text-white'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+          }`}
+        >
+          <Icon size={18} />
+          <span className="flex-1 text-left">{label}</span>
+          <ChevronDown size={15} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+        </button>
+        {isOpen && items.map(({ to, label: l, icon, end }) => (
+          <NavItem key={to} to={to} label={l} Icon={icon} end={end} nested onClick={() => setOpen(false)} />
+        ))}
+      </>
+    );
+  };
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
 
@@ -79,23 +110,8 @@ export default function Layout() {
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         <NavItem to="/" label="Dashboard" Icon={LayoutDashboard} onClick={() => setOpen(false)} />
 
-        {/* Workouts group */}
-        <button
-          onClick={() => setWorkoutsOpen((o) => !o)}
-          aria-expanded={workoutsOpen}
-          className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-            inWorkouts && !workoutsOpen
-              ? 'bg-brand-600 text-white'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
-          }`}
-        >
-          <WorkoutsIcon size={18} />
-          <span className="flex-1 text-left">Workouts</span>
-          <ChevronDown size={15} className={`transition-transform ${workoutsOpen ? '' : '-rotate-90'}`} />
-        </button>
-        {workoutsOpen && workoutNav.map(({ to, label, icon: Icon }) => (
-          <NavItem key={to} to={to} label={label} Icon={Icon} nested onClick={() => setOpen(false)} />
-        ))}
+        <NavGroup id="workouts" label="Workouts" Icon={WorkoutsIcon} items={workoutNav} />
+        <NavGroup id="nutrition" label="Nutrition" Icon={Apple} items={nutritionNav} />
 
         {nav.map(({ to, label, icon: Icon }) => (
           <NavItem key={to} to={to} label={label} Icon={Icon} onClick={() => setOpen(false)}

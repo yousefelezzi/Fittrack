@@ -284,7 +284,7 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
               )}
               <div className={`max-w-[80%] space-y-1.5 ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
                 {showName && <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 px-1">{sender?.name ?? 'Former member'}</p>}
-                {m.workoutSession && <div className="w-64"><WorkoutSummary workout={m.workoutSession} /></div>}
+                {m.workoutSession && <div className="w-64"><WorkoutSummary workout={m.workoutSession} source={{ messageId: m._id }} /></div>}
                 {m.text && (
                   <p className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-line break-words ${mine
                     ? 'bg-brand-600 text-white rounded-br-md' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'}`}>

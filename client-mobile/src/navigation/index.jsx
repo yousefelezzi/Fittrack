@@ -17,6 +17,10 @@ import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen     from '../screens/DashboardScreen';
 import TrainScreen         from '../screens/TrainScreen';
 import NutritionScreen     from '../screens/NutritionScreen';
+import NutritionHubScreen  from '../screens/NutritionHubScreen';
+import HydrationScreen     from '../screens/HydrationScreen';
+import SupplementsScreen   from '../screens/SupplementsScreen';
+import NutritionProgressScreen from '../screens/NutritionProgressScreen';
 import FeedScreen          from '../screens/FeedScreen';
 import ProfileScreen       from '../screens/ProfileScreen';
 import LogWorkoutScreen    from '../screens/LogWorkoutScreen';
@@ -43,7 +47,7 @@ const RootStack = createNativeStackNavigator();
 const TABS = [
   ['Dashboard', DashboardScreen, 'Home', House],
   ['Train', TrainScreen, 'Train', Dumbbell],
-  ['Nutrition', NutritionScreen, 'Nutrition', Salad],
+  ['Nutrition', NutritionHubScreen, 'Nutrition', Salad],
   ['Feed', FeedScreen, 'Community', Users],
   ['Profile', ProfileScreen, 'Me', User],
 ];
@@ -75,6 +79,10 @@ function AppTabs() {
 // Screens opened on top of the tabs: [route name, component, header title].
 const STACK_SCREENS = [
   ['LogWorkout', LogWorkoutScreen, 'Log Workout'],
+  ['FoodLog', NutritionScreen, 'Food Log'],
+  ['Hydration', HydrationScreen, 'Hydration'],
+  ['Supplements', SupplementsScreen, 'Supplements'],
+  ['NutritionProgress', NutritionProgressScreen, 'Nutrition Progress'],
   ['Plans', PlansScreen, 'Workout Plans'],
   ['PlanGenerator', PlanGeneratorScreen, 'Workout Planner'],
   ['Exercises', ExercisesScreen, 'Exercise Library'],

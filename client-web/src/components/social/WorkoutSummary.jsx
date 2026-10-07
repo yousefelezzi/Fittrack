@@ -1,13 +1,53 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Dumbbell, ChevronDown, ChevronUp } from 'lucide-react';
+import { Dumbbell, ChevronDown, ChevronUp, BookmarkPlus, Check } from 'lucide-react';
 import ExerciseImage from '../ExerciseImage';
 import { summarizeWorkout } from '../../utils/workoutSummary';
+import { planAPI } from '../../api';
 
 export { summarizeWorkout };
 
-/** A shared workout: name, date, duration, sets and volume; tap to see each exercise. */
-export default function WorkoutSummary({ workout, compact = false }) {
+/**
+ * "Save as template": copies the workout into your plans. `source` says where
+ * you saw it ({ postId } or { messageId }) so the server can check you may.
+ */
+function SaveAsTemplate({ workout, source }) {
+  const [state, setState] = useState('idle'); // idle | saving | saved | error
+  const [error, setError] = useState('');
+  const save = async () => {
+    setState('saving');
+    try {
+      await planAPI.fromWorkout({ workoutId: workout._id, ...source });
+      setState('saved');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save it');
+      setState('error');
+    }
+  };
+  if (state === 'saved') {
+    return (
+      <p className="flex items-center gap-1.5 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400 border-t border-brand-100 dark:border-brand-900/50">
+        <Check size={13} /> Saved to your templates · <Link to="/plans" className="underline">Plans</Link>
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 border-t border-brand-100 dark:border-brand-900/50">
+      <button type="button" onClick={save} disabled={state === 'saving'}
+        className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50">
+        <BookmarkPlus size={14} /> {state === 'saving' ? 'Saving…' : 'Save as template'}
+      </button>
+      {state === 'error' && <span className="text-xs text-red-500">{error}</span>}
+    </div>
+  );
+}
+
+/**
+ * A shared workout: name, date, duration, sets and volume; tap to see each
+ * exercise. With `source` ({ postId } / { messageId }) it can be saved as a template.
+ */
+export default function WorkoutSummary({ workout, compact = false, source }) {
   const [open, setOpen] = useState(false);
   if (!workout) return null;
   const { exercises, volume, sets } = summarizeWorkout(workout);
@@ -42,6 +82,7 @@ export default function WorkoutSummary({ workout, compact = false }) {
           ))}
         </ul>
       )}
+      {source && workout._id && <SaveAsTemplate workout={workout} source={source} />}
     </div>
   );
 }
