@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { Utensils, GlassWater, Pill, ChartLine, History } from 'lucide-react-native';
 import { nutritionAPI, supplementAPI } from '../api';
 import { Card, ListRow, colors, makeStyles, Title } from '../components';
-import { WATER_PRESETS, formatMl } from '../../../client-web/src/utils/nutritionProgress';
+import { formatMl } from '../../../client-web/src/utils/nutritionProgress';
 import { MACRO_COLORS } from '../../../client-web/src/utils/foodLogic';
 
 const today = () => format(new Date(), 'yyyy-MM-dd');
@@ -32,10 +32,6 @@ export default function NutritionHubScreen({ navigation }) {
   const takenIds = new Set((log?.supplementsTaken || []).map((t) => String(t.supplement)));
   const taken = supplements.filter((s) => takenIds.has(String(s._id))).length;
 
-  const drink = async (ml) => {
-    setBusy(true);
-    try { setLog((await nutritionAPI.addWater(today(), ml)).data); } catch { /* shown on next load */ } finally { setBusy(false); }
-  };
   // The whole supplement stack in one tap.
   const takeStack = async () => {
     setBusy(true);
@@ -69,13 +65,6 @@ export default function NutritionHubScreen({ navigation }) {
           <Text style={styles.statValue}>{formatMl(water)} / {formatMl(waterGoal)}</Text>
         </View>
         {bar(water, waterGoal, '#06b6d4')}
-        <View style={[styles.statRow, { marginTop: 4 }]}>
-          {WATER_PRESETS.slice(0, 3).map((ml) => (
-            <TouchableOpacity key={ml} disabled={busy} onPress={() => drink(ml)} style={styles.quick}>
-              <GlassWater size={13} color={colors.brand} /><Text style={styles.quickText}>+{formatMl(ml)}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
         {supplements.length > 0 ? (
           <View style={[styles.statRow, { marginTop: 10 }]}>
             <Text style={styles.statLabel}>Supplements: <Text style={styles.statValue}>{taken} of {supplements.length} taken</Text></Text>
@@ -104,6 +93,5 @@ const styles = makeStyles(() => ({
   statValue: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   track:     { height: 7, backgroundColor: colors.subtle, borderRadius: 999, overflow: 'hidden', marginTop: 4 },
   fill:      { height: '100%', borderRadius: 999 },
-  quick:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingVertical: 6 },
   quickText: { fontSize: 12, fontWeight: '600', color: colors.brand },
 }));
