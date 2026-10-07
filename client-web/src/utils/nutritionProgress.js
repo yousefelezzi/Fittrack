@@ -47,18 +47,16 @@ export function dailySeries(summary, metric, days, today = new Date()) {
 }
 
 /**
- * Average over logged days, and how many of them hit the target: calories
- * within 10% of the goal; protein and water at or above it; carbs and fat at
- * or below it.
+ * Average over logged days, and how many of them hit the target: calories and
+ * fat within 10% of the goal; protein, carbs and water at or above it.
  */
 export function seriesStats(series, metric) {
   const logged = series.filter((p) => p.value != null);
   const avg = logged.length ? Math.round(logged.reduce((n, p) => n + p.value, 0) / logged.length) : null;
   const hit = (p) => {
     if (!p.target) return false;
-    if (metric === 'calories') return Math.abs(p.value - p.target) <= p.target * 0.1;
-    if (metric === 'protein' || metric === 'water') return p.value >= p.target;
-    return p.value <= p.target;
+    if (metric === 'calories' || metric === 'fat') return Math.abs(p.value - p.target) <= p.target * 0.1;
+    return p.value >= p.target; // protein, carbs, water
   };
   const withTarget = logged.filter((p) => p.target);
   return { average: avg, daysLogged: logged.length, onTarget: withTarget.filter(hit).length, daysWithTarget: withTarget.length };
@@ -68,8 +66,8 @@ export function seriesStats(series, metric) {
 export const TARGET_RULE = {
   calories: 'within 10% of your goal',
   protein: 'at or above your goal',
-  carbs: 'at or under your goal',
-  fat: 'at or under your goal',
+  carbs: 'at or above your goal',
+  fat: 'within 10% of your goal',
   water: 'at or above your goal',
 };
 

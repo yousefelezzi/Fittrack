@@ -508,13 +508,26 @@ exports.getSummary = async (req, res, next) => {
   try {
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ message: 'from and to dates are required' });
-    const [logs, user] = await Promise.all([
+    const [logs, user, stepLogs] = await Promise.all([
       NutritionLog.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } })
         .select('date meals.calories meals.protein meals.carbs meals.fat meals.micros.fiber water supplementsTaken dailyGoals')
         .sort({ date: 1 })
         .lean(),
-      User.findById(req.user.id).select('weight waterGoal waterType').lean(),
+      User.findById(req.user.id).select(`${TARGET_PROFILE_FIELDS} waterGoal waterType`).lean(),
+      StepLog.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } }).select('date steps').lean(),
     ]);
+    // A day's goals are only synced to the user's targets when it's viewed as
+    // "today"; days logged other ways (meal plans, copying, water…) still hold the
+    // defaults. For those, work out the target from the profile and that day's steps.
+    const DEFAULT_GOALS = Object.fromEntries(MACRO_KEYS.map((k) => [k, NutritionLog.schema.path(`dailyGoals.${k}`).defaultValue]));
+    const stepsByDay = new Map(stepLogs.map((s) => [s.date.toISOString().slice(0, 10), s.steps]));
+    const goalsFor = (l) => {
+      const g = l.dailyGoals;
+      const untouched = !g || MACRO_KEYS.every((k) => g[k] === DEFAULT_GOALS[k]);
+      if (!untouched) return g;
+      const { targets } = nutritionTargets(user, { steps: stepsByDay.get(l.date.toISOString().slice(0, 10)) });
+      return targets || g || null;
+    };
     const sum = (list, f) => Math.round(list.reduce((n, x) => n + (Number(f(x)) || 0), 0));
     const days = logs
       .map((l) => ({
@@ -526,7 +539,7 @@ exports.getSummary = async (req, res, next) => {
         fiber: sum(l.meals, (m) => m.micros?.fiber),
         water: sum(l.water || [], (w) => w.amount),
         supplements: (l.supplementsTaken || []).length,
-        goals: l.dailyGoals || null,
+        goals: goalsFor(l),
       }))
       .filter((d) => d.calories || d.water || d.supplements);
     // waterTypes: the minerals per litre of each kind of water, for the Hydration page.
