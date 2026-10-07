@@ -7,7 +7,7 @@ import { format, subDays, parseISO, isToday } from 'date-fns';
 import { Plus, Trash2, Search, X, ChevronDown, ChefHat, Pencil, Check, Sparkles, Salad } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import {
-  MACRO_COLORS, r, r0, servingText, scale, MICRO_CONFIG, sumMicros,
+  MACRO_COLORS, r, r0, servingText, scale, MICRO_CONFIG, sumMicros, addMicros,
   canPickState, storedStateOf, stateOf, stateLabel, foodInState, nameInState, yieldHint,
   portionIngredients, isEditableCustomFood, LABEL_FIELDS, EXTRA_FIELDS, customFoodInitial,
   sumIngredients, ingredientPayload, useRecipeServing, GOAL_NAMES,
@@ -15,11 +15,14 @@ import {
 } from '../utils/foodLogic';
 
 // ── Macro Pie + Micronutrient hover card ─────────────────────────────────────
-// `supplementMicros`: vitamins and minerals from the supplements ticked off today.
-function MacroCard({ totals, meals, supplementMicros }) {
+// `supplementMicros` / `waterMicros`: vitamins and minerals from the supplements
+// ticked off today and the water drunk.
+function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
   const [hovered, setHovered] = useState(false);
-  const microTotals = sumMicros(meals, supplementMicros);
+  const microTotals = sumMicros(meals, addMicros(supplementMicros, waterMicros));
   const fromSupplements = Object.values(supplementMicros || {}).some((v) => v > 0);
+  const fromWater = Object.values(waterMicros || {}).some((v) => v > 0);
+  const extraNote = [fromSupplements && 'supplements', fromWater && 'water'].filter(Boolean).join(' and ');
 
   // Split by calories, not grams: a gram of fat is 9 kcal, protein and carbs 4.
   // `value` drives the pie, so the slices show each macro's share of calories.
@@ -104,7 +107,7 @@ function MacroCard({ totals, meals, supplementMicros }) {
         <div className="absolute inset-0 bg-white dark:bg-gray-900 p-3 overflow-y-auto">
           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             Micronutrients today
-            {fromSupplements && <span className="normal-case font-normal text-gray-400"> · includes supplements</span>}
+            {extraNote && <span className="normal-case font-normal text-gray-400"> · includes {extraNote}</span>}
           </p>
           <div className="space-y-1.5">
             {activeMicros.map(({ key, label, unit, dv }) => {
@@ -1508,7 +1511,7 @@ export default function Nutrition() {
         </div>
 
         {/* Macro pie + micro hover */}
-        <MacroCard totals={totals} meals={log?.meals || []} supplementMicros={log?.supplementMicros} />
+        <MacroCard totals={totals} meals={log?.meals || []} supplementMicros={log?.supplementMicros} waterMicros={log?.waterMicros} />
       </div>
 
       {/* Macro progress bars */}

@@ -33,6 +33,11 @@ export default function NutritionHubScreen({ navigation }) {
     setBusy(true);
     try { setLog((await nutritionAPI.addWater(today(), ml)).data); } catch { /* shown on next load */ } finally { setBusy(false); }
   };
+  // The whole supplement stack in one tap.
+  const takeStack = async () => {
+    setBusy(true);
+    try { setLog((await nutritionAPI.takeSupplements(today(), { supplementIds: supplements.map((s) => s._id) })).data); } catch { /* shown on next load */ } finally { setBusy(false); }
+  };
   const bar = (value, goal, color) => (
     <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, goal ? (value / goal) * 100 : 0)}%`, backgroundColor: color }]} /></View>
   );
@@ -65,7 +70,12 @@ export default function NutritionHubScreen({ navigation }) {
           ))}
         </View>
         {supplements.length > 0 ? (
-          <Text style={[styles.statLabel, { marginTop: 10 }]}>Supplements: <Text style={styles.statValue}>{taken} of {supplements.length} taken</Text></Text>
+          <View style={[styles.statRow, { marginTop: 10 }]}>
+            <Text style={styles.statLabel}>Supplements: <Text style={styles.statValue}>{taken} of {supplements.length} taken</Text></Text>
+            {taken < supplements.length ? (
+              <TouchableOpacity disabled={busy} onPress={takeStack} hitSlop={6}><Text style={styles.quickText}>Tick off all</Text></TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
       </Card>
 

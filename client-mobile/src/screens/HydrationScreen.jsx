@@ -48,6 +48,15 @@ export default function HydrationScreen() {
   const remove = async (id) => {
     try { setLog((await nutritionAPI.deleteWater(id)).data); load(); } catch { setError('Could not remove that drink'); }
   };
+  // The kind of water sets the minerals it adds to the day's micronutrients.
+  const setWaterType = async (waterType) => {
+    try { updateUser((await userAPI.updateMe({ waterType })).data); load(); } catch { setError('Could not save that'); }
+  };
+  const waterType = summary?.waterType || 'tap';
+  const types = summary?.waterTypes || {};
+  const minerals = Object.entries(log?.waterMicros || {}).filter(([, v]) => v > 0);
+  const perLitre = (t) => Object.entries(types[t]?.perLitre || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${v} mg`).join(' · ');
+
   const saveGoal = async (value) => {
     try {
       const { data } = await userAPI.updateMe({ waterGoal: value });
@@ -117,6 +126,20 @@ export default function HydrationScreen() {
       </Card>
 
       <Card>
+        <Text style={styles.title}>Your water</Text>
+        <Hint style={{ marginBottom: 8 }}>Water has minerals too: they're added to the Food Log's micronutrients. Values are typical per litre; tap water varies by area and mineral waters list theirs on the label.</Hint>
+        {Object.entries(types).map(([k, t]) => (
+          <TouchableOpacity key={k} onPress={() => k !== waterType && setWaterType(k)} style={[styles.typeOption, waterType === k && styles.typeOptionOn]}>
+            <Text style={[styles.goal, { fontSize: 14 }, waterType === k && { color: colors.brand }]}>{t.label}</Text>
+            <Text style={styles.cap}>{perLitre(k)} per L</Text>
+          </TouchableOpacity>
+        ))}
+        {minerals.length > 0 ? (
+          <Text style={[styles.cap, { color: '#0ea5e9', marginTop: 6 }]}>From your water {date === key(new Date()) ? 'today' : 'this day'}: {minerals.map(([k, v]) => `${k} ${v} mg`).join(' · ')}</Text>
+        ) : null}
+      </Card>
+
+      <Card>
         <Text style={styles.title}>Last 7 days</Text>
         <BarChart data={week} goal={goal} height={120} />
       </Card>
@@ -136,5 +159,7 @@ const styles = makeStyles(() => ({
   quick:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   quickText: { fontSize: 13, fontWeight: '600', color: colors.brand },
   input:     { minWidth: 80, height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  typeOption:   { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 6 },
+  typeOptionOn: { borderColor: colors.brand, backgroundColor: colors.brandLight },
   drink:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.subtle },
 }));

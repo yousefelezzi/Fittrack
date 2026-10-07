@@ -51,6 +51,15 @@ export default function Hydration() {
   const remove = async (id) => {
     try { setLog((await nutritionAPI.deleteWater(id)).data); load(); } catch { setError('Could not remove that drink'); }
   };
+  // The kind of water sets the minerals it adds to the day's micronutrients.
+  const setWaterType = async (waterType) => {
+    try { updateUser((await userAPI.updateMe({ waterType })).data); load(); } catch { setError('Could not save that'); }
+  };
+  const waterType = summary?.waterType || 'tap';
+  const types = summary?.waterTypes || {};
+  const minerals = Object.entries(log?.waterMicros || {}).filter(([, v]) => v > 0);
+  const perLitre = (t) => Object.entries(types[t]?.perLitre || {}).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${v} mg`).join(' · ');
+
   const saveGoal = async (value) => {
     try {
       const { data } = await userAPI.updateMe({ waterGoal: value });
@@ -129,6 +138,28 @@ export default function Hydration() {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div className="card space-y-3">
+        <div>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Your water</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Water has minerals too: they're added to the Food Log's micronutrients. Values are typical per litre; tap water varies by area and mineral waters list theirs on the label.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {Object.entries(types).map(([key, t]) => (
+            <button key={key} onClick={() => key !== waterType && setWaterType(key)}
+              className={`px-3 py-2 rounded-lg border text-left transition-colors ${waterType === key
+                ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/30' : 'border-gray-300 dark:border-gray-600 hover:border-brand-400'}`}>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.label}</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 capitalize">{perLitre(key)} per L</p>
+            </button>
+          ))}
+        </div>
+        {minerals.length > 0 && (
+          <p className="text-xs text-sky-600 dark:text-sky-400 capitalize">
+            From your water {date === key(new Date()) ? 'today' : 'this day'}: {minerals.map(([k, v]) => `${k} ${v} mg`).join(' · ')}
+          </p>
         )}
       </div>
 

@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema(
     activityLevel: { type: Number, enum: [1.2, 1.375, 1.55, 1.725, 1.9, null], default: null },
     stepGoal: { type: Number, min: 1000, max: 50000, default: 10000 }, // daily steps
     waterGoal: { type: Number, min: 500, max: 8000, default: null }, // ml a day; null = worked out from weight
+    waterType: { type: String, enum: ['tap', 'mineral', 'filtered'], default: 'tap' }, // for the minerals in water
     weightUnit: { type: String, enum: ['kg', 'lb'], default: 'kg' }, // default unit when logging lifts
     // Which profile stats other users can see. Everything is private by default.
     statsVisibility: {

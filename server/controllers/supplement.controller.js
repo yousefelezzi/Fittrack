@@ -2,9 +2,17 @@ const Supplement = require('../models/Supplement');
 const SupplementCatalog = require('../models/SupplementCatalog');
 
 const FIELDS = ['name', 'dose', 'timing'];
+const { MICRO_KEYS } = require('../utils/nutritionConstants');
+
+// Your own micros: known keys with an amount above 0 (others are dropped).
+const cleanMicros = (micros) => Object.fromEntries(Object.entries(micros || {})
+  .filter(([k, v]) => MICRO_KEYS.includes(k) && Number(v) > 0 && Number(v) < 100000)
+  .map(([k, v]) => [k, Math.round(Number(v) * 1000) / 1000]));
+
 const pick = (body) => ({
   ...Object.fromEntries(FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, String(body[k]).trim()])),
   ...(body.servings !== undefined && { servings: Number(body.servings) }),
+  ...(body.micros !== undefined && { micros: cleanMicros(body.micros) }),
 });
 
 // GET /api/supplements/catalog — the built-in list, by category

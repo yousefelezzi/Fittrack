@@ -206,6 +206,8 @@ export const nutritionAPI = {
   addWater:    (date, amount)     => api.post('/nutrition/water', { date, amount }),
   deleteWater: (entryId)          => api.delete(`/nutrition/water/${entryId}`),
   toggleSupplement: (date, supplementId) => api.post('/nutrition/supplements/toggle', { date, supplementId }),
+  // Tick off several at once: { supplementIds } or { copyFrom: 'YYYY-MM-DD' } (same as that day).
+  takeSupplements: (date, body) => api.post('/nutrition/supplements/take', { date, ...body }),
 };
 
 // ── Foods ─────────────────────────────────────────────────────────────────────

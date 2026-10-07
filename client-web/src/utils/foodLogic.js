@@ -75,6 +75,16 @@ export const sumMicros = (meals, extra = {}) => {
   return totals;
 };
 
+/** Micronutrient objects added up (e.g. the day's supplementMicros and waterMicros). */
+export const addMicros = (...sources) => {
+  const out = {};
+  for (const src of sources) for (const [k, v] of Object.entries(src || {})) out[k] = (out[k] || 0) + (Number(v) || 0);
+  return out;
+};
+
+/** Micronutrients you can enter for your own supplement (sugar and cholesterol left out). */
+export const SUPPLEMENT_MICROS = MICRO_CONFIG.filter((c) => !['sugar', 'cholesterol'].includes(c.key));
+
 /** "Vitamin D 25 mcg · Calcium 500 mg" for a supplement's micros per serving × servings. */
 export const microsText = (micros = {}, servings = 1) => MICRO_CONFIG
   .filter((c) => Number(micros[c.key]) > 0)

@@ -6,7 +6,7 @@ const { generateMealPlan, catalogFoodNames } = require('../utils/mealPlan');
 const { MACRO_KEYS } = require('../utils/nutritionConstants');
 const Food = require('../models/Food');
 const Supplement = require('../models/Supplement');
-const { waterGoal } = require('../utils/hydration');
+const { waterGoal, waterMinerals, WATER_TYPES } = require('../utils/hydration');
 const { per100gFor, portionNutrition, resolveState, nameInState } = require('../utils/foodState');
 
 // Lazy require: food.controller is only needed for recipe meals.
@@ -126,8 +126,14 @@ exports.getLogByDate = async (req, res, next) => {
     await linkLegacyMeals(log);
     const synced = await syncGoals(log, req.user.id);
     if (!synced) return res.json(synced);
-    // Micronutrients from the supplements ticked off that day (built-in ones only).
-    res.json({ ...(synced.toJSON ? synced.toJSON() : synced), supplementMicros: await supplementMicros(synced, req.user.id) });
+    // Micronutrients from the supplements ticked off that day, and the minerals in the water drunk.
+    const user = await User.findById(req.user.id).select('waterType').lean();
+    const ml = (synced.water || []).reduce((n, w) => n + w.amount, 0);
+    res.json({
+      ...(synced.toJSON ? synced.toJSON() : synced),
+      supplementMicros: await supplementMicros(synced, req.user.id),
+      waterMicros: ml ? waterMinerals(ml, user?.waterType) : {},
+    });
   } catch (err) {
     next(err);
   }
@@ -404,14 +410,17 @@ exports.updateGoals = async (req, res, next) => {
 
 // ── Hydration & supplements ─────────────────────────────────────────────────
 
-/** Micronutrients from a log's ticked-off supplements: catalog micros × servings. */
+/**
+ * Micronutrients from a log's ticked-off supplements, times the servings taken:
+ * the built-in list's amounts, or your own supplement's.
+ */
 async function supplementMicros(log, userId) {
   const ids = (log.supplementsTaken || []).map((t) => t.supplement);
   if (!ids.length) return {};
-  const taken = await Supplement.find({ _id: { $in: ids }, user: userId, catalog: { $ne: null } }).populate('catalog', 'micros').lean();
+  const taken = await Supplement.find({ _id: { $in: ids }, user: userId }).populate('catalog', 'micros').lean();
   const totals = {};
   for (const s of taken) {
-    for (const [key, amount] of Object.entries(s.catalog?.micros || {})) {
+    for (const [key, amount] of Object.entries((s.catalog ? s.catalog.micros : s.micros) || {})) {
       totals[key] = Math.round(((totals[key] || 0) + amount * (s.servings || 1)) * 100) / 100;
     }
   }
@@ -466,10 +475,35 @@ exports.toggleSupplement = async (req, res, next) => {
   }
 };
 
+// POST /api/nutrition/supplements/take { date, supplementIds? , copyFrom? }
+// Tick off several supplements at once: the ones listed, or the same ones as
+// another day (copyFrom: YYYY-MM-DD) — like copying meals. Already ticked ones stay.
+exports.takeSupplements = async (req, res, next) => {
+  try {
+    const { date, copyFrom } = req.body;
+    let ids = Array.isArray(req.body.supplementIds) ? req.body.supplementIds.map(String) : [];
+    if (copyFrom) {
+      const from = await NutritionLog.findOne({ user: req.user.id, date: sameDay(copyFrom) }).select('supplementsTaken').lean();
+      ids = (from?.supplementsTaken || []).map((t) => String(t.supplement));
+      if (!ids.length) return res.status(400).json({ message: 'Nothing was ticked off that day' });
+    }
+    // Only your own, still-existing supplements.
+    const mine = (await Supplement.find({ _id: { $in: ids }, user: req.user.id }).select('_id').lean()).map((s) => String(s._id));
+    if (!mine.length) return res.status(400).json({ message: 'No supplements to tick off' });
+    const current = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date) }).select('supplementsTaken').lean();
+    const already = new Set((current?.supplementsTaken || []).map((t) => String(t.supplement)));
+    const add = mine.filter((id) => !already.has(id)).map((supplement) => ({ supplement, at: new Date() }));
+    const log = await logForDay(req.user.id, date, add.length ? { $push: { supplementsTaken: { $each: add } } } : {});
+    res.json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/nutrition/summary?from=2026-09-01&to=2026-10-01
 // Per-day totals for the Progress charts (days with nothing logged are left
 // out) plus the daily water goal: { days: [{ date, calories, protein, carbs,
-// fat, fiber, water, supplements, goals }], waterGoal }.
+// fat, fiber, water, supplements, goals }], waterGoal, waterType, waterTypes }.
 exports.getSummary = async (req, res, next) => {
   try {
     const { from, to } = req.query;
@@ -479,7 +513,7 @@ exports.getSummary = async (req, res, next) => {
         .select('date meals.calories meals.protein meals.carbs meals.fat meals.micros.fiber water supplementsTaken dailyGoals')
         .sort({ date: 1 })
         .lean(),
-      User.findById(req.user.id).select('weight waterGoal').lean(),
+      User.findById(req.user.id).select('weight waterGoal waterType').lean(),
     ]);
     const sum = (list, f) => Math.round(list.reduce((n, x) => n + (Number(f(x)) || 0), 0));
     const days = logs
@@ -495,7 +529,8 @@ exports.getSummary = async (req, res, next) => {
         goals: l.dailyGoals || null,
       }))
       .filter((d) => d.calories || d.water || d.supplements);
-    res.json({ days, waterGoal: waterGoal(user) });
+    // waterTypes: the minerals per litre of each kind of water, for the Hydration page.
+    res.json({ days, waterGoal: waterGoal(user), waterType: user?.waterType || 'tap', waterTypes: WATER_TYPES });
   } catch (err) {
     next(err);
   }

@@ -11,3 +11,10 @@ const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 const DIETS = ['any', 'pescatarian', 'vegetarian', 'vegan'];
 
 module.exports = { MACRO_KEYS, MEAL_TYPES, DIETS };
+
+/** Micronutrient keys (same as meals' micros and MICRO_CONFIG on the clients). */
+const MICRO_KEYS = [
+  'vitaminA', 'vitaminC', 'vitaminD', 'vitaminE', 'vitaminK', 'vitaminB1', 'vitaminB2', 'vitaminB3', 'vitaminB6', 'vitaminB12',
+  'folate', 'calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'sodium', 'zinc', 'selenium', 'fiber', 'sugar', 'cholesterol', 'omega3',
+];
+module.exports.MICRO_KEYS = MICRO_KEYS;

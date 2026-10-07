@@ -10,6 +10,7 @@ const fields = (required) => [
   (required ? body('name').if(body('catalogId').not().exists()) : body('name').optional()).isString().trim().isLength({ min: 1, max: 60 }).withMessage('Name must be 1–60 characters'),
   body('catalogId').optional().isMongoId().withMessage('Invalid supplement'),
   body('servings').optional().isFloat({ min: 0.25, max: 20 }).withMessage('Servings must be between 0.25 and 20'),
+  body('micros').optional().isObject().withMessage('Micros must be an object of amounts'),
   body('dose').optional().isString().isLength({ max: 40 }).withMessage('Dose must be at most 40 characters'),
   body('timing').optional().isString().isLength({ max: 40 }).withMessage('Timing must be at most 40 characters'),
 ];

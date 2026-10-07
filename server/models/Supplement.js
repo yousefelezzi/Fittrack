@@ -14,6 +14,9 @@ const supplementSchema = new mongoose.Schema(
     // when ticked off, times the servings taken. null = your own (no micros).
     catalog: { type: mongoose.Schema.Types.ObjectId, ref: 'SupplementCatalog', default: null },
     servings: { type: Number, min: 0.25, max: 20, default: 1 },
+    // Your own supplement's vitamins and minerals per serving (same keys and
+    // units as food micros). Built-in ones use the catalog's instead.
+    micros: { type: Map, of: Number, default: {} },
     order: { type: Number, default: 0 },
   },
   { timestamps: true }

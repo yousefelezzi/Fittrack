@@ -8,7 +8,7 @@ import {
   FoodSearch, PortionSelector, ManualEntry, CustomFoodForm, RecipeBuilder, RecipeEditor, RecipeMealEditor, QuickAddEditor, Btn,
 } from '../components/nutrition/FoodForms';
 import { MEAL_TYPES, DIETS, PROFILE_FIELD_NAMES } from '../../../client-web/src/constants/nutrition';
-import { MACRO_COLORS, MICRO_CONFIG, sumMicros, r, r0, GOAL_NAMES } from '../../../client-web/src/utils/foodLogic';
+import { MACRO_COLORS, MICRO_CONFIG, sumMicros, addMicros, r, r0, GOAL_NAMES } from '../../../client-web/src/utils/foodLogic';
 import { formatServing } from '../../../client-web/src/utils/servings';
 import { ChefHat, Plus, Sparkles, RefreshCw, Salad, X } from 'lucide-react-native';
 
@@ -38,11 +38,15 @@ function MacroDonut({ totals }) {
   );
 }
 
-// `supplementMicros`: vitamins and minerals from the supplements ticked off today.
-function MacroCard({ totals, meals, supplementMicros }) {
+// `supplementMicros` / `waterMicros`: vitamins and minerals from the supplements
+// ticked off today and the water drunk.
+function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
   const [showMicros, setShowMicros] = useState(false);
-  const micros = sumMicros(meals, supplementMicros);
-  const fromSupplements = Object.values(supplementMicros || {}).some((v) => v > 0);
+  const micros = sumMicros(meals, addMicros(supplementMicros, waterMicros));
+  const extraNote = [
+    Object.values(supplementMicros || {}).some((v) => v > 0) && 'the supplements you ticked off',
+    Object.values(waterMicros || {}).some((v) => v > 0) && 'the minerals in your water',
+  ].filter(Boolean).join(' and ');
   const active = MICRO_CONFIG.filter((c) => (micros[c.key] || 0) > 0);
   const kcal = { protein: totals.protein * 4, carbs: totals.carbs * 4, fat: totals.fat * 9 };
   const kcalTotal = kcal.protein + kcal.carbs + kcal.fat;
@@ -86,7 +90,7 @@ function MacroCard({ totals, meals, supplementMicros }) {
           })}
         </View>
       )}
-      {showMicros && fromSupplements ? <Text style={[styles.muted, { marginTop: 6 }]}>Includes the supplements you ticked off today.</Text> : null}
+      {showMicros && extraNote ? <Text style={[styles.muted, { marginTop: 6 }]}>Includes {extraNote} today.</Text> : null}
       {active.length > 0 && <LinkText style={{ marginTop: 10, alignSelf: 'center' }} onPress={() => setShowMicros(!showMicros)}>{showMicros ? 'Show macros' : 'Show micronutrients'}</LinkText>}
     </Card>
   );
@@ -487,7 +491,7 @@ export default function NutritionScreen({ navigation }) {
           </View>
         </Card>
 
-        <MacroCard totals={totals} meals={meals} supplementMicros={log?.supplementMicros} />
+        <MacroCard totals={totals} meals={meals} supplementMicros={log?.supplementMicros} waterMicros={log?.waterMicros} />
 
         <Card>
           <View style={[styles.rowBetween, { marginBottom: 10 }]}>

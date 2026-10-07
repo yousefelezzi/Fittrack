@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { format } from 'date-fns';
-import { Pill, Trash2, Pencil, Check, Plus, Sun } from 'lucide-react-native';
+import { format, subDays, parseISO } from 'date-fns';
+import { Pill, Trash2, Pencil, Check, Plus, Sun, CheckCheck, Copy } from 'lucide-react-native';
 import { supplementAPI, nutritionAPI } from '../api';
 import { Card, Button, Sheet, colors, makeStyles, Hint, ErrorText, LinkText, confirm } from '../components';
 import DayNav from '../components/DayNav';
-import { microsText } from '../../../client-web/src/utils/foodLogic';
+import { microsText, SUPPLEMENT_MICROS } from '../../../client-web/src/utils/foodLogic';
 
 const SUN_NOTE = 'Sun is an estimate: roughly 1,000 IU of vitamin D per 15 minutes of midday summer sun with arms and legs bare, for lighter skin. Much less in winter, early or late in the day, with darker skin or sunscreen.';
 
@@ -43,16 +43,24 @@ function CatalogSheet({ visible, onPick, onCustom, onClose }) {
 const key = (d) => format(d, 'yyyy-MM-dd');
 const EMPTY = { name: '', dose: '', timing: '' };
 
-/** Name / dose / timing (and servings for built-in ones), for adding or editing a supplement. */
-function SupplementForm({ initial = EMPTY, onSave, onCancel, saveLabel, withServings }) {
+/**
+ * Name / serving / servings / timing, for adding or editing a supplement. Your
+ * own ones (`withMicros`) can list their vitamins and minerals per serving.
+ */
+function SupplementForm({ initial = EMPTY, onSave, onCancel, saveLabel, withMicros }) {
   const [form, setForm] = useState({ servings: '1', ...initial });
+  const [micros, setMicros] = useState(() => Object.fromEntries(Object.entries(initial.micros || {}).map(([k, v]) => [k, String(v)])));
+  const [showMicros, setShowMicros] = useState(Object.keys(initial.micros || {}).length > 0);
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
   const submit = async () => {
     if (!form.name.trim()) return;
     setBusy(true);
     try {
-      await onSave({ name: form.name.trim(), dose: form.dose.trim(), timing: form.timing.trim(), ...(withServings && { servings: Number(form.servings) || 1 }) });
+      await onSave({
+        name: form.name.trim(), dose: form.dose.trim(), timing: form.timing.trim(), servings: Number(form.servings) || 1,
+        ...(withMicros && { micros: Object.fromEntries(Object.entries(micros).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v)])) }),
+      });
     } finally { setBusy(false); }
   };
   const field = (k, placeholder, max) => (
@@ -62,14 +70,28 @@ function SupplementForm({ initial = EMPTY, onSave, onCancel, saveLabel, withServ
     <View style={{ gap: 6, paddingVertical: 6 }}>
       {field('name', 'Name, e.g. Creatine', 60)}
       <View style={styles.row}>
-        <View style={{ flex: 1 }}>{field('dose', 'Dose, e.g. 5 g', 40)}</View>
+        <View style={{ flex: 1 }}>{field('dose', 'Serving, e.g. 1 capsule', 40)}</View>
         <View style={{ flex: 1 }}>{field('timing', 'When, e.g. Morning', 40)}</View>
       </View>
-      {withServings ? (
-        <View style={styles.row}>
-          <Text style={styles.small}>Servings</Text>
-          <TextInput style={[styles.input, { width: 70 }]} keyboardType="decimal-pad" value={String(form.servings)} onChangeText={set('servings')} />
-        </View>
+      <View style={styles.row}>
+        <Text style={styles.small}>Servings you take</Text>
+        <TextInput style={[styles.input, { width: 70 }]} keyboardType="decimal-pad" value={String(form.servings)} onChangeText={set('servings')} />
+      </View>
+      {withMicros ? (
+        <>
+          <LinkText onPress={() => setShowMicros(!showMicros)}>{showMicros ? 'Hide' : 'Add'} vitamins & minerals per serving (from the label)</LinkText>
+          {showMicros ? (
+            <View style={styles.microGrid}>
+              {SUPPLEMENT_MICROS.map((c) => (
+                <View key={c.key} style={styles.microCell}>
+                  <Text style={styles.small}>{c.label} ({c.unit})</Text>
+                  <TextInput style={styles.input} keyboardType="decimal-pad" value={micros[c.key] ?? ''}
+                    onChangeText={(v) => setMicros((m) => ({ ...m, [c.key]: v }))} />
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </>
       ) : null}
       <View style={[styles.row, { justifyContent: 'flex-end' }]}>
         <LinkText onPress={onCancel}>Cancel</LinkText>
@@ -106,6 +128,17 @@ export default function SupplementsScreen() {
   const create = (body) => run(async () => { await supplementAPI.create(body); setAdding(false); loadList(); }, 'Could not add that supplement');
   const addFromCatalog = (c) => create({ catalogId: c._id, ...(c.category === 'sun' && { timing: 'Midday' }) });
   const update = (id, body) => run(async () => { await supplementAPI.update(id, body); setEditing(null); loadList(); }, 'Could not save that');
+  // The whole stack at once, or the same as the day before (like copying meals).
+  const takeAll = () => run(async () => {
+    const { data } = await nutritionAPI.takeSupplements(date, { supplementIds: list.map((s) => s._id) });
+    setTaken(new Set((data.supplementsTaken || []).map((t) => String(t.supplement))));
+  }, 'Could not tick them off');
+  const sameAsDayBefore = () => run(async () => {
+    const { data } = await nutritionAPI.takeSupplements(date, { copyFrom: format(subDays(parseISO(date), 1), 'yyyy-MM-dd') });
+    setTaken(new Set((data.supplementsTaken || []).map((t) => String(t.supplement))));
+  }, 'Could not copy the day before');
+  const microsOf = (s) => (s.catalog ? s.catalog.micros : s.micros);
+
   const remove = async (s) => {
     if (!(await confirm(`Remove ${s.name}?`, 'Days you already ticked stay ticked.', 'Remove', true))) return;
     run(async () => { await supplementAPI.delete(s._id); loadList(); }, 'Could not remove that');
@@ -128,12 +161,18 @@ export default function SupplementsScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        {adding === 'custom' ? <SupplementForm saveLabel="Add" onSave={create} onCancel={() => setAdding(false)} /> : null}
+        {list?.length > 0 && takenCount < list.length ? (
+          <View style={[styles.row, { flexWrap: 'wrap', marginTop: 8 }]}>
+            <TouchableOpacity onPress={takeAll} style={styles.stackBtn}><CheckCheck size={14} color={colors.brand} /><Text style={styles.link}>Tick off whole stack</Text></TouchableOpacity>
+            <TouchableOpacity onPress={sameAsDayBefore} style={styles.stackBtn}><Copy size={14} color={colors.brand} /><Text style={styles.link}>Same as day before</Text></TouchableOpacity>
+          </View>
+        ) : null}
+        {adding === 'custom' ? <SupplementForm saveLabel="Add" withMicros onSave={create} onCancel={() => setAdding(false)} /> : null}
 
         {list === null ? <Hint>Loading…</Hint> : list.map((s) => {
           const isTaken = taken.has(String(s._id));
           return editing === s._id ? (
-            <SupplementForm key={s._id} initial={{ name: s.name, dose: s.dose, timing: s.timing, servings: String(s.servings ?? 1) }} withServings={!!s.catalog} saveLabel="Save"
+            <SupplementForm key={s._id} initial={{ name: s.name, dose: s.dose, timing: s.timing, servings: String(s.servings ?? 1), micros: s.micros }} withMicros={!s.catalog} saveLabel="Save"
               onSave={(body) => update(s._id, body)} onCancel={() => setEditing(null)} />
           ) : (
             <View key={s._id} style={styles.item}>
@@ -146,8 +185,8 @@ export default function SupplementsScreen() {
                 {s.dose || s.timing || s.servings !== 1 ? (
                   <Text style={styles.small}>{[s.servings && s.servings !== 1 ? `${s.servings} ×` : '', s.dose, s.timing].filter(Boolean).join(' · ')}</Text>
                 ) : null}
-                {s.catalog && microsText(s.catalog.micros, s.servings || 1) ? (
-                  <Text style={styles.micros}>{microsText(s.catalog.micros, s.servings || 1)}{s.catalog.category === 'sun' ? ' (estimate)' : ''}</Text>
+                {microsText(microsOf(s), s.servings || 1) ? (
+                  <Text style={styles.micros}>{microsText(microsOf(s), s.servings || 1)}{s.catalog?.category === 'sun' ? ' (estimate)' : ''}</Text>
                 ) : null}
               </View>
               <TouchableOpacity onPress={() => setEditing(s._id)} hitSlop={8}><Pencil size={15} color={colors.textMuted} /></TouchableOpacity>
@@ -174,6 +213,9 @@ const styles = makeStyles(() => ({
   name:    { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   done:    { color: colors.textMuted, textDecorationLine: 'line-through' },
   micros:  { fontSize: 11, color: '#0ea5e9', marginTop: 1 },
+  microGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  microCell: { width: '47%' },
+  stackBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   group:   { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5 },
   catRow:  { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.subtle },
 }));
