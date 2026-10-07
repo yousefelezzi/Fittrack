@@ -67,3 +67,34 @@ export const ACTIVITY_LEVELS = [
 export function calcTDEE(bmr, activityMultiplier) {
   return bmr * activityMultiplier;
 }
+
+// ── One-rep max ─────────────────────────────────────────────────────────────
+
+/**
+ * Estimated one-rep max, the same way as the rest of the app (server
+ * utils/oneRepMax.js): reps in reserve count as reps (5 reps @ 1 RIR = a 6-rep
+ * max), then the Epley formula; a true single (1 rep, 0 RIR) counts as-is.
+ * Estimates get unreliable past ONE_RM_MAX_REPS.
+ * @returns {number|null} in the same unit as `weight`
+ */
+export const ONE_RM_MAX_REPS = 12;
+export function calcOneRepMax(weight, reps, rir = 0) {
+  const w = Number(weight);
+  const n = Number(reps);
+  if (!(w > 0) || !(n > 0)) return null;
+  const effective = n + (Number(rir) || 0);
+  return effective === 1 ? w : w * (1 + effective / 30);
+}
+
+/**
+ * What you could lift for 1–`maxReps` reps to failure from a 1RM (Epley the
+ * other way round), with each as a % of the 1RM.
+ * @returns [{ reps, weight, percent }]
+ */
+export function repMaxTable(oneRepMax, maxReps = ONE_RM_MAX_REPS) {
+  return Array.from({ length: maxReps }, (_, i) => {
+    const reps = i + 1;
+    const weight = reps === 1 ? oneRepMax : oneRepMax / (1 + reps / 30);
+    return { reps, weight, percent: Math.round((weight / oneRepMax) * 100) };
+  });
+}

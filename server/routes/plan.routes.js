@@ -15,6 +15,7 @@ const {
   analyzePlan,
   planSkeleton,
   saveWorkoutAsPlan,
+  saveSharedPlan,
 } = require('../controllers/plan.controller');
 
 router.get('/', protect, getPlans);
@@ -24,6 +25,12 @@ router.post('/from-workout', protect, [
   body('postId').optional().isMongoId().withMessage('Invalid post'),
   body('messageId').optional().isMongoId().withMessage('Invalid message'),
 ], validate, saveWorkoutAsPlan);
+// Save a copy of a whole plan shared with you in a post or message.
+router.post('/from-shared', protect, [
+  body('planId').isMongoId().withMessage('Invalid plan'),
+  body('postId').optional().isMongoId().withMessage('Invalid post'),
+  body('messageId').optional().isMongoId().withMessage('Invalid message'),
+], validate, saveSharedPlan);
 router.post(
   '/generate',
   protect,

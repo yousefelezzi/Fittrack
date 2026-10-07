@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Heart, MessageCircle, Trash2, Send, UserPlus, Check, Pencil, CornerDownRight } from 'lucide-react';
 import Avatar from '../Avatar';
 import WorkoutSummary from './WorkoutSummary';
+import PlanSummary from './PlanSummary';
 
 const idOf = (x) => String(x?._id ?? x);
 const ago = (date) => formatDistanceToNow(new Date(date), { addSuffix: true });
@@ -126,6 +127,7 @@ export default function PostCard({ post, me, following, requested, onFollow, onL
           onSave={async (caption) => { await onEdit(post._id, caption); setEditing(false); }} />
       ) : post.caption && <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-line">{post.caption}</p>}
       {post.workoutSession && <WorkoutSummary workout={post.workoutSession} source={{ postId: post._id }} />}
+      {post.workoutPlan && <PlanSummary plan={post.workoutPlan} source={{ postId: post._id }} />}
       {post.image && <img src={post.image} alt="" className="w-full rounded-xl object-cover max-h-96" />}
 
       <div className="flex items-center gap-4 pt-1 border-t border-gray-50 dark:border-gray-800">

@@ -9,6 +9,7 @@ require('dotenv').config();
 
 const connectDB = require('./config/db');
 const runMigrations = require('./migrations');
+const syncSupplementCatalog = require('./utils/syncSupplementCatalog');
 const errorHandler = require('./middleware/errorHandler');
 
 const authRoutes      = require('./routes/auth.routes');
@@ -40,7 +41,7 @@ app.use('/uploads', express.static(uploadsDir));
 // ── Database ──────────────────────────────────────────────────────────────────
 // Migrations run in the server (not the seed), after the seed has updated the
 // exercise library, since some of them depend on it (e.g. which are unilateral).
-connectDB().then(runMigrations);
+connectDB().then(runMigrations).then(syncSupplementCatalog);
 
 // ── Security middleware ───────────────────────────────────────────────────────
 app.use(helmet());

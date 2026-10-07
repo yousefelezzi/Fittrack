@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, colors, makeStyles, Segmented, Chip, Label, Hint, LinkText, isDark } from '../components';
-import { calcFFMI, ffmiCategory, calcBMR, calcTDEE, ACTIVITY_LEVELS } from '../../../client-web/src/utils/calculators';
+import { calcFFMI, ffmiCategory, calcBMR, calcTDEE, ACTIVITY_LEVELS, calcOneRepMax, repMaxTable, ONE_RM_MAX_REPS } from '../../../client-web/src/utils/calculators';
+import { UNITS } from '../../../client-web/src/utils/weightUnits';
 import {
   computeWNSResult, validateFreqValue, validateMaintValue, validateSetsValue, validateStimValue,
   validateRepsValue, validateRirValue, effectiveSetFactor,
@@ -284,16 +285,67 @@ function WNS({ onAbout }) {
   );
 }
 
+// ── One-rep max ──────────────────────────────────────────────────────────────
+const roundToPlates = (n, unit) => { const step = unit === 'lb' ? 5 : 2.5; return Math.round(n / step) * step; };
+
+/** One-rep max from a set (weight × reps, plus reps in reserve), and what you could do for 1–12 reps. */
+function OneRepMax({ user }) {
+  const [unit, setUnit] = useState(user?.weightUnit === 'lb' ? 'lb' : 'kg');
+  const [weight, setWeight] = useState('');
+  const [reps, setReps] = useState('');
+  const [rir, setRir] = useState('');
+  const oneRm = calcOneRepMax(weight, reps, rir);
+  const effective = (Number(reps) || 0) + (Number(rir) || 0);
+  return (
+    <>
+      <Card>
+        <Text style={styles.body}>Estimates the most you could lift for one rep from a set you've done. Reps in reserve count as reps, so 5 reps with 1 left in the tank counts like a 6-rep max. It's the same estimate your progress charts use.</Text>
+        <Segmented value={unit} onChange={setUnit} options={UNITS.map((u) => [u, u])} style={{ marginTop: 12, width: 120 }} />
+        <View style={styles.row}>
+          <Field label={`Weight (${unit})`} value={weight} onChange={setWeight} placeholder={unit === 'lb' ? '225' : '100'} />
+          <Field label="Reps" value={reps} onChange={setReps} placeholder="5" keyboardType="number-pad" />
+          <Field label="RIR (optional)" value={rir} onChange={setRir} placeholder="0" keyboardType="number-pad" />
+        </View>
+        {oneRm ? (
+          <View style={styles.result}>
+            <Text style={[styles.statCap, { textAlign: 'center' }]}>ESTIMATED 1RM</Text>
+            <Text style={[styles.statVal, { fontSize: 32, textAlign: 'center' }]}>{Math.round(oneRm * 10) / 10} {unit}</Text>
+            {effective > ONE_RM_MAX_REPS ? (
+              <Hint style={{ marginTop: 6, textAlign: 'center', color: colors.warning }}>
+                With {effective} reps to failure this is a rough guess. Estimates are most accurate from sets of {ONE_RM_MAX_REPS} reps or fewer.
+              </Hint>
+            ) : null}
+          </View>
+        ) : <Hint style={{ marginTop: 12 }}>Enter the weight and reps of a set to see your estimated one-rep max.</Hint>}
+      </Card>
+      {oneRm ? (
+        <Card>
+          <Text style={styles.bold}>Rep maxes</Text>
+          <Hint style={{ marginBottom: 6 }}>What you could lift for each number of reps to failure, rounded to the nearest {unit === 'lb' ? '5 lb' : '2.5 kg'}.</Hint>
+          {repMaxTable(oneRm).map((row) => (
+            <View key={row.reps} style={styles.repRow}>
+              <Text style={[styles.body, { width: 60 }]}>{row.reps} rep{row.reps !== 1 ? 's' : ''}</Text>
+              <Text style={[styles.bold, { flex: 1, textAlign: 'right' }]}>{roundToPlates(row.weight, unit)} {unit}</Text>
+              <Text style={[styles.hintText, { width: 50, textAlign: 'right' }]}>{row.percent}%</Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+    </>
+  );
+}
+
 export default function CalculatorsScreen({ navigation, route }) {
   const { user } = useAuth();
   const [tab, setTab] = useState(route?.params?.calc || 'ffmi');
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-        <Segmented value={tab} onChange={setTab} style={{ marginBottom: 12 }} options={[['ffmi', 'FFMI'], ['tdee', 'BMR & TDEE'], ['wns', 'WNS']]} />
+        <Segmented value={tab} onChange={setTab} style={{ marginBottom: 12 }} options={[['ffmi', 'FFMI'], ['tdee', 'BMR & TDEE'], ['wns', 'WNS'], ['1rm', '1RM']]} />
         {tab === 'ffmi' && <FFMI user={user} />}
         {tab === 'tdee' && <TDEE user={user} />}
         {tab === 'wns' && <WNS onAbout={() => navigation.navigate('AboutWNS')} />}
+        {tab === '1rm' && <OneRepMax user={user} />}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -301,6 +353,7 @@ export default function CalculatorsScreen({ navigation, route }) {
 
 const styles = makeStyles(() => ({
   row:        { flexDirection: 'row', gap: 10 },
+  repRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.subtle },
   field:      { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 15, color: colors.textPrimary },
   err:        { fontSize: 11, color: colors.danger, fontWeight: '400' },
   result:     { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },

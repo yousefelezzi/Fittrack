@@ -14,6 +14,12 @@ const workoutPopulate = {
   select: 'name duration date exercises',
   populate: { path: 'exercises.exercise', select: 'name images type' },
 };
+const planPopulate = {
+  path: 'workoutPlan',
+  select: 'name description schedule rotation days',
+  populate: { path: 'days.exercises.exercise', select: 'name images type laterality' },
+};
+const attachments = [workoutPopulate, planPopulate];
 
 // A conversation the current user is part of, or null.
 const myConversation = (id, userId) =>
@@ -229,7 +235,7 @@ exports.getMessages = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
     const filter = { conversation: convo._id };
     if (req.query.before) filter.createdAt = { $lt: new Date(req.query.before) };
-    const page = await Message.find(filter).sort({ createdAt: -1 }).limit(limit + 1).populate(workoutPopulate).lean();
+    const page = await Message.find(filter).sort({ createdAt: -1 }).limit(limit + 1).populate(attachments).lean();
     const messages = page.slice(0, limit).reverse();
 
     const senderIds = [...new Set(messages.map((m) => String(m.sender)))];
@@ -265,12 +271,20 @@ exports.sendMessage = async (req, res, next) => {
       if (!w) return res.status(400).json({ message: 'Workout not found' });
       workoutSession = w._id;
     }
-    if (!text && !workoutSession) return res.status(400).json({ message: 'Message is empty' });
+    let workoutPlan = null;
+    if (req.body.workoutPlan) {
+      // Only your own plans can be sent.
+      const WorkoutPlan = require('../models/WorkoutPlan');
+      const plan = isId(req.body.workoutPlan) ? await WorkoutPlan.findOne({ _id: req.body.workoutPlan, user: me }).select('_id') : null;
+      if (!plan) return res.status(400).json({ message: 'Plan not found' });
+      workoutPlan = plan._id;
+    }
+    if (!text && !workoutSession && !workoutPlan) return res.status(400).json({ message: 'Message is empty' });
 
-    const message = await Message.create({ conversation: convo._id, sender: me, text, workoutSession, readBy: [me] });
-    convo.lastMessage = { text: text || 'Shared a workout', sender: me, sentAt: message.createdAt };
+    const message = await Message.create({ conversation: convo._id, sender: me, text, workoutSession, workoutPlan, readBy: [me] });
+    convo.lastMessage = { text: text || (workoutPlan ? 'Shared a plan' : 'Shared a workout'), sender: me, sentAt: message.createdAt };
     await convo.save();
-    await message.populate(workoutPopulate);
+    await message.populate(attachments);
     res.status(201).json(message);
   } catch (err) {
     next(err);

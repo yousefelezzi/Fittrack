@@ -124,7 +124,10 @@ exports.getLogByDate = async (req, res, next) => {
     const date = req.query.date ? new Date(req.query.date) : new Date();
     const log = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date) });
     await linkLegacyMeals(log);
-    res.json(await syncGoals(log, req.user.id));
+    const synced = await syncGoals(log, req.user.id);
+    if (!synced) return res.json(synced);
+    // Micronutrients from the supplements ticked off that day (built-in ones only).
+    res.json({ ...(synced.toJSON ? synced.toJSON() : synced), supplementMicros: await supplementMicros(synced, req.user.id) });
   } catch (err) {
     next(err);
   }
@@ -400,6 +403,20 @@ exports.updateGoals = async (req, res, next) => {
 };
 
 // ── Hydration & supplements ─────────────────────────────────────────────────
+
+/** Micronutrients from a log's ticked-off supplements: catalog micros × servings. */
+async function supplementMicros(log, userId) {
+  const ids = (log.supplementsTaken || []).map((t) => t.supplement);
+  if (!ids.length) return {};
+  const taken = await Supplement.find({ _id: { $in: ids }, user: userId, catalog: { $ne: null } }).populate('catalog', 'micros').lean();
+  const totals = {};
+  for (const s of taken) {
+    for (const [key, amount] of Object.entries(s.catalog?.micros || {})) {
+      totals[key] = Math.round(((totals[key] || 0) + amount * (s.servings || 1)) * 100) / 100;
+    }
+  }
+  return totals;
+}
 
 // The log for a day, created if there isn't one yet.
 const logForDay = (userId, date, update) => NutritionLog.findOneAndUpdate(

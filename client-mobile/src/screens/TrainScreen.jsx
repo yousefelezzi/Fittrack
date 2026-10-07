@@ -36,7 +36,7 @@ export default function TrainScreen({ navigation }) {
         <ListRow icon={History} title="History" subtitle="Past workouts and meals" onPress={() => navigation.navigate('History')} last />
       </Card>
       <Card style={{ paddingVertical: 4 }}>
-        <ListRow icon={Calculator} title="Calculators" subtitle="FFMI, BMR & TDEE, Weekly Net Stimulus" onPress={() => navigation.navigate('Calculators')} last />
+        <ListRow icon={Calculator} title="Calculators" subtitle="FFMI, BMR & TDEE, Weekly Net Stimulus, one-rep max" onPress={() => navigation.navigate('Calculators')} last />
       </Card>
     </ScrollView>
   );

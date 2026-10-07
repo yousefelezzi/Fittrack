@@ -1,8 +1,9 @@
 import { NavLink, Navigate, useParams } from 'react-router-dom';
-import { Calculator, Activity, Gauge } from 'lucide-react';
+import { Calculator, Activity, Gauge, Trophy } from 'lucide-react';
 import FFMICalculator from './FFMICalculator';
 import TDEECalculator from './TDEECalculator';
 import WNSCalculator from './WNSCalculator';
+import OneRepMaxCalculator from './OneRepMaxCalculator';
 
 // Each calculator keeps its own URL (/calculators/ffmi etc.) so tabs can be
 // linked to, bookmarked, and survive a refresh.
@@ -10,6 +11,7 @@ const CALCULATORS = [
   { key: 'ffmi', label: 'FFMI',       icon: Calculator, component: FFMICalculator },
   { key: 'tdee', label: 'BMR & TDEE', icon: Activity,   component: TDEECalculator },
   { key: 'wns',  label: 'WNS',        icon: Gauge,      component: WNSCalculator },
+  { key: '1rm',  label: '1RM',        icon: Trophy,     component: OneRepMaxCalculator },
 ];
 
 export default function Calculators() {

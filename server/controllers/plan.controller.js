@@ -227,6 +227,84 @@ exports.setActivePlan = async (req, res, next) => {
   }
 };
 
+/**
+ * An exercise the user can use in their own plan: built-ins and their own
+ * custom ones as they are; someone else's custom exercise becomes the user's
+ * custom exercise with the same name, copied over if they don't have one.
+ */
+async function usableExercise(e, me) {
+  if (!e || !e.isCustom || String(e.createdBy) === me) return e;
+  const nameRe = new RegExp(`^${e.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  const mine = await Exercise.findOne({ isCustom: true, createdBy: me, name: nameRe });
+  return mine || Exercise.create({
+    name: e.name, muscleGroups: e.muscleGroups, secondaryMuscles: e.secondaryMuscles, equipment: e.equipment,
+    category: e.category, laterality: e.laterality, type: e.type, instructions: e.instructions, images: e.images,
+    isCustom: true, createdBy: me,
+  });
+}
+
+/** Whether `me` can see something shared in a post (postId) or a message in one of their chats (messageId). */
+async function canSeeShared(me, { postId, messageId, field, id, ownerDoc }) {
+  if (postId) {
+    const Post = require('../models/Post');
+    const { canViewContent } = require('../utils/privacy');
+    const post = await Post.findOne({ _id: postId, [field]: id }).select('_id').lean();
+    if (post && canViewContent(ownerDoc, me)) return true;
+  }
+  if (messageId) {
+    const Message = require('../models/Message');
+    const Conversation = require('../models/Conversation');
+    const msg = await Message.findOne({ _id: messageId, [field]: id }).select('conversation').lean();
+    if (msg && await Conversation.exists({ _id: msg.conversation, participants: me })) return true;
+  }
+  return false;
+}
+
+// POST /api/plans/from-shared { planId, postId?, messageId? }
+// Save a copy of a whole plan shared with you (in a post you can see or a
+// message in one of your chats) to your plans.
+exports.saveSharedPlan = async (req, res, next) => {
+  try {
+    const me = String(req.user.id);
+    const { planId, postId, messageId } = req.body;
+    const source = await WorkoutPlan.findById(planId)
+      .populate('days.exercises.exercise')
+      .populate('user', 'name privacy followers following')
+      .lean();
+    const mine = String(source?.user?._id) === me;
+    if (!source || !(mine || await canSeeShared(me, { postId, messageId, field: 'workoutPlan', id: planId, ownerDoc: source.user }))) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    const days = [];
+    for (const day of source.days || []) {
+      const exercises = [];
+      for (const e of day.exercises || []) {
+        const ex = await usableExercise(e.exercise, me);
+        if (!ex) continue; // deleted exercise
+        exercises.push({
+          exercise: ex._id, targetSets: e.targetSets, targetReps: e.targetReps, targetWeight: e.targetWeight,
+          weightUnit: e.weightUnit, targetRepsMax: e.targetRepsMax, targetRir: e.targetRir, order: e.order,
+        });
+      }
+      days.push({ dayOfWeek: day.dayOfWeek, label: day.label, exercises });
+    }
+    const from = mine ? ' (copy)' : ` (from ${source.user?.name || 'someone'})`;
+    const plan = await WorkoutPlan.create({
+      user: me,
+      name: `${source.name}${from}`.slice(0, 100),
+      description: source.description || (mine ? '' : `Shared by ${source.user?.name}.`),
+      schedule: source.schedule,
+      rotation: source.rotation,
+      days,
+    });
+    await plan.populate('days.exercises.exercise', 'name muscleGroups secondaryMuscles equipment laterality type images');
+    res.status(201).json(plan);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /api/plans/from-workout { workoutId, postId?, messageId? }
 // Save a workout as a template (a one-workout plan). It can be your own, or one
 // shared with you: in a post you can see (postId) or a message in one of your
@@ -244,34 +322,11 @@ exports.saveWorkoutAsPlan = async (req, res, next) => {
     if (!workout) return notFound();
 
     // You can save it if it's yours, or it reached you through a post or a message.
-    let allowed = String(workout.user?._id) === me;
-    if (!allowed && postId) {
-      const Post = require('../models/Post');
-      const { canViewContent } = require('../utils/privacy');
-      const post = await Post.findOne({ _id: postId, workoutSession: workoutId }).select('_id').lean();
-      allowed = !!post && canViewContent(workout.user, me);
-    }
-    if (!allowed && messageId) {
-      const Message = require('../models/Message');
-      const Conversation = require('../models/Conversation');
-      const msg = await Message.findOne({ _id: messageId, workoutSession: workoutId }).select('conversation').lean();
-      allowed = !!msg && !!(await Conversation.exists({ _id: msg.conversation, participants: me }));
-    }
+    const allowed = String(workout.user?._id) === me
+      || await canSeeShared(me, { postId, messageId, field: 'workoutSession', id: workoutId, ownerDoc: workout.user });
     if (!allowed) return notFound();
 
-    // Custom exercises you can't use (someone else's) get a copy of your own,
-    // or your existing custom exercise with the same name.
-    for (const ex of workout.exercises) {
-      const e = ex.exercise;
-      if (!e || !e.isCustom || String(e.createdBy) === me) continue;
-      const nameRe = new RegExp(`^${e.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-      const mine = await Exercise.findOne({ isCustom: true, createdBy: me, name: nameRe });
-      ex.exercise = mine || await Exercise.create({
-        name: e.name, muscleGroups: e.muscleGroups, secondaryMuscles: e.secondaryMuscles, equipment: e.equipment,
-        category: e.category, laterality: e.laterality, type: e.type, instructions: e.instructions, images: e.images,
-        isCustom: true, createdBy: me,
-      });
-    }
+    for (const ex of workout.exercises) ex.exercise = await usableExercise(ex.exercise, me);
 
     const { planExercisesFromWorkout } = require('../utils/planFromWorkout');
     const exercises = planExercisesFromWorkout(workout);

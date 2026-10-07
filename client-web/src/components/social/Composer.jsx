@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { ImagePlus, X, Dumbbell } from 'lucide-react';
+import { ImagePlus, X, Dumbbell, ClipboardList } from 'lucide-react';
 import Avatar from '../Avatar';
 import WorkoutSummary from './WorkoutSummary';
-import { postAPI, workoutAPI } from '../../api';
+import PlanSummary from './PlanSummary';
+import { postAPI, workoutAPI, planAPI } from '../../api';
 
-/** New post: text, an optional workout from your history, and an optional photo. */
+/** New post: text, an optional workout from your history and/or one of your plans, and an optional photo. */
 export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
   const [caption, setCaption] = useState('');
   const [workouts, setWorkouts] = useState([]);
   const [workoutId, setWorkoutId] = useState(initialWorkoutId || '');
+  const [plans, setPlans] = useState([]);
+  const [planId, setPlanId] = useState('');
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState('');
   const [posting, setPosting] = useState(false);
@@ -18,6 +21,7 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
 
   useEffect(() => {
     workoutAPI.getAll({ limit: 15 }).then(({ data }) => setWorkouts(data.workouts || [])).catch(() => setWorkouts([]));
+    planAPI.getAll().then(({ data }) => setPlans(data)).catch(() => setPlans([]));
   }, []);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -31,7 +35,8 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
   };
 
   const selected = workouts.find((w) => w._id === workoutId);
-  const canPost = caption.trim() || workoutId || photo;
+  const selectedPlan = plans.find((p) => p._id === planId);
+  const canPost = caption.trim() || workoutId || planId || photo;
 
   const submit = async () => {
     if (!canPost) return;
@@ -41,6 +46,7 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
       const form = new FormData();
       form.append('caption', caption.trim());
       if (workoutId) form.append('workoutSession', workoutId);
+      if (planId) form.append('workoutPlan', planId);
       if (photo) form.append('image', photo);
       const { data } = await postAPI.create(form);
       onPosted(data);
@@ -73,6 +79,19 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
         </select>
         {selected && <div className="mt-2"><WorkoutSummary workout={selected} /></div>}
       </div>
+
+      {plans.length > 0 && (
+        <div>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <ClipboardList size={13} /> Attach a plan (all its days)
+          </label>
+          <select className="input text-sm" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            <option value="">None</option>
+            {plans.map((p) => <option key={p._id} value={p._id}>{p.name} — {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</option>)}
+          </select>
+          {selectedPlan && <div className="mt-2"><PlanSummary plan={selectedPlan} /></div>}
+        </div>
+      )}
 
       {preview ? (
         <div className="relative">

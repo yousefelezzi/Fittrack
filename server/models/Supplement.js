@@ -10,6 +10,10 @@ const supplementSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 60 },
     dose: { type: String, trim: true, maxlength: 40, default: '' },   // e.g. "5 g", "2 capsules"
     timing: { type: String, trim: true, maxlength: 40, default: '' }, // e.g. "Morning", "With dinner"
+    // From the built-in list: its micronutrients count toward the day's totals
+    // when ticked off, times the servings taken. null = your own (no micros).
+    catalog: { type: mongoose.Schema.Types.ObjectId, ref: 'SupplementCatalog', default: null },
+    servings: { type: Number, min: 0.25, max: 20, default: 1 },
     order: { type: Number, default: 0 },
   },
   { timestamps: true }

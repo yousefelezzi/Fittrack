@@ -1,12 +1,25 @@
 const Supplement = require('../models/Supplement');
+const SupplementCatalog = require('../models/SupplementCatalog');
 
 const FIELDS = ['name', 'dose', 'timing'];
-const pick = (body) => Object.fromEntries(FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, String(body[k]).trim()]));
+const pick = (body) => ({
+  ...Object.fromEntries(FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, String(body[k]).trim()])),
+  ...(body.servings !== undefined && { servings: Number(body.servings) }),
+});
+
+// GET /api/supplements/catalog — the built-in list, by category
+exports.getCatalog = async (req, res, next) => {
+  try {
+    res.json(await SupplementCatalog.find().sort({ category: 1, name: 1 }).lean());
+  } catch (err) {
+    next(err);
+  }
+};
 
 // GET /api/supplements — your supplements, in your order
 exports.getSupplements = async (req, res, next) => {
   try {
-    res.json(await Supplement.find({ user: req.user.id }).sort({ order: 1, createdAt: 1 }).lean());
+    res.json(await Supplement.find({ user: req.user.id }).sort({ order: 1, createdAt: 1 }).populate('catalog').lean());
   } catch (err) {
     next(err);
   }
@@ -17,7 +30,22 @@ exports.createSupplement = async (req, res, next) => {
   try {
     const count = await Supplement.countDocuments({ user: req.user.id });
     if (count >= 50) return res.status(400).json({ message: 'You can track up to 50 supplements' });
-    const supplement = await Supplement.create({ ...pick(req.body), user: req.user.id, order: count });
+    // From the built-in list: its name and serving fill in anything left blank.
+    let catalog = null;
+    if (req.body.catalogId) {
+      catalog = await SupplementCatalog.findById(req.body.catalogId).lean();
+      if (!catalog) return res.status(404).json({ message: 'Supplement not found in the list' });
+    }
+    const fields = pick(req.body);
+    const supplement = await Supplement.create({
+      ...fields,
+      name: fields.name || catalog?.name,
+      dose: fields.dose ?? catalog?.serving ?? '',
+      catalog: catalog?._id ?? null,
+      user: req.user.id,
+      order: count,
+    });
+    await supplement.populate('catalog');
     res.status(201).json(supplement);
   } catch (err) {
     next(err);
@@ -27,7 +55,7 @@ exports.createSupplement = async (req, res, next) => {
 // PUT /api/supplements/:id { name?, dose?, timing? }
 exports.updateSupplement = async (req, res, next) => {
   try {
-    const supplement = await Supplement.findOneAndUpdate({ _id: req.params.id, user: req.user.id }, pick(req.body), { new: true, runValidators: true });
+    const supplement = await Supplement.findOneAndUpdate({ _id: req.params.id, user: req.user.id }, pick(req.body), { new: true, runValidators: true }).populate('catalog');
     if (!supplement) return res.status(404).json({ message: 'Supplement not found' });
     res.json(supplement);
   } catch (err) {

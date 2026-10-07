@@ -16,7 +16,9 @@ import ExerciseImage from './ExerciseImage';
 import {
   Heart, MessageCircle, Pencil, Trash2, Send, Dumbbell, Check, ChevronLeft, Users, UserPlus, LogOut, Image as ImageIcon,
   BookmarkPlus,
+  ClipboardList,
 } from 'lucide-react-native';
+import { typeOf } from '../../../client-web/src/utils/exerciseTypes';
 
 const idOf = (x) => String(x?._id ?? x);
 
@@ -66,6 +68,73 @@ function SaveAsTemplate({ workout, source }) {
         </TouchableOpacity>
       )}
       {state === 'error' ? <Text style={[styles.small, { color: colors.danger }]}>{error}</Text> : null}
+    </View>
+  );
+}
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const planDayName = (plan, d) => d.label || (plan.schedule === 'rotation' ? `Workout ${d.dayOfWeek + 1}` : DAY_NAMES[d.dayOfWeek]);
+const planTarget = (e) => {
+  const type = typeOf(e.exercise);
+  const amount = type === 'yielding' ? `${e.targetReps}s` : type === 'overcoming' ? `${e.targetReps} bursts` : `${e.targetReps}${e.targetRepsMax ? `–${e.targetRepsMax}` : ''}`;
+  return `${e.targetSets} × ${amount}`;
+};
+
+/**
+ * A shared workout plan (every day of it): tap to see each day's exercises.
+ * With `source` ({ postId } / { messageId }) it can be saved to your plans.
+ */
+export function PlanSummary({ plan, source }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState('idle'); // idle | saving | saved | error
+  const [error, setError] = useState('');
+  if (!plan) return null;
+  const days = [...(plan.days || [])].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  const exerciseCount = days.reduce((n, d) => n + (d.exercises?.length || 0), 0);
+  const save = async () => {
+    setState('saving');
+    try { await planAPI.fromShared({ planId: plan._id, ...source }); setState('saved'); } catch (err) {
+      setError(err.response?.data?.message || 'Could not save it');
+      setState('error');
+    }
+  };
+  return (
+    <View style={[styles.workout, styles.planCard]}>
+      <TouchableOpacity style={styles.workoutHead} onPress={() => setOpen(!open)}>
+        <View style={[styles.workoutIcon, { backgroundColor: '#ede9fe' }]}><ClipboardList size={18} color="#7c3aed" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bold} numberOfLines={1}>{plan.name}</Text>
+          <Text style={styles.muted}>Plan · {days.length} workout{days.length !== 1 ? 's' : ''} · {exerciseCount} exercises · {plan.schedule === 'rotation' ? 'rotation' : 'weekly'}</Text>
+        </View>
+        <Text style={styles.muted}>{open ? '▴' : '▾'}</Text>
+      </TouchableOpacity>
+      {open && days.map((d) => (
+        <View key={d.dayOfWeek} style={styles.workoutRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.small, { fontWeight: '700', color: colors.textPrimary }]}>{planDayName(plan, d)}</Text>
+            {(d.exercises || []).filter((e) => e.exercise).length === 0 ? <Text style={styles.muted}>Rest / no exercises</Text>
+              : d.exercises.filter((e) => e.exercise).map((e, i) => (
+                <View key={i} style={[styles.row, { justifyContent: 'space-between' }]}>
+                  <Text style={[styles.muted, { flex: 1 }]} numberOfLines={1}>{e.exercise.name}</Text>
+                  <Text style={styles.muted}>{planTarget(e)}</Text>
+                </View>
+              ))}
+          </View>
+        </View>
+      ))}
+      {source ? (
+        <View style={styles.workoutRow}>
+          {state === 'saved' ? (
+            <><Check size={14} color={colors.success} /><Text style={[styles.small, { color: colors.success }]}>Saved to your plans (Train → Plans)</Text></>
+          ) : (
+            <TouchableOpacity onPress={save} disabled={state === 'saving'} style={styles.row} hitSlop={6}>
+              <BookmarkPlus size={15} color="#7c3aed" />
+              <Text style={[styles.linkText, { color: '#7c3aed' }]}>{state === 'saving' ? 'Saving…' : 'Save plan to my plans'}</Text>
+            </TouchableOpacity>
+          )}
+          {state === 'error' ? <Text style={[styles.small, { color: colors.danger }]}>{error}</Text> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -210,6 +279,7 @@ export function PostCard({ post, me, following, requested, onFollow, onLike, onU
         </View>
       ) : post.caption ? <Text style={styles.caption}>{post.caption}</Text> : null}
       {post.workoutSession ? <View style={{ marginTop: 8 }}><WorkoutSummary workout={post.workoutSession} source={{ postId: post._id }} /></View> : null}
+      {post.workoutPlan ? <View style={{ marginTop: 8 }}><PlanSummary plan={post.workoutPlan} source={{ postId: post._id }} /></View> : null}
       {post.image ? <Image source={{ uri: uploadUrl(post.image) }} style={styles.postImage} resizeMode="cover" /> : null}
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => (liked ? onUnlike(post._id) : onLike(post._id))} style={styles.row} hitSlop={6}>
@@ -255,6 +325,8 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
   const [caption, setCaption] = useState('');
   const [workouts, setWorkouts] = useState(initialWorkout ? [initialWorkout] : []);
   const [workoutId, setWorkoutId] = useState(initialWorkout?._id || '');
+  const [plans, setPlans] = useState([]);
+  const [planId, setPlanId] = useState('');
   const [photo, setPhoto] = useState(null); // { uri, mimeType }
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
@@ -264,6 +336,7 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
       const list = data.workouts || [];
       setWorkouts(initialWorkout && !list.some((w) => w._id === initialWorkout._id) ? [initialWorkout, ...list] : list);
     }).catch(() => {});
+    planAPI.getAll().then(({ data }) => setPlans(data)).catch(() => {});
   }, []);
 
   const pickPhoto = async () => {
@@ -278,7 +351,8 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
   };
 
   const selected = workouts.find((w) => w._id === workoutId);
-  const canPost = caption.trim() || workoutId || photo;
+  const selectedPlan = plans.find((p) => p._id === planId);
+  const canPost = caption.trim() || workoutId || planId || photo;
 
   const submit = async () => {
     if (!canPost) return;
@@ -288,6 +362,7 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
       const form = new FormData();
       form.append('caption', caption.trim());
       if (workoutId) form.append('workoutSession', workoutId);
+      if (planId) form.append('workoutPlan', planId);
       if (photo) {
         const type = photo.mimeType || 'image/jpeg';
         form.append('image', { uri: photo.uri, name: `photo.${type.split('/')[1] || 'jpg'}`, type });
@@ -315,6 +390,18 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
         </ChipRow>
       </ScrollView>
       {selected && <View style={{ marginTop: 8 }}><WorkoutSummary workout={selected} /></View>}
+      {plans.length > 0 ? (
+        <>
+          <View style={[styles.row, { marginTop: 10, marginBottom: 6, gap: 6 }]}><ClipboardList size={14} color={colors.textMuted} /><Text style={styles.muted}>Attach a plan (all its days)</Text></View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ChipRow style={{ flexWrap: 'nowrap', gap: 6 }}>
+              <Chip small label="None" active={!planId} onPress={() => setPlanId('')} />
+              {plans.map((p) => <Chip key={p._id} small label={p.name} active={planId === p._id} onPress={() => setPlanId(p._id)} />)}
+            </ChipRow>
+          </ScrollView>
+          {selectedPlan ? <View style={{ marginTop: 8 }}><PlanSummary plan={selectedPlan} /></View> : null}
+        </>
+      ) : null}
       {photo ? (
         <View style={{ marginTop: 10 }}>
           <Image source={{ uri: photo.uri }} style={styles.postImage} resizeMode="cover" />
@@ -650,10 +737,14 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
       setSending(false);
     }
   };
+  // The attach panel: recent workouts and your plans (a plan is sent whole).
   const toggleWorkouts = async () => {
     if (workouts) { setWorkouts(null); return; }
-    const { data } = await workoutAPI.getAll({ limit: 10 });
-    setWorkouts(data.workouts || []);
+    const [w, p] = await Promise.all([
+      workoutAPI.getAll({ limit: 10 }).catch(() => ({ data: {} })),
+      planAPI.getAll().catch(() => ({ data: [] })),
+    ]);
+    setWorkouts({ workouts: w.data.workouts || [], plans: p.data || [] });
   };
   // A group change (rename, new people) adds a note to the chat: reload it.
   const groupChanged = (updated) => { setConvo(updated); setShowMenu(false); load(); onActivity(); };
@@ -703,6 +794,7 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
                 </View>
               ) : null}
               {m.workoutSession ? <View style={{ width: 260 }}><WorkoutSummary workout={m.workoutSession} source={{ messageId: m._id }} /></View> : null}
+              {m.workoutPlan ? <View style={{ width: 260 }}><PlanSummary plan={m.workoutPlan} source={{ messageId: m._id }} /></View> : null}
               {m.text ? <Text style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>{m.text}</Text> : null}
               <Text style={styles.tiny}>
                 {format(new Date(m.createdAt), isToday(new Date(m.createdAt)) ? 'HH:mm' : 'MMM d, HH:mm')}
@@ -715,12 +807,18 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
       />
       {workouts && (
         <View style={styles.workoutPick}>
-          <Hint>Share a workout</Hint>
-          {workouts.length === 0 && <Hint>No workouts logged yet.</Hint>}
-          <ScrollView style={{ maxHeight: 150 }}>
-            {workouts.map((w) => (
+          <ScrollView style={{ maxHeight: 200 }}>
+            <Hint>Share a workout</Hint>
+            {workouts.workouts.length === 0 && <Hint>No workouts logged yet.</Hint>}
+            {workouts.workouts.map((w) => (
               <TouchableOpacity key={w._id} disabled={sending} onPress={() => send({ workoutSession: w._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
                 <Text style={styles.small}>{w.name} <Text style={styles.muted}>· {format(new Date(w.date), 'MMM d')}</Text></Text>
+              </TouchableOpacity>
+            ))}
+            {workouts.plans.length > 0 ? <Hint style={{ marginTop: 6 }}>Share a plan (all its days)</Hint> : null}
+            {workouts.plans.map((p) => (
+              <TouchableOpacity key={p._id} disabled={sending} onPress={() => send({ workoutPlan: p._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
+                <Text style={styles.small}>{p.name} <Text style={styles.muted}>· {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</Text></Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -829,6 +927,7 @@ const styles = makeStyles(() => ({
   checkbox:      { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   checkboxOn:    { backgroundColor: colors.brand, borderColor: colors.brand },
   groupMenu:     { maxHeight: 320, flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
+  planCard:      { borderColor: '#ddd6fe', backgroundColor: colors.infoBg },
   linkText:      { fontSize: 14, fontWeight: '600', color: colors.brand },
   sendBtn:       { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   input:         { minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },

@@ -62,10 +62,11 @@ export const MICRO_CONFIG = [
   { key: 'omega3',     label: 'Omega-3',     unit: 'g',   dv: 1.6  },
 ];
 
-// Sum micros across all meals
-export const sumMicros = (meals) => {
+// Sum micros across all meals, plus `extra` (e.g. the day's supplements: the
+// log's supplementMicros, from the supplements ticked off that day).
+export const sumMicros = (meals, extra = {}) => {
   const totals = {};
-  for (const cfg of MICRO_CONFIG) totals[cfg.key] = 0;
+  for (const cfg of MICRO_CONFIG) totals[cfg.key] = r(Number(extra?.[cfg.key]) || 0);
   for (const meal of (meals || [])) {
     for (const cfg of MICRO_CONFIG) {
       totals[cfg.key] = r((totals[cfg.key] || 0) + ((meal.micros || {})[cfg.key] || 0));
@@ -73,6 +74,12 @@ export const sumMicros = (meals) => {
   }
   return totals;
 };
+
+/** "Vitamin D 25 mcg · Calcium 500 mg" for a supplement's micros per serving × servings. */
+export const microsText = (micros = {}, servings = 1) => MICRO_CONFIG
+  .filter((c) => Number(micros[c.key]) > 0)
+  .map((c) => `${c.label} ${r(micros[c.key] * servings)} ${c.unit}`)
+  .join(' · ');
 
 
 // A food with a cookedYield can be logged raw/dry or cooked: 1 g raw makes

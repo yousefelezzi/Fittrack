@@ -316,7 +316,7 @@ export default function ProfileScreen({ route, navigation }) {
         {isOwn && (
           <Card style={{ paddingVertical: 4 }}>
             <ListRow icon={Footprints} title="Steps" subtitle="Daily steps, goal and history" onPress={() => navigation.navigate('Steps')} />
-            <ListRow icon={Calculator} title="Calculators" subtitle="FFMI, BMR & TDEE, Weekly Net Stimulus" onPress={() => navigation.navigate('Calculators')} />
+            <ListRow icon={Calculator} title="Calculators" subtitle="FFMI, BMR & TDEE, Weekly Net Stimulus, one-rep max" onPress={() => navigation.navigate('Calculators')} />
             <ListRow icon={History} title="History" subtitle="Past workouts and meals" onPress={() => navigation.navigate('History')} />
             <ListRow icon={Settings} title="Settings" subtitle="Appearance, privacy, password, sign out" onPress={() => navigation.navigate('Settings')} last />
           </Card>

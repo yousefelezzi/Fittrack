@@ -15,9 +15,11 @@ import {
 } from '../utils/foodLogic';
 
 // ── Macro Pie + Micronutrient hover card ─────────────────────────────────────
-function MacroCard({ totals, meals }) {
+// `supplementMicros`: vitamins and minerals from the supplements ticked off today.
+function MacroCard({ totals, meals, supplementMicros }) {
   const [hovered, setHovered] = useState(false);
-  const microTotals = sumMicros(meals);
+  const microTotals = sumMicros(meals, supplementMicros);
+  const fromSupplements = Object.values(supplementMicros || {}).some((v) => v > 0);
 
   // Split by calories, not grams: a gram of fat is 9 kcal, protein and carbs 4.
   // `value` drives the pie, so the slices show each macro's share of calories.
@@ -102,6 +104,7 @@ function MacroCard({ totals, meals }) {
         <div className="absolute inset-0 bg-white dark:bg-gray-900 p-3 overflow-y-auto">
           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             Micronutrients today
+            {fromSupplements && <span className="normal-case font-normal text-gray-400"> · includes supplements</span>}
           </p>
           <div className="space-y-1.5">
             {activeMicros.map(({ key, label, unit, dv }) => {
@@ -1505,7 +1508,7 @@ export default function Nutrition() {
         </div>
 
         {/* Macro pie + micro hover */}
-        <MacroCard totals={totals} meals={log?.meals || []} />
+        <MacroCard totals={totals} meals={log?.meals || []} supplementMicros={log?.supplementMicros} />
       </div>
 
       {/* Macro progress bars */}

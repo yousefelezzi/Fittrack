@@ -15,6 +15,8 @@ const postSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     workoutSession: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutSession', default: null },
+    // A whole plan (all its days) can be shared too.
+    workoutPlan: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutPlan', default: null },
     caption: { type: String, trim: true, maxlength: 500, default: '' },
     image: { type: String, default: '' }, // Local upload URL
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

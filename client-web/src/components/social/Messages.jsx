@@ -4,7 +4,8 @@ import { format, isToday, formatDistanceToNowStrict } from 'date-fns';
 import { ArrowLeft, Send, Dumbbell, Users, UserPlus, Pencil, LogOut, Check, Hand } from 'lucide-react';
 import Avatar from '../Avatar';
 import WorkoutSummary from './WorkoutSummary';
-import { messageAPI, workoutAPI, userAPI } from '../../api';
+import PlanSummary from './PlanSummary';
+import { messageAPI, workoutAPI, userAPI, planAPI } from '../../api';
 
 const POLL_MS = 5000; // new messages show up within a few seconds
 
@@ -232,10 +233,14 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
     }
   };
 
+  // The attach panel: recent workouts and your plans (a plan is sent whole).
   const openWorkouts = async () => {
     if (workouts) { setWorkouts(null); return; }
-    const { data } = await workoutAPI.getAll({ limit: 10 });
-    setWorkouts(data.workouts || []);
+    const [w, p] = await Promise.all([
+      workoutAPI.getAll({ limit: 10 }).catch(() => ({ data: {} })),
+      planAPI.getAll().catch(() => ({ data: [] })),
+    ]);
+    setWorkouts({ workouts: w.data.workouts || [], plans: p.data || [] });
   };
 
   // A group change (rename, new people) adds a note to the chat: reload it.
@@ -285,6 +290,7 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
               <div className={`max-w-[80%] space-y-1.5 ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
                 {showName && <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 px-1">{sender?.name ?? 'Former member'}</p>}
                 {m.workoutSession && <div className="w-64"><WorkoutSummary workout={m.workoutSession} source={{ messageId: m._id }} /></div>}
+                {m.workoutPlan && <div className="w-64"><PlanSummary plan={m.workoutPlan} source={{ messageId: m._id }} /></div>}
                 {m.text && (
                   <p className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-line break-words ${mine
                     ? 'bg-brand-600 text-white rounded-br-md' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'}`}>
@@ -304,20 +310,27 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
       </div>
 
       {workouts && (
-        <div className="border-t border-gray-100 dark:border-gray-800 max-h-40 overflow-y-auto px-3 py-2 space-y-1">
+        <div className="border-t border-gray-100 dark:border-gray-800 max-h-48 overflow-y-auto px-3 py-2 space-y-1">
           <p className="text-xs text-gray-400 dark:text-gray-500">Share a workout</p>
-          {workouts.length === 0 && <p className="text-xs text-gray-400">No workouts logged yet.</p>}
-          {workouts.map((w) => (
+          {workouts.workouts.length === 0 && <p className="text-xs text-gray-400">No workouts logged yet.</p>}
+          {workouts.workouts.map((w) => (
             <button key={w._id} onClick={() => send({ workoutSession: w._id, text: text.trim() || undefined })} disabled={sending}
               className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
               {w.name} <span className="text-xs text-gray-400">· {format(new Date(w.date), 'MMM d')}</span>
+            </button>
+          ))}
+          {workouts.plans.length > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">Share a plan (all its days)</p>}
+          {workouts.plans.map((p) => (
+            <button key={p._id} onClick={() => send({ workoutPlan: p._id, text: text.trim() || undefined })} disabled={sending}
+              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
+              {p.name} <span className="text-xs text-gray-400">· {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</span>
             </button>
           ))}
         </div>
       )}
       {error && <p className="text-xs text-red-500 px-4">{error}</p>}
       <div className="flex items-end gap-2 p-3 border-t border-gray-100 dark:border-gray-800">
-        <button onClick={openWorkouts} title="Share a workout"
+        <button onClick={openWorkouts} title="Share a workout or plan"
           className={`p-2 rounded-lg ${workouts ? 'text-brand-600 bg-brand-50 dark:bg-brand-900/30' : 'text-gray-400 hover:text-brand-600'}`}>
           <Dumbbell size={18} />
         </button>

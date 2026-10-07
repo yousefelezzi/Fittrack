@@ -38,9 +38,11 @@ function MacroDonut({ totals }) {
   );
 }
 
-function MacroCard({ totals, meals }) {
+// `supplementMicros`: vitamins and minerals from the supplements ticked off today.
+function MacroCard({ totals, meals, supplementMicros }) {
   const [showMicros, setShowMicros] = useState(false);
-  const micros = sumMicros(meals);
+  const micros = sumMicros(meals, supplementMicros);
+  const fromSupplements = Object.values(supplementMicros || {}).some((v) => v > 0);
   const active = MICRO_CONFIG.filter((c) => (micros[c.key] || 0) > 0);
   const kcal = { protein: totals.protein * 4, carbs: totals.carbs * 4, fat: totals.fat * 9 };
   const kcalTotal = kcal.protein + kcal.carbs + kcal.fat;
@@ -84,6 +86,7 @@ function MacroCard({ totals, meals }) {
           })}
         </View>
       )}
+      {showMicros && fromSupplements ? <Text style={[styles.muted, { marginTop: 6 }]}>Includes the supplements you ticked off today.</Text> : null}
       {active.length > 0 && <LinkText style={{ marginTop: 10, alignSelf: 'center' }} onPress={() => setShowMicros(!showMicros)}>{showMicros ? 'Show macros' : 'Show micronutrients'}</LinkText>}
     </Card>
   );
@@ -484,7 +487,7 @@ export default function NutritionScreen({ navigation }) {
           </View>
         </Card>
 
-        <MacroCard totals={totals} meals={meals} />
+        <MacroCard totals={totals} meals={meals} supplementMicros={log?.supplementMicros} />
 
         <Card>
           <View style={[styles.rowBetween, { marginBottom: 10 }]}>

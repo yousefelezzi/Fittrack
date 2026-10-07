@@ -64,11 +64,14 @@ export const planAPI = {
   skeleton:  (opts)    => api.post('/plans/skeleton', opts),
   // Save a workout (yours, or shared with you: { postId } or { messageId }) as a template.
   fromWorkout: (body) => api.post('/plans/from-workout', body),
+  // Save a copy of a whole plan shared with you ({ planId, postId } or { planId, messageId }).
+  fromShared: (body) => api.post('/plans/from-shared', body),
 };
 
 // ── Nutrition ─────────────────────────────────────────────────────────────────
 export const supplementAPI = {
   getAll: ()         => api.get('/supplements'),
+  catalog: ()        => api.get('/supplements/catalog'), // built-in list with micros per serving
   create: (data)     => api.post('/supplements', data),
   update: (id, data) => api.put(`/supplements/${id}`, data),
   delete: (id)       => api.delete(`/supplements/${id}`),

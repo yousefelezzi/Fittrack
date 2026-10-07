@@ -23,6 +23,11 @@ const populatePost = (query) =>
       select: 'name exercises duration date',
       populate: { path: 'exercises.exercise', select: 'name images type' },
     })
+    .populate({
+      path: 'workoutPlan',
+      select: 'name description schedule rotation days',
+      populate: { path: 'days.exercises.exercise', select: 'name images type laterality' },
+    })
     .populate('comments.user', 'name avatar');
 
 // GET /api/posts/feed?scope=following|discover&page=1&limit=10
@@ -101,13 +106,24 @@ exports.createPost = async (req, res, next) => {
       if (!w) return res.status(400).json({ message: 'Workout not found' });
       workoutSession = w._id;
     }
-    if (!caption && !workoutSession && !req.file) {
-      return res.status(400).json({ message: 'Add some text, a photo or a workout' });
+    let workoutPlan = null;
+    if (req.body.workoutPlan) {
+      // Only your own plans can be posted.
+      const WorkoutPlan = require('../models/WorkoutPlan');
+      const plan = mongoose.isValidObjectId(req.body.workoutPlan)
+        ? await WorkoutPlan.findOne({ _id: req.body.workoutPlan, user: req.user.id }).select('_id')
+        : null;
+      if (!plan) return res.status(400).json({ message: 'Plan not found' });
+      workoutPlan = plan._id;
+    }
+    if (!caption && !workoutSession && !workoutPlan && !req.file) {
+      return res.status(400).json({ message: 'Add some text, a photo, a workout or a plan' });
     }
     const post = await Post.create({
       user: req.user.id,
       caption,
       workoutSession,
+      workoutPlan,
       image: req.file ? `/uploads/${req.file.filename}` : '',
     });
     res.status(201).json(await populatePost(Post.findById(post._id)));
@@ -204,7 +220,7 @@ exports.editPost = async (req, res, next) => {
     if (!post) return res.status(404).json({ message: 'Post not found' });
     const caption = String(req.body.caption ?? '').trim();
     // A post needs something in it: text, a workout or a photo.
-    if (!caption && !post.workoutSession && !post.image) return res.status(400).json({ message: 'A post needs some text' });
+    if (!caption && !post.workoutSession && !post.workoutPlan && !post.image) return res.status(400).json({ message: 'A post needs some text' });
     post.caption = caption;
     post.editedAt = new Date();
     await post.save();
