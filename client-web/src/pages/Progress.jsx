@@ -47,6 +47,7 @@ function MuscleTooltip({ active, payload }) {
 
 export default function Progress() {
   const [stats, setStats] = useState(null);
+  const [setsView, setSetsView] = useState('total'); // muscle chart: 'total' | 'direct'
   const [exercises, setExercises] = useState([]);
   const [selectedEx, setSelectedEx] = useState('');
   const [selectedExName, setSelectedExName] = useState('');
@@ -82,7 +83,9 @@ export default function Progress() {
 
   const weeklyData = buildWeeklyData(stats?.recentWorkouts || []);
   // Sets per muscle. Pecs, calves and triceps carry a per-sub-region breakdown for the tooltip.
-  const muscleData = (stats?.muscleGroupStats || [])
+  // Total counts secondary muscles too (part of a set); direct only main targets.
+  const muscleData = ((setsView === 'direct' ? stats?.muscleGroupStatsDirect : stats?.muscleGroupStats) || [])
+    .filter(m => m.count > 0)
     .map(m => ({ key: m._id, name: m._id.replace('_', ' '), value: m.count, subregions: m.subregions }))
     // Body order (upper → core → legs); anything unknown goes last, biggest first.
     .sort((a, b) => (MUSCLE_POS[a.key] ?? 99) - (MUSCLE_POS[b.key] ?? 99) || b.value - a.value);
@@ -155,7 +158,18 @@ export default function Progress() {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Muscle Group Breakdown */}
         <div className="card">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Muscle Groups Trained <span className="text-xs font-normal text-gray-400 dark:text-gray-500">· sets</span></h2>
+          <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Muscle Groups Trained <span className="text-xs font-normal text-gray-400 dark:text-gray-500">· sets</span></h2>
+            <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg" role="group" aria-label="Sets to count">
+              {[['total', 'Total sets', 'Main and secondary muscles (secondary count part of a set)'], ['direct', 'Direct sets', 'Only sets where the muscle is a main target']].map(([k, label, hint]) => (
+                <button key={k} type="button" title={hint} onClick={() => setSetsView(k)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${setsView === k
+                    ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {muscleData.length === 0
             ? <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-8">No data yet</p>
             : <ResponsiveContainer width="100%" height={220}>

@@ -64,22 +64,26 @@ exports.getWorkoutStats = async (req, res, next) => {
     twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
 
     const secondaryWeight = await mySecondaryWeight(userId);
-    const [totalWorkouts, recentWorkouts, muscleGroupStats] = await Promise.all([
+    const [totalWorkouts, recentWorkouts, allSessions] = await Promise.all([
       WorkoutSession.countDocuments({ user: userId }),
 
       WorkoutSession.find({ user: userId, date: { $gte: twelveWeeksAgo } })
         .select('date exercises duration')
         .populate('exercises.exercise', 'muscleGroups secondaryMuscles'),
 
-      // Sets per muscle, all time (see utils/muscleGroups.js for sub-regions).
       WorkoutSession.find({ user: userId })
         .select('exercises')
         .populate('exercises.exercise', 'muscleGroups secondaryMuscles')
-        .lean()
-        .then((sessions) => muscleBreakdown(sessions, secondaryWeight)),
+        .lean(),
     ]);
 
-    res.json({ totalWorkouts, recentWorkouts, muscleGroupStats });
+    // Sets per muscle, all time (see utils/muscleGroups.js for sub-regions):
+    // total counts secondary muscles at the user's 0.5 − x; direct only counts
+    // sets where the muscle is a main target (secondary counts 0).
+    const muscleGroupStats = muscleBreakdown(allSessions, secondaryWeight);
+    const muscleGroupStatsDirect = muscleBreakdown(allSessions, 0);
+
+    res.json({ totalWorkouts, recentWorkouts, muscleGroupStats, muscleGroupStatsDirect });
   } catch (err) {
     next(err);
   }

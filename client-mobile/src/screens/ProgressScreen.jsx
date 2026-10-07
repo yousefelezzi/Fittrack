@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { format } from 'date-fns';
 import { workoutAPI, exerciseAPI } from '../api';
-import { Card, Spinner, colors, makeStyles, BarChart, LineChart, HBarList, ExercisePicker, Hint, SectionTitle } from '../components';
+import { Card, Spinner, colors, makeStyles, BarChart, LineChart, HBarList, ExercisePicker, Hint, SectionTitle, Segmented } from '../components';
 import VolumeCheck from '../components/VolumeCheck';
 import { X, ChevronDown } from 'lucide-react-native';
 
@@ -41,6 +41,7 @@ export default function ProgressScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [expandedMuscle, setExpandedMuscle] = useState(null);
+  const [setsView, setSetsView] = useState('total'); // muscle chart: 'total' | 'direct'
 
   const load = () => Promise.all([workoutAPI.getStats(), exerciseAPI.getAll()])
     // Overcoming isometrics have no load or reps to track, so they aren't listed.
@@ -57,7 +58,9 @@ export default function ProgressScreen({ navigation }) {
   if (loading) return <View style={styles.centered}><Spinner /></View>;
 
   const weekly = buildWeeklyData(stats?.recentWorkouts || []);
-  const muscles = (stats?.muscleGroupStats || [])
+  // Total counts secondary muscles too (part of a set); direct only main targets.
+  const muscles = ((setsView === 'direct' ? stats?.muscleGroupStatsDirect : stats?.muscleGroupStats) || [])
+    .filter((m) => m.count > 0)
     .map((m) => ({
       key: m._id, label: m._id.replace('_', ' '), value: m.count, color: MUSCLE_COLOR[m._id],
       sub: m.subregions?.length ? (
@@ -92,6 +95,10 @@ export default function ProgressScreen({ navigation }) {
 
       <Card>
         <SectionTitle>Muscle groups trained · sets</SectionTitle>
+        <Segmented value={setsView} onChange={setSetsView} style={{ marginBottom: 6 }} options={[['total', 'Total sets'], ['direct', 'Direct sets']]} />
+        <Hint style={{ marginBottom: 8 }}>
+          {setsView === 'direct' ? 'Only sets where the muscle is a main target of the exercise.' : 'Main and secondary muscles; a secondary muscle counts part of a set (by your training level).'}
+        </Hint>
         {muscles.length === 0 ? <Text style={styles.empty}>No data yet</Text> : (
           <>
             <HBarList data={muscles} expandedKey={expandedMuscle} onPress={(m) => setExpandedMuscle(expandedMuscle === m.key ? null : m.key)} />
