@@ -12,7 +12,7 @@ import AvatarCropper from '../components/AvatarCropper';
 import { PostCard } from '../components/social';
 import { usePostActions } from '../components/usePostActions';
 import { ACTIVITY_LEVELS } from '../../../client-web/src/utils/calculators';
-import { Footprints, Calculator, History, Settings, Lock, FileText, Pencil } from 'lucide-react-native';
+import { Footprints, Calculator, History, Settings, Lock, FileText, Pencil, Camera } from 'lucide-react-native';
 
 const GOAL_LABELS = {
   lose_weight: 'Lose Weight', build_muscle: 'Build Muscle', improve_endurance: 'Improve Endurance', stay_active: 'Stay Active', other: 'Other',
@@ -89,10 +89,13 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
             <TouchableOpacity onPress={onClose}><Text style={{ color: colors.brand }}>Cancel</Text></TouchableOpacity>
           </View>
           <ErrorText>{err}</ErrorText>
-          <View style={styles.photoRow}>
-            <Avatar user={profile} size={64} />
-            <TouchableOpacity onPress={onChangePhoto} style={styles.photoBtn}><Text style={styles.photoBtnText}>Change profile picture</Text></TouchableOpacity>
-          </View>
+          {/* Tap the picture (or its camera badge) to change it. */}
+          <TouchableOpacity onPress={onChangePhoto} style={styles.photoRow} activeOpacity={0.8} accessibilityLabel="Change profile picture">
+            <View>
+              <Avatar user={profile} size={76} />
+              <View style={styles.cameraBadge}><Camera size={15} color="#fff" /></View>
+            </View>
+          </TouchableOpacity>
           {field('Name', 'name')}
           {field('Bio', 'bio', { multiline: true, maxLength: 200, placeholder: 'Short bio…', style: [styles.field, { height: 70, textAlignVertical: 'top', paddingTop: 8 }] })}
           <View style={styles.row}>
@@ -370,9 +373,8 @@ const styles = makeStyles(() => ({
   avatarViewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
   // The full-size picture is shown as a circle, like the avatar.
   avatarFull:   { width: AVATAR_FULL, height: AVATAR_FULL, borderRadius: AVATAR_FULL / 2 },
-  photoRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 },
-  photoBtn:     { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  photoBtnText: { fontSize: 14, fontWeight: '600', color: colors.brand },
+  photoRow:     { alignSelf: 'center', marginBottom: 8 },
+  cameraBadge:  { position: 'absolute', right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
   statsRow:     { flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 16 },
   statPill:     { alignItems: 'center' },
   statNum:      { fontSize: 18, fontWeight: '700', color: colors.textPrimary },

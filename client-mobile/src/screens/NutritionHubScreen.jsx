@@ -5,6 +5,7 @@ import { Utensils, GlassWater, Pill, ChartLine, History } from 'lucide-react-nat
 import { nutritionAPI, supplementAPI } from '../api';
 import { Card, ListRow, colors, makeStyles, Title } from '../components';
 import { WATER_PRESETS, formatMl } from '../../../client-web/src/utils/nutritionProgress';
+import { MACRO_COLORS } from '../../../client-web/src/utils/foodLogic';
 
 const today = () => format(new Date(), 'yyyy-MM-dd');
 
@@ -23,7 +24,9 @@ export default function NutritionHubScreen({ navigation }) {
   }, []);
   useEffect(() => navigation.addListener('focus', load), [navigation, load]);
 
-  const totals = (log?.meals || []).reduce((t, m) => ({ calories: t.calories + (m.calories || 0), protein: t.protein + (m.protein || 0) }), { calories: 0, protein: 0 });
+  const totals = (log?.meals || []).reduce((t, m) => ({
+    calories: t.calories + (m.calories || 0), protein: t.protein + (m.protein || 0), carbs: t.carbs + (m.carbs || 0), fat: t.fat + (m.fat || 0),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   const goals = log?.dailyGoals || {};
   const water = (log?.water || []).reduce((n, w) => n + w.amount, 0);
   const takenIds = new Set((log?.supplementsTaken || []).map((t) => String(t.supplement)));
@@ -52,11 +55,15 @@ export default function NutritionHubScreen({ navigation }) {
           <Text style={styles.statValue}>{Math.round(totals.calories)} / {Math.round(goals.calories || 0)} kcal</Text>
         </View>
         {bar(totals.calories, goals.calories, '#f97316')}
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Protein</Text>
-          <Text style={styles.statValue}>{Math.round(totals.protein)} / {Math.round(goals.protein || 0)} g</Text>
-        </View>
-        {bar(totals.protein, goals.protein, colors.brand)}
+        {[['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat']].map(([k, label]) => (
+          <View key={k}>
+            <View style={styles.statRow}>
+              <Text style={styles.statLabel}>{label}</Text>
+              <Text style={styles.statValue}>{Math.round(totals[k])} / {Math.round(goals[k] || 0)} g</Text>
+            </View>
+            {bar(totals[k], goals[k], MACRO_COLORS[k])}
+          </View>
+        ))}
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Water</Text>
           <Text style={styles.statValue}>{formatMl(water)} / {formatMl(waterGoal)}</Text>

@@ -304,7 +304,8 @@ function OneRepMax({ user }) {
         <View style={styles.row}>
           <Field label={`Weight (${unit})`} value={weight} onChange={setWeight} placeholder={unit === 'lb' ? '225' : '100'} />
           <Field label="Reps" value={reps} onChange={setReps} placeholder="5" keyboardType="number-pad" />
-          <Field label="RIR (optional)" value={rir} onChange={setRir} placeholder="0" keyboardType="number-pad" />
+          {/* A short label keeps the three boxes on one line; it's optional (blank = 0). */}
+          <Field label="RIR" value={rir} onChange={setRir} placeholder="optional" keyboardType="number-pad" />
         </View>
         {oneRm ? (
           <View style={styles.result}>
