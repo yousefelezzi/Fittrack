@@ -8,7 +8,7 @@ import { X } from 'lucide-react-native';
 import { EXERCISE_TYPES, TYPE_LABEL, typeOf } from '../../../client-web/src/utils/exerciseTypes';
 import { coveringMuscle, toggleMuscleTag } from '../../../client-web/src/utils/exerciseFilters';
 
-const MUSCLES = ['pecs','clavicular pecs','sternal pecs','costal pecs','lats','trapezius','posterior delt','middle delt','anterior delt','elbow flexors','biceps','brachialis/brachioradialis','triceps','medial/lateral triceps','triceps long head','forearms','abs','erectors','glutes','adductors','hip flexors','quads','vastus quads','rectus femoris','hamstrings','biarticular hamstrings','hamstrings short head','calves','soleus'];
+const MUSCLES = ['pecs','clavicular pecs','sternal pecs','costal pecs','lats','trapezius','posterior delt','middle delt','anterior delt','elbow flexors','biceps','brachialis/brachioradialis','triceps','medial/lateral triceps','triceps long head','forearms','abs','erectors','glutes','adductors','hip flexors','quads','vastus quads','rectus femoris','hamstrings','biarticular hamstrings','hamstrings short head','calves','gastrocnemius','soleus'];
 const EQUIPMENT = ['barbell','dumbbell','machine','cable','bodyweight','kettlebell','resistance_band','other'];
 const CATEGORIES = [['strength', 'Strength'], ['cardio', 'Cardio']];
 const EMPTY_FORM = { name: '', muscleGroups: [], secondaryMuscles: [], equipment: 'bodyweight', category: 'strength', laterality: 'bilateral', type: 'dynamic', instructions: [''] };

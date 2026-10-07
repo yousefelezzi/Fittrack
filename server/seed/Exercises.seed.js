@@ -4,6 +4,7 @@ const Exercise = require('../models/Exercise');
 const connectDB = require('../config/db');
 const { forearmsAreSecondary } = require('../utils/forearmRole');
 const { needsSecondaryElbowFlexors, needsSecondaryRearDelts } = require('../utils/pullHelpers');
+const { needsSecondaryGastroc } = require('../utils/legCurlHelpers');
 
 const exercises = [
   // ── CHEST ──────────────────────────────────────────────────────────────────
@@ -944,6 +945,8 @@ const SECONDARY = {
   "Lateral Raise": ["anterior delt"],
   "Close Grip Pulldown": ["costal pecs"],
   "Reverse Curl": ["biceps"],
+  "Dumbbell Pullover": ["posterior delt"],
+  "Upright Row": ["posterior delt"],
 };
 for (const ex of exercises) ex.secondaryMuscles = SECONDARY[ex.name] || [];
 // Forearms only hold the grip, except on wrist curls and reverse curls.
@@ -953,6 +956,8 @@ for (const ex of exercises) {
   if (needsSecondaryElbowFlexors(ex)) { ex.muscleGroups.push('elbow flexors'); ex.secondaryMuscles.push('elbow flexors'); }
   // Wide-grip pulldowns also bring in the rear delts (half a set).
   if (needsSecondaryRearDelts(ex)) { ex.muscleGroups.push('posterior delt'); ex.secondaryMuscles.push('posterior delt'); }
+  // Leg curls bend the knee, which the gastrocnemius helps with.
+  if (needsSecondaryGastroc(ex)) { ex.muscleGroups.push('gastrocnemius'); ex.secondaryMuscles.push('gastrocnemius'); }
 }
 
 const seed = async () => {

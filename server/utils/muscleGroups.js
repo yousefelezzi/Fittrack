@@ -31,6 +31,7 @@ const TARGETS = {
   'sternal pecs':           [{ group: 'pecs',    subs: ['Sternal'] }],
   'costal pecs':            [{ group: 'pecs',    subs: ['Costal'] }],
   calves:                   [{ group: 'calves',  subs: ['Gastrocnemius', 'Soleus'] }],
+  gastrocnemius:            [{ group: 'calves',  subs: ['Gastrocnemius'] }],
   soleus:                   [{ group: 'calves',  subs: ['Soleus'] }],
   triceps:                  [{ group: 'triceps', subs: ['Medial/lateral head', 'Long head'] }],
   'medial/lateral triceps': [{ group: 'triceps', subs: ['Medial/lateral head'] }],

@@ -18,7 +18,7 @@ export const MUSCLE_FILTERS = [
   ['glutes', 'Glutes', ['glutes']],
   ['quads', 'Quads', ['quads', 'vastus quads', 'rectus femoris']],
   ['hamstrings', 'Hamstrings', ['hamstrings', 'biarticular hamstrings', 'hamstrings short head']],
-  ['calves', 'Calves', ['calves', 'soleus']],
+  ['calves', 'Calves', ['calves', 'gastrocnemius', 'soleus']],
   ['adductors', 'Adductors', ['adductors']],
   ['hip-flexors', 'Hip flexors', ['hip flexors']],
 ];
@@ -48,7 +48,7 @@ export const MUSCLE_REGIONS = {
   triceps: ['medial/lateral triceps', 'triceps long head'],
   quads: ['vastus quads', 'rectus femoris'],
   hamstrings: ['biarticular hamstrings', 'hamstrings short head'],
-  calves: ['soleus'],
+  calves: ['gastrocnemius', 'soleus'],
 };
 
 /** The selected whole muscle that already includes `tag`, or null. */

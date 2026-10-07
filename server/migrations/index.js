@@ -8,6 +8,7 @@ const splitUnilateralSets = require('../utils/splitUnilateralSets');
 const { UNILATERAL_NAME_PATTERN } = require('../utils/laterality');
 const { forearmsAreSecondary } = require('../utils/forearmRole');
 const { needsSecondaryElbowFlexors, needsSecondaryRearDelts } = require('../utils/pullHelpers');
+const { needsSecondaryGastroc } = require('../utils/legCurlHelpers');
 
 const migrations = [
   {
@@ -319,6 +320,46 @@ const migrations = [
       );
       const rest = await ex.updateMany({ type: { $exists: false } }, { $set: { type: 'dynamic' } });
       return `${holds.modifiedCount} hold(s) set to yielding, ${rest.modifiedCount} set to dynamic`;
+    },
+  },
+  {
+    // Leg curls count the gastrocnemius as a secondary muscle (it helps bend
+    // the knee). The seed does the built-in ones; this updates every exercise
+    // already in the database, custom ones included.
+    name: '2026-10-leg-curls-secondary-gastrocnemius',
+    async up(db) {
+      const exercises = db.collection('exercises');
+      let n = 0;
+      for await (const ex of exercises.find({ name: { $regex: 'curl|nordic', $options: 'i' } }, { projection: { name: 1, muscleGroups: 1 } })) {
+        if (!needsSecondaryGastroc(ex)) continue;
+        await exercises.updateOne({ _id: ex._id }, { $push: { muscleGroups: 'gastrocnemius' }, $addToSet: { secondaryMuscles: 'gastrocnemius' } });
+        n++;
+      }
+      return `${n} exercise(s) updated`;
+    },
+  },
+  {
+    // Rear delts only help on dumbbell pullovers: secondary (0.5 − x per set)
+    // instead of a full set. Built-in and custom ones that list them.
+    name: '2026-10-dumbbell-pullover-secondary-rear-delts',
+    async up(db) {
+      const res = await db.collection('exercises').updateMany(
+        { name: { $regex: 'dumbbell.*pull[- ]?over', $options: 'i' }, muscleGroups: 'posterior delt' },
+        { $addToSet: { secondaryMuscles: 'posterior delt' } }
+      );
+      return `${res.modifiedCount} exercise(s) updated`;
+    },
+  },
+  {
+    // Rear delts only help on upright rows too: secondary instead of a full set.
+    // Built-in and custom upright rows that list them.
+    name: '2026-10-upright-row-secondary-rear-delts',
+    async up(db) {
+      const res = await db.collection('exercises').updateMany(
+        { name: { $regex: 'upright[- ]?row', $options: 'i' }, muscleGroups: 'posterior delt' },
+        { $addToSet: { secondaryMuscles: 'posterior delt' } }
+      );
+      return `${res.modifiedCount} exercise(s) updated`;
     },
   },
 ];

@@ -6,7 +6,7 @@ const exerciseSchema = new mongoose.Schema(
     muscleGroups: [
       {
         type: String,
-        enum: ['pecs', 'clavicular pecs', 'sternal pecs', 'costal pecs', 'lats', 'trapezius', 'anterior delt', 'middle delt', 'posterior delt', 'elbow flexors', 'biceps', 'brachialis/brachioradialis', 'triceps', 'medial/lateral triceps', 'triceps long head', 'forearms', 'abs', 'erectors', 'adductors', 'hip flexors', 'glutes', 'quads', 'vastus quads', 'rectus femoris', 'hamstrings', 'biarticular hamstrings', 'hamstrings short head', 'calves', 'soleus'],
+        enum: ['pecs', 'clavicular pecs', 'sternal pecs', 'costal pecs', 'lats', 'trapezius', 'anterior delt', 'middle delt', 'posterior delt', 'elbow flexors', 'biceps', 'brachialis/brachioradialis', 'triceps', 'medial/lateral triceps', 'triceps long head', 'forearms', 'abs', 'erectors', 'adductors', 'hip flexors', 'glutes', 'quads', 'vastus quads', 'rectus femoris', 'hamstrings', 'biarticular hamstrings', 'hamstrings short head', 'calves', 'gastrocnemius', 'soleus'],
       },
     ],
     // Tags (from muscleGroups) that only count half a set each, e.g. the

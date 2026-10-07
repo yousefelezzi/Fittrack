@@ -18,7 +18,7 @@ const REGION_OF = {
   'anterior delt': 'Shoulders', 'middle delt': 'Shoulders', 'posterior delt': 'Shoulders',
   'elbow flexors': 'Arms', biceps: 'Arms', 'brachialis/brachioradialis': 'Arms', triceps: 'Arms', 'medial/lateral triceps': 'Arms', 'triceps long head': 'Arms', forearms: 'Arms',
   quads: 'Legs', 'vastus quads': 'Legs', 'rectus femoris': 'Legs', hamstrings: 'Legs', 'biarticular hamstrings': 'Legs', 'hamstrings short head': 'Legs', glutes: 'Legs', adductors: 'Legs',
-  'hip flexors': 'Legs', calves: 'Legs', soleus: 'Legs',
+  'hip flexors': 'Legs', calves: 'Legs', gastrocnemius: 'Legs', soleus: 'Legs',
   abs: 'Core',
 };
 
