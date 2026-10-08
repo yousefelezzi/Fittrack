@@ -48,6 +48,7 @@ export const workoutAPI = {
   getStats:        ()       => api.get('/workouts/stats'),
   getProgress:     (exerciseId) => api.get(`/workouts/progress/${exerciseId}`),
   lastSets:    (exerciseId) => api.get(`/workouts/last/${exerciseId}`), // sets from the last workout with it
+  plateaus:    ()         => api.get('/workouts/plateaus'), // exercises with no progress in the past month
 };
 
 // ── Plans ────────────────────────────────────────────────────────────────────

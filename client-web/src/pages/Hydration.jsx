@@ -6,6 +6,7 @@ import { nutritionAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import DayNav from '../components/DayNav';
 import { WATER_PRESETS, formatMl, dailySeries } from '../utils/nutritionProgress';
+import ChartTooltip, { CHART_CURSOR } from '../components/ChartTooltip';
 
 const key = (d) => format(d, 'yyyy-MM-dd');
 
@@ -169,7 +170,7 @@ export default function Hydration() {
           <BarChart data={week}>
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} width={40} />
-            <Tooltip formatter={(v) => formatMl(v)} />
+            <Tooltip cursor={CHART_CURSOR} content={<ChartTooltip format={(v) => [formatMl(v), 'Water']} />} />
             <ReferenceLine y={goal} stroke="#10b981" strokeDasharray="4 4" />
             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
               {week.map((p) => <Cell key={p.date} fill={p.value >= goal ? '#10b981' : '#0ea5e9'} />)}

@@ -4,6 +4,7 @@ import { format, subDays, isToday, parseISO } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from 'recharts';
 import { Footprints, Flame, Target, TrendingUp, Check } from 'lucide-react';
 import { stepsAPI } from '../api';
+import ChartTooltip, { CHART_CURSOR } from '../components/ChartTooltip';
 
 const RANGE_DAYS = 30;
 const QUICK_ADD = [1000, 2500, 5000];
@@ -178,9 +179,7 @@ export default function Steps() {
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
             <XAxis dataKey="label" tick={tickStyle} interval={4} />
             <YAxis tick={tickStyle} width={44} tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : v)} />
-            <Tooltip cursor={{ fill: 'var(--chart-grid, #e2e8f0)', opacity: 0.4 }}
-              formatter={(v) => [v.toLocaleString(), 'Steps']}
-              contentStyle={{ backgroundColor: 'var(--tooltip-bg, #fff)', borderColor: 'var(--tooltip-border, #e5e7eb)', color: 'var(--tooltip-text, #111)' }} />
+            <Tooltip cursor={CHART_CURSOR} content={<ChartTooltip format={(v) => [v.toLocaleString(), 'Steps']} />} />
             <ReferenceLine y={goal} stroke="#10b981" strokeDasharray="4 4" />
             <Bar dataKey="steps" radius={[4, 4, 0, 0]} className="cursor-pointer">
               {chart.map((d) => <Cell key={d.date} fill={d.steps >= goal ? '#10b981' : '#0ea5e9'} />)}

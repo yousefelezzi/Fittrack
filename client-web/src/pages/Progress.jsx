@@ -2,8 +2,45 @@ import { useState, useEffect, useRef } from 'react';
 import { workoutAPI, exerciseAPI } from '../api';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import { format } from 'date-fns';
-import { Search, Clock, X } from 'lucide-react';
+import { Search, Clock, X, TrendingDown, ChevronRight } from 'lucide-react';
 import VolumeCheck from '../components/VolumeCheck';
+import { useAuth } from '../context/AuthContext';
+import { plateauLine, PLATEAU_TIPS } from '../utils/plateaus';
+
+/** Exercises that haven't gone up at all in the past month; click one to see its chart. */
+function Plateaus({ plateaus, unit, onPick }) {
+  const [showTips, setShowTips] = useState(false);
+  if (!plateaus?.length) return null;
+  return (
+    <div className="card border-l-4 border-amber-400 space-y-2">
+      <h2 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
+        <TrendingDown size={18} className="text-amber-500" /> Plateaus
+        <span className="text-xs font-normal text-gray-400 dark:text-gray-500">· no progress in the past month</span>
+      </h2>
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        {plateaus.map((p) => (
+          <li key={p.exerciseId}>
+            <button onClick={() => onPick(p)} className="w-full flex items-center gap-3 py-2 text-left hover:opacity-80">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{plateauLine(p, unit)}</p>
+              </div>
+              <ChevronRight size={16} className="text-gray-300" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button onClick={() => setShowTips(!showTips)} className="text-xs font-medium text-brand-600 hover:underline">
+        {showTips ? 'Hide' : 'How to break a plateau'}
+      </button>
+      {showTips && (
+        <ul className="list-disc pl-5 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+          {PLATEAU_TIPS.map((t) => <li key={t}>{t}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const COLORS = ['#0ea5e9','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'];
 
@@ -56,8 +93,11 @@ export default function Progress() {
   const [search, setSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const pickerRef = useRef(null);
+  const { user } = useAuth();
+  const [plateaus, setPlateaus] = useState([]);
 
   useEffect(() => {
+    workoutAPI.plateaus().then(({ data }) => setPlateaus(data.plateaus)).catch(() => setPlateaus([]));
     Promise.all([workoutAPI.getStats(), exerciseAPI.getAll()])
       // Overcoming isometrics have no load or reps to track, so they aren't listed.
       .then(([s, e]) => { setStats(s.data); setExercises(e.data.filter((x) => x.type !== 'overcoming')); })
@@ -154,6 +194,8 @@ export default function Progress() {
       </div>
 
       <VolumeCheck />
+      <Plateaus plateaus={plateaus} unit={user?.weightUnit === 'lb' ? 'lb' : 'kg'}
+        onPick={(p) => { selectExercise({ _id: p.exerciseId, name: p.name }); pickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Muscle Group Breakdown */}

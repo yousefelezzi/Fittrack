@@ -1,10 +1,38 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { format } from 'date-fns';
 import { workoutAPI, exerciseAPI } from '../api';
-import { Card, Spinner, colors, makeStyles, BarChart, LineChart, HBarList, ExercisePicker, Hint, SectionTitle, Segmented } from '../components';
+import { Card, Spinner, colors, makeStyles, BarChart, LineChart, HBarList, ExercisePicker, Hint, SectionTitle, Segmented, LinkText } from '../components';
 import VolumeCheck from '../components/VolumeCheck';
-import { X, ChevronDown } from 'lucide-react-native';
+import { X, ChevronDown, TrendingDown, ChevronRight } from 'lucide-react-native';
+import { useAuth } from '../context/AuthContext';
+import { plateauLine, PLATEAU_TIPS } from '../../../client-web/src/utils/plateaus';
+
+/** Exercises that haven't gone up at all in the past month; tap one to see its chart. */
+function Plateaus({ plateaus, unit, onPick }) {
+  const [showTips, setShowTips] = useState(false);
+  if (!plateaus?.length) return null;
+  return (
+    <Card style={{ borderLeftWidth: 4, borderLeftColor: colors.warning }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <TrendingDown size={18} color={colors.warning} />
+        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>Plateaus</Text>
+      </View>
+      <Hint style={{ marginBottom: 4 }}>No progress in the past month. Tap one to see its chart.</Hint>
+      {plateaus.map((p) => (
+        <TouchableOpacity key={p.exerciseId} onPress={() => onPick(p)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.subtle }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{p.name}</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>{plateauLine(p, unit)}</Text>
+          </View>
+          <ChevronRight size={16} color={colors.textMuted} />
+        </TouchableOpacity>
+      ))}
+      <LinkText onPress={() => setShowTips(!showTips)} style={{ marginTop: 6 }}>{showTips ? 'Hide tips' : 'How to break a plateau'}</LinkText>
+      {showTips ? PLATEAU_TIPS.map((t) => <Text key={t} style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>• {t}</Text>) : null}
+    </Card>
+  );
+}
 
 // Muscles in body order — upper body, core, legs — with the same colours as the web pie.
 const MUSCLE_ORDER = [
@@ -42,8 +70,12 @@ export default function ProgressScreen({ navigation }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [expandedMuscle, setExpandedMuscle] = useState(null);
   const [setsView, setSetsView] = useState('total'); // muscle chart: 'total' | 'direct'
+  const [plateaus, setPlateaus] = useState([]);
+  const { user } = useAuth();
+  const scrollRef = useRef(null);
 
-  const load = () => Promise.all([workoutAPI.getStats(), exerciseAPI.getAll()])
+  const load = () => workoutAPI.plateaus().then(({ data }) => setPlateaus(data.plateaus)).catch(() => setPlateaus([]))
+    .then(() => Promise.all([workoutAPI.getStats(), exerciseAPI.getAll()]))
     // Overcoming isometrics have no load or reps to track, so they aren't listed.
     .then(([s, e]) => { setStats(s.data); setExercises(e.data.filter((x) => x.type !== 'overcoming')); })
     .catch(console.error)
@@ -83,7 +115,7 @@ export default function ProgressScreen({ navigation }) {
   ];
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}
+    <ScrollView ref={scrollRef} style={styles.root} contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}>
       <Card>
         <SectionTitle>Workouts per week</SectionTitle>
@@ -92,6 +124,8 @@ export default function ProgressScreen({ navigation }) {
       </Card>
 
       <VolumeCheck onOpenCalculator={() => navigation.navigate('Calculators', { calc: 'wns' })} />
+      <Plateaus plateaus={plateaus} unit={user?.weightUnit === 'lb' ? 'lb' : 'kg'}
+        onPick={(p) => { setSelected(exercises.find((e) => e._id === p.exerciseId) || { _id: p.exerciseId, name: p.name }); setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50); }} />
 
       <Card>
         <SectionTitle>Muscle groups trained · sets</SectionTitle>

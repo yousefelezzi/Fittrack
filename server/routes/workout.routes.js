@@ -12,7 +12,7 @@ const {
   deleteAllWorkouts,
   getWorkoutStats,
   getMuscleSessions,
-  getExerciseProgress,
+  getExerciseProgress, getPlateaus,
   getLastSets,
 } = require('../controllers/workout.controller');
 
@@ -21,6 +21,7 @@ router.get('/', protect, getWorkouts);
 router.get('/stats', protect, getWorkoutStats);
 router.get('/muscle-sessions', protect, getMuscleSessions);
 router.get('/progress/:exerciseId', protect, getExerciseProgress);
+router.get('/plateaus', protect, getPlateaus);
 router.get('/last/:exerciseId', protect, getLastSets);
 router.get('/:id', protect, getWorkoutById);
 

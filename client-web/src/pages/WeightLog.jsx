@@ -6,6 +6,7 @@ import { weightAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import DayNav from '../components/DayNav';
 import { kgTo, toKgFrom, formatBodyWeight, weightSeries } from '../utils/bodyUnits';
+import ChartTooltip, { CHART_CURSOR } from '../components/ChartTooltip';
 
 const key = (d) => format(d, 'yyyy-MM-dd');
 const RANGES = [[30, '30 days'], [90, '90 days'], [180, '6 months']];
@@ -106,7 +107,7 @@ export default function WeightLog() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" minTickGap={16} />
                 <YAxis tick={{ fontSize: 11 }} width={44} domain={['dataMin - 1', 'dataMax + 1']} />
-                <Tooltip formatter={(v, name) => [`${v} ${unit}`, name === 'average' ? '7-day average' : 'Weigh-in']} />
+                <Tooltip cursor={{ stroke: 'var(--tooltip-border, #e5e7eb)' }} content={<ChartTooltip format={(v, k) => [`${v} ${unit}`, k === 'average' ? '7-day average' : 'Weigh-in']} />} />
                 <Scatter dataKey="weight" name="weight" fill="#94a3b8" />
                 <Line type="monotone" dataKey="average" name="average" stroke="#0284c7" strokeWidth={2} dot={false} connectNulls />
               </ComposedChart>

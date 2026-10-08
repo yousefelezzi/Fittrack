@@ -215,3 +215,19 @@ exports.deleteWorkout = async (req, res, next) => {
     next(err);
   }
 };
+
+// GET /api/workouts/plateaus — exercises that haven't gone up at all in the past month
+exports.getPlateaus = async (req, res, next) => {
+  try {
+    const { findPlateaus, WINDOW_DAYS } = require('../utils/plateaus');
+    const since = new Date(Date.now() - WINDOW_DAYS * 86400000);
+    const sessions = await WorkoutSession.find({ user: req.user.id, date: { $gte: since } })
+      .select('date exercises')
+      .sort({ date: 1 })
+      .populate('exercises.exercise', 'name type')
+      .lean();
+    res.json({ plateaus: findPlateaus(sessions), windowDays: WINDOW_DAYS });
+  } catch (err) {
+    next(err);
+  }
+};

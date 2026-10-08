@@ -5,6 +5,7 @@ import { nutritionAPI } from '../api';
 import {
   NUTRITION_METRICS, NUTRITION_RANGES, rangeDates, dailySeries, seriesStats, TARGET_RULE, formatMl,
 } from '../utils/nutritionProgress';
+import ChartTooltip, { CHART_CURSOR } from '../components/ChartTooltip';
 
 const COLORS = { calories: '#f97316', protein: '#0ea5e9', carbs: '#eab308', fat: '#a855f7', water: '#06b6d4' };
 
@@ -70,7 +71,7 @@ export default function NutritionProgress() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" minTickGap={12} />
               <YAxis tick={{ fontSize: 11 }} width={48} />
-              <Tooltip formatter={(v, name) => [fmt(v), name === 'target' ? 'Goal' : label]} />
+              <Tooltip cursor={CHART_CURSOR} content={<ChartTooltip format={(v, k) => [fmt(v), k === 'target' ? 'Goal' : label]} />} />
               <Bar dataKey="value" name={label} fill={COLORS[metric]} radius={[4, 4, 0, 0]} />
               <Line type="stepAfter" dataKey="target" name="target" stroke="#10b981" strokeDasharray="5 4" dot={false} connectNulls />
             </ComposedChart>
