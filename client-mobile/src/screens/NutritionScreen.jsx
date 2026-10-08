@@ -47,7 +47,7 @@ function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
   const [showMicros, setShowMicros] = useState(false);
   const micros = sumMicros(meals, addMicros(supplementMicros, waterMicros));
   const extraNote = [
-    Object.values(supplementMicros || {}).some((v) => v > 0) && 'the supplements you ticked off',
+    Object.values(supplementMicros || {}).some((v) => v > 0) && 'the supplements you took',
     Object.values(waterMicros || {}).some((v) => v > 0) && 'the minerals in your water',
   ].filter(Boolean).join(' and ');
   const active = MICRO_CONFIG.filter((c) => (micros[c.key] || 0) > 0);

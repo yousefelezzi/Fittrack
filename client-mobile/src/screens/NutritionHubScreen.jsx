@@ -33,12 +33,14 @@ export default function NutritionHubScreen({ navigation }) {
   const goals = log?.dailyGoals || {};
   const water = (log?.water || []).reduce((n, w) => n + w.amount, 0);
   const takenIds = new Set((log?.supplementsTaken || []).map((t) => String(t.supplement)));
-  const taken = supplements.filter((s) => takenIds.has(String(s._id))).length;
+  const taken = takenIds.size;
+  const stack = supplements.filter((s) => s.inStack);
+  const stackMissing = stack.some((s) => !takenIds.has(String(s._id)));
 
-  // The whole supplement stack in one tap.
+  // Your whole supplement stack onto today in one tap.
   const takeStack = async () => {
     setBusy(true);
-    try { setLog((await nutritionAPI.takeSupplements(today(), { supplementIds: supplements.map((s) => s._id) })).data); } catch { /* shown on next load */ } finally { setBusy(false); }
+    try { setLog((await nutritionAPI.takeSupplements(today(), { stack: true })).data); } catch { /* shown on next load */ } finally { setBusy(false); }
   };
   const bar = (value, goal, color) => (
     <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, goal ? (value / goal) * 100 : 0)}%`, backgroundColor: color }]} /></View>
@@ -70,9 +72,9 @@ export default function NutritionHubScreen({ navigation }) {
         {bar(water, waterGoal, '#06b6d4')}
         {supplements.length > 0 ? (
           <View style={[styles.statRow, { marginTop: 10 }]}>
-            <Text style={styles.statLabel}>Supplements: <Text style={styles.statValue}>{taken} of {supplements.length} taken</Text></Text>
-            {taken < supplements.length ? (
-              <TouchableOpacity disabled={busy} onPress={takeStack} hitSlop={6}><Text style={styles.quickText}>Tick off all</Text></TouchableOpacity>
+            <Text style={styles.statLabel}>Supplements: <Text style={styles.statValue}>{taken} taken</Text></Text>
+            {stackMissing ? (
+              <TouchableOpacity disabled={busy} onPress={takeStack} hitSlop={6}><Text style={styles.quickText}>Load my stack</Text></TouchableOpacity>
             ) : null}
           </View>
         ) : null}
@@ -81,7 +83,7 @@ export default function NutritionHubScreen({ navigation }) {
       <Card style={{ paddingVertical: 4 }}>
         <ListRow icon={Utensils} title="Food Log" subtitle="Meals, macros, the meal planner and recipes" onPress={() => navigation.navigate('FoodLog')} />
         <ListRow icon={GlassWater} title="Hydration" subtitle="Water through the day against your goal" onPress={() => navigation.navigate('Hydration')} />
-        <ListRow icon={Pill} title="Supplements" subtitle="Your supplements, ticked off each day" onPress={() => navigation.navigate('Supplements')} />
+        <ListRow icon={Pill} title="Supplements" subtitle="What you take each day, and your stack" onPress={() => navigation.navigate('Supplements')} />
         <ListRow icon={Scale} title="Weight" subtitle={user?.weight ? `${formatBodyWeight(user.weight, user.bodyWeightUnit)} · 7-day average` : 'Daily weigh-ins and your 7-day average'} onPress={() => navigation.navigate('Weight')} />
         <ListRow icon={ChartLine} title="Progress" subtitle="Daily calories, macros and water over time" onPress={() => navigation.navigate('NutritionProgress')} />
         <ListRow icon={History} title="History" subtitle="Past days' meals" onPress={() => navigation.navigate('History', { tab: 'nutrition' })} last />

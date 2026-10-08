@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { format, subDays, parseISO } from 'date-fns';
-import { Pill, Plus, Trash2, Pencil, Check, X, Search, Sun, CheckCheck, Copy } from 'lucide-react';
+import { Pill, Plus, Trash2, Pencil, X, Search, Sun, Copy, Layers } from 'lucide-react';
 import { supplementAPI, nutritionAPI } from '../api';
 import DayNav from '../components/DayNav';
 import { microsText, SUPPLEMENT_MICROS } from '../utils/foodLogic';
@@ -10,14 +10,18 @@ const EMPTY = { name: '', dose: '', timing: '' };
 
 const SUN_NOTE = 'Roughly 1,000 IU of vitamin D per 15 minutes of midday summer sun with arms and legs bare, for lighter skin. Much less in winter, early or late in the day, with darker skin or sunscreen.';
 
-/** The built-in list: search, grouped by category; pick one to add it. Or add your own. */
-function CatalogPicker({ onPick, onCustom, onCancel }) {
+/**
+ * Pick a supplement: `mine` (ones you've used before) first, then the built-in
+ * list, searchable and grouped by category. Or add your own.
+ */
+function CatalogPicker({ mine = [], mineLabel = 'Your supplements', onPickMine, onPick, onCustom, onCancel }) {
   const [catalog, setCatalog] = useState(null);
   const [q, setQ] = useState('');
   useEffect(() => { supplementAPI.catalog().then(({ data }) => setCatalog(data)).catch(() => setCatalog([])); }, []);
   const term = q.trim().toLowerCase();
   const shown = (catalog || []).filter((c) => !term || c.name.toLowerCase().includes(term) || c.category.includes(term));
   const groups = [...new Set(shown.map((c) => c.category))];
+  const myShown = mine.filter((m) => !term || m.name.toLowerCase().includes(term));
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 space-y-2">
       <div className="flex items-center gap-2">
@@ -28,6 +32,16 @@ function CatalogPicker({ onPick, onCustom, onCancel }) {
         <button onClick={onCancel} className="btn-secondary py-2 px-3 text-sm"><X size={14} /></button>
       </div>
       <div className="max-h-80 overflow-y-auto space-y-2">
+        {myShown.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mt-1">{mineLabel}</p>
+            {myShown.map((m) => (
+              <button key={m._id} type="button" onClick={() => onPickMine(m)} className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                <p className="text-sm text-gray-900 dark:text-gray-100">{m.name} <span className="text-xs text-gray-400">· {detailText(m)}{m.inStack ? ' · in your stack' : ''}</span></p>
+              </button>
+            ))}
+          </div>
+        )}
         {catalog === null && <p className="text-sm text-gray-400 py-2">Loading…</p>}
         {groups.map((g) => (
           <div key={g}>
@@ -42,7 +56,7 @@ function CatalogPicker({ onPick, onCustom, onCancel }) {
         ))}
       </div>
       <button type="button" onClick={onCustom} className="text-sm font-medium text-brand-600 hover:underline">+ Add your own instead</button>
-      <p className="text-[11px] text-gray-400 dark:text-gray-500">Amounts are typical label doses; set the servings you take. Their vitamins and minerals count toward the Food Log's micronutrients on days you tick them off.</p>
+      <p className="text-[11px] text-gray-400 dark:text-gray-500">Amounts are typical label doses; set the servings you take. Their vitamins and minerals count toward the Food Log's micronutrients on the days you take them.</p>
     </div>
   );
 }
@@ -102,114 +116,187 @@ function SupplementForm({ initial = EMPTY, onSave, onCancel, saveLabel, withMicr
   );
 }
 
-/** Supplements: your list, ticked off day by day. */
-export default function Supplements() {
-  const [date, setDate] = useState(key(new Date()));
-  const [list, setList] = useState(null);
-  const [taken, setTaken] = useState(new Set());
+const detailText = (s, servings = s.servings) => [servings && servings !== 1 ? `${servings} ×` : '', s.dose, s.timing].filter(Boolean).join(' · ') || '1 serving';
+const microsOf = (s) => (s.catalog ? s.catalog.micros : s.micros);
+
+/** One supplement's name, serving and micros (for `servings`). */
+function SupplementInfo({ s, servings }) {
+  const micros = microsText(microsOf(s), servings || 1);
+  return (
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+        {s.catalog?.category === 'sun' ? <Sun size={14} className="text-amber-500" /> : <Pill size={14} className="text-gray-400" />}{s.name}
+      </p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">{[s.dose, s.timing].filter(Boolean).join(' · ')}</p>
+      {micros && (
+        <p className="text-[11px] text-sky-600 dark:text-sky-400" title={s.catalog?.category === 'sun' ? SUN_NOTE : undefined}>
+          {micros}{s.catalog?.category === 'sun' ? ' (estimate)' : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** − servings + for one day's entry. */
+function ServingsStepper({ value, onChange }) {
+  const step = (d) => onChange(Math.min(20, Math.max(0.25, Math.round((value + d) * 4) / 4)));
+  return (
+    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+      <button onClick={() => step(value > 1 ? -1 : -0.25)} disabled={value <= 0.25} className="w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-800 disabled:opacity-30" aria-label="Fewer servings">−</button>
+      <span className="w-10 text-center tabular-nums">{value} ×</span>
+      <button onClick={() => step(value >= 1 ? 1 : 0.25)} disabled={value >= 20} className="w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-800 disabled:opacity-30" aria-label="More servings">+</button>
+    </div>
+  );
+}
+
+/** Your stack: the supplements you usually take, loaded onto a day in one go. */
+function StackPanel({ list, run, reload, onClose }) {
   const [adding, setAdding] = useState(false); // false | 'catalog' | 'custom'
   const [editing, setEditing] = useState(null);
+  const stack = list.filter((s) => s.inStack);
+  const others = list.filter((s) => !s.inStack);
+  const create = (body) => run(async () => { await supplementAPI.create({ ...body, inStack: true }); setAdding(false); reload(); }, 'Could not add that supplement');
+  const setInStack = (s, inStack) => run(async () => { await supplementAPI.update(s._id, { inStack }); setAdding(false); reload(); }, 'Could not update your stack');
+  const update = (id, body) => run(async () => { await supplementAPI.update(id, body); setEditing(null); reload(); }, 'Could not save that');
+  return (
+    <div className="card space-y-3 ring-1 ring-brand-200 dark:ring-brand-900">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"><Layers size={16} className="text-brand-600" /> My stack</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500">What you usually take. "Load my stack" adds these to a day; changing the stack doesn't change days already logged.</p>
+        </div>
+        <button onClick={onClose} className="btn-secondary py-1.5 px-2.5 text-sm" aria-label="Close my stack"><X size={14} /></button>
+      </div>
+      {!adding && <button onClick={() => setAdding('catalog')} className="btn-secondary text-sm py-1.5"><Plus size={14} /> Add to stack</button>}
+      {adding === 'catalog' && (
+        <CatalogPicker mine={others} mineLabel="Used before" onPickMine={(s) => setInStack(s, true)}
+          onPick={(c) => create({ catalogId: c._id, ...(c.category === 'sun' && { timing: 'Midday' }) })}
+          onCustom={() => setAdding('custom')} onCancel={() => setAdding(false)} />
+      )}
+      {adding === 'custom' && <SupplementForm saveLabel="Add" withMicros onSave={create} onCancel={() => setAdding(false)} />}
+      {stack.length === 0 ? <p className="text-sm text-gray-400 py-1">Your stack is empty.</p> : (
+        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {stack.map((s) => (
+            <li key={s._id} className="py-2.5">
+              {editing === s._id ? (
+                <SupplementForm initial={{ name: s.name, dose: s.dose, timing: s.timing, servings: s.servings ?? 1, micros: s.micros }} withMicros={!s.catalog}
+                  saveLabel="Save" onSave={(body) => update(s._id, body)} onCancel={() => setEditing(null)} />
+              ) : (
+                <div className="flex items-center gap-3">
+                  <SupplementInfo s={s} servings={s.servings} />
+                  <span className="text-xs text-gray-400 shrink-0">{s.servings && s.servings !== 1 ? `${s.servings} ×` : ''}</span>
+                  <button onClick={() => setEditing(s._id)} className="p-1 text-gray-300 hover:text-brand-600" aria-label={`Edit ${s.name}`}><Pencil size={14} /></button>
+                  <button onClick={() => setInStack(s, false)} className="p-1 text-gray-300 hover:text-red-500" aria-label={`Remove ${s.name} from your stack`} title="Remove from stack"><Trash2 size={14} /></button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Supplements: each day's own list (like the Food Log), and your stack to load onto a day. */
+export default function Supplements() {
+  const [date, setDate] = useState(key(new Date()));
+  const [list, setList] = useState(null);   // every supplement you've used
+  const [day, setDay] = useState(null);     // [{ supplement, servings }] for the day
+  const [adding, setAdding] = useState(false); // false | 'catalog' | 'custom'
+  const [stackOpen, setStackOpen] = useState(false);
   const [error, setError] = useState('');
 
   const loadList = useCallback(() => supplementAPI.getAll().then(({ data }) => setList(data)).catch(() => setList([])), []);
-  const loadDay = useCallback(() => nutritionAPI.getByDate(date)
-    .then(({ data }) => setTaken(new Set((data?.supplementsTaken || []).map((t) => String(t.supplement)))))
-    .catch(() => setTaken(new Set())), [date]);
+  const fromLog = (log) => setDay(log?.supplementsTaken || []);
+  const loadDay = useCallback(() => { setDay(null); nutritionAPI.getByDate(date).then(({ data }) => fromLog(data)).catch(() => setDay([])); }, [date]);
   useEffect(() => { loadList(); }, [loadList]);
-  useEffect(() => { loadDay(); }, [loadDay]);
+  useEffect(() => { loadDay(); setAdding(false); }, [loadDay]);
 
   const run = async (fn, fallback) => {
     setError('');
     try { await fn(); } catch (err) { setError(err.response?.data?.errors?.[0]?.message || err.response?.data?.message || fallback); }
   };
-  const toggle = (id) => run(async () => {
-    const { data } = await nutritionAPI.toggleSupplement(date, id);
-    setTaken(new Set((data.supplementsTaken || []).map((t) => String(t.supplement))));
-  }, 'Could not update that');
-  const create = (body) => run(async () => { await supplementAPI.create(body); setAdding(false); loadList(); }, 'Could not add that supplement');
-  const addFromCatalog = (c) => create({ catalogId: c._id, ...(c.category === 'sun' && { timing: 'Midday' }) });
-  const update = (id, body) => run(async () => { await supplementAPI.update(id, body); setEditing(null); loadList(); }, 'Could not save that');
-  // The whole stack at once, or the same as the day before (like copying meals).
-  const takeAll = () => run(async () => {
-    const { data } = await nutritionAPI.takeSupplements(date, { supplementIds: list.map((s) => s._id) });
-    setTaken(new Set((data.supplementsTaken || []).map((t) => String(t.supplement))));
-  }, 'Could not tick them off');
+  const byId = new Map((list || []).map((s) => [String(s._id), s]));
+  const onDay = new Set((day || []).map((t) => String(t.supplement)));
+  const stack = (list || []).filter((s) => s.inStack);
+  const stackMissing = stack.filter((s) => !onDay.has(String(s._id))).length;
+
+  // Only this day changes.
+  const addToDay = (s) => run(async () => { fromLog((await nutritionAPI.toggleSupplement(date, s._id)).data); setAdding(false); }, 'Could not add that');
+  const removeFromDay = (id) => run(async () => fromLog((await nutritionAPI.toggleSupplement(date, id)).data), 'Could not remove that');
+  const setServings = (id, servings) => run(async () => fromLog((await nutritionAPI.setSupplementServings(date, id, servings)).data), 'Could not change the servings');
+  // Something new for this day only (not added to the stack).
+  const createForDay = (body) => run(async () => {
+    const { data } = await supplementAPI.create({ ...body, inStack: false });
+    await loadList();
+    if (!onDay.has(String(data._id))) fromLog((await nutritionAPI.toggleSupplement(date, data._id)).data);
+    setAdding(false);
+  }, 'Could not add that supplement');
+  const loadStack = () => run(async () => fromLog((await nutritionAPI.takeSupplements(date, { stack: true })).data), 'Could not load your stack');
   const sameAsDayBefore = () => run(async () => {
-    const { data } = await nutritionAPI.takeSupplements(date, { copyFrom: format(subDays(parseISO(date), 1), 'yyyy-MM-dd') });
-    setTaken(new Set((data.supplementsTaken || []).map((t) => String(t.supplement))));
+    fromLog((await nutritionAPI.takeSupplements(date, { copyFrom: format(subDays(parseISO(date), 1), 'yyyy-MM-dd') })).data);
   }, 'Could not copy the day before');
-  const microsOf = (s) => (s.catalog ? s.catalog.micros : s.micros);
 
-  const remove = (s) => {
-    if (!window.confirm(`Remove ${s.name}? Days you already ticked stay ticked.`)) return;
-    run(async () => { await supplementAPI.delete(s._id); loadList(); }, 'Could not remove that');
-  };
-
-  const takenCount = (list || []).filter((s) => taken.has(String(s._id))).length;
+  const available = (list || []).filter((s) => !onDay.has(String(s._id))).sort((a, b) => Number(b.inStack) - Number(a.inStack));
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Supplements</h1>
-        <DayNav date={date} onChange={setDate} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setStackOpen(!stackOpen)} aria-expanded={stackOpen}
+            className={`btn-secondary text-sm py-1.5 ${stackOpen ? '!border-brand-500 !text-brand-600' : ''}`}>
+            <Layers size={15} /> My stack{list ? ` (${stack.length})` : ''}
+          </button>
+          <DayNav date={date} onChange={setDate} />
+        </div>
       </div>
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      <div className="card space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {list?.length ? <><span className="font-semibold text-gray-900 dark:text-gray-100">{takenCount} of {list.length}</span> taken</> : 'Add the supplements you take to tick them off each day.'}
-          </p>
-          {!adding && <button onClick={() => setAdding('catalog')} className="btn-secondary text-sm py-1.5"><Plus size={14} /> Add</button>}
-        </div>
-        {list?.length > 0 && takenCount < list.length && (
-          <div className="flex flex-wrap gap-2">
-            <button onClick={takeAll} className="btn-secondary text-xs py-1.5"><CheckCheck size={14} /> Tick off my whole stack</button>
-            <button onClick={sameAsDayBefore} className="btn-secondary text-xs py-1.5"><Copy size={14} /> Same as the day before</button>
-          </div>
-        )}
-        {adding === 'catalog' && <CatalogPicker onPick={addFromCatalog} onCustom={() => setAdding('custom')} onCancel={() => setAdding(false)} />}
-        {adding === 'custom' && <SupplementForm saveLabel="Add" withMicros onSave={create} onCancel={() => setAdding(false)} />}
+      {stackOpen && list && <StackPanel list={list} run={run} reload={loadList} onClose={() => setStackOpen(false)} />}
 
-        {list === null ? <p className="text-sm text-gray-400 py-2">Loading…</p> : (
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {day?.length ? <><span className="font-semibold text-gray-900 dark:text-gray-100">{day.length}</span> taken</> : 'Nothing logged for this day.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {stack.length > 0 && stackMissing > 0 && (
+              <button onClick={loadStack} className="btn-primary text-xs py-1.5"><Layers size={14} /> Load my stack</button>
+            )}
+            <button onClick={sameAsDayBefore} className="btn-secondary text-xs py-1.5"><Copy size={14} /> Same as the day before</button>
+            {!adding && <button onClick={() => setAdding('catalog')} className="btn-secondary text-xs py-1.5"><Plus size={14} /> Add</button>}
+          </div>
+        </div>
+        {list && stack.length === 0 && !day?.length && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">Tip: put what you take every day in <button onClick={() => setStackOpen(true)} className="text-brand-600 hover:underline">My stack</button>, then load it onto each day in one tap.</p>
+        )}
+        {adding === 'catalog' && (
+          <CatalogPicker mine={available} onPickMine={addToDay}
+            onPick={(c) => createForDay({ catalogId: c._id, ...(c.category === 'sun' && { timing: 'Midday' }) })}
+            onCustom={() => setAdding('custom')} onCancel={() => setAdding(false)} />
+        )}
+        {adding === 'custom' && <SupplementForm saveLabel="Add" withMicros onSave={createForDay} onCancel={() => setAdding(false)} />}
+
+        {day === null || list === null ? <p className="text-sm text-gray-400 py-2">Loading…</p> : day.length > 0 && (
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {list.map((s) => {
-              const isTaken = taken.has(String(s._id));
+            {day.map((t) => {
+              const s = byId.get(String(t.supplement));
+              const servings = t.servings || s?.servings || 1;
               return (
-                <li key={s._id} className="py-2.5">
-                  {editing === s._id ? (
-                    <SupplementForm initial={{ name: s.name, dose: s.dose, timing: s.timing, servings: s.servings ?? 1, micros: s.micros }} withMicros={!s.catalog}
-                      saveLabel="Save" onSave={(body) => update(s._id, body)} onCancel={() => setEditing(null)} />
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => toggle(s._id)} aria-pressed={isTaken} aria-label={`${isTaken ? 'Untick' : 'Tick off'} ${s.name}`}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isTaken ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600 hover:border-emerald-400'}`}>
-                        {isTaken && <Check size={14} />}
-                      </button>
-                      <Pill size={16} className="text-gray-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${isTaken ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-gray-100'}`}>{s.name}</p>
-                        {(s.dose || s.timing || s.servings !== 1) && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500">
-                            {[s.servings && s.servings !== 1 ? `${s.servings} ×` : '', s.dose, s.timing].filter(Boolean).join(' · ')}
-                          </p>
-                        )}
-                        {microsText(microsOf(s), s.servings || 1) && (
-                          <p className="text-[11px] text-sky-600 dark:text-sky-400" title={s.catalog?.category === 'sun' ? SUN_NOTE : undefined}>
-                            {microsText(microsOf(s), s.servings || 1)}{s.catalog?.category === 'sun' ? ' (estimate)' : ''}
-                          </p>
-                        )}
-                      </div>
-                      <button onClick={() => setEditing(s._id)} className="p-1 text-gray-300 hover:text-brand-600" aria-label={`Edit ${s.name}`}><Pencil size={14} /></button>
-                      <button onClick={() => remove(s)} className="p-1 text-gray-300 hover:text-red-500" aria-label={`Remove ${s.name}`}><Trash2 size={14} /></button>
-                    </div>
-                  )}
+                <li key={String(t.supplement)} className="py-2.5 flex items-center gap-3">
+                  {s ? <SupplementInfo s={s} servings={servings} /> : <p className="flex-1 text-sm text-gray-400">A removed supplement</p>}
+                  {s && <ServingsStepper value={servings} onChange={(v) => setServings(s._id, v)} />}
+                  <button onClick={() => removeFromDay(t.supplement)} className="p-1 text-gray-300 hover:text-red-500" aria-label={`Remove ${s?.name || 'it'} from this day`} title="Remove from this day">
+                    <X size={15} />
+                  </button>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+      <p className="text-xs text-center text-gray-400 dark:text-gray-500">Supplements add their vitamins and minerals to that day's micronutrients in the Food Log. Changing servings here only changes this day.</p>
     </div>
   );
 }

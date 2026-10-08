@@ -1,8 +1,11 @@
 const mongoose = require('mongoose');
 
 /**
- * A supplement the user takes (creatine, vitamin D…). Each day's intake is
- * ticked off on that day's nutrition log (NutritionLog.supplementsTaken).
+ * A supplement the user has used (creatine, vitamin D…). The ones `inStack`
+ * make up their usual stack, which can be loaded onto a day in one go; the
+ * others were only taken on some days. What was taken each day is kept on
+ * that day's nutrition log (NutritionLog.supplementsTaken), so changing the
+ * stack doesn't change other days.
  */
 const supplementSchema = new mongoose.Schema(
   {
@@ -18,6 +21,7 @@ const supplementSchema = new mongoose.Schema(
     // units as food micros). Built-in ones use the catalog's instead.
     micros: { type: Map, of: Number, default: {} },
     order: { type: Number, default: 0 },
+    inStack: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

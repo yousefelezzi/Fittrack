@@ -27,6 +27,7 @@ const {
   toggleSupplement,
   getSummary,
   takeSupplements,
+  setSupplementServings,
 } = require('../controllers/nutrition.controller');
 
 // GET /api/nutrition?date=2024-01-15
@@ -54,11 +55,17 @@ router.post('/supplements/toggle', protect, [
   body('date').isISO8601().withMessage('Valid date is required'),
   body('supplementId').isMongoId().withMessage('Invalid supplement'),
 ], validate, toggleSupplement);
+router.put('/supplements/servings', protect, [
+  body('date').isISO8601().withMessage('Valid date is required'),
+  body('supplementId').isMongoId().withMessage('Invalid supplement'),
+  body('servings').isFloat({ min: 0.25, max: 20 }).withMessage('Servings must be between 0.25 and 20'),
+], validate, setSupplementServings);
 router.post('/supplements/take', protect, [
   body('date').isISO8601().withMessage('Valid date is required'),
   body('supplementIds').optional().isArray({ max: 50 }).withMessage('Supplements must be a list'),
   body('supplementIds.*').optional().isMongoId().withMessage('Invalid supplement'),
   body('copyFrom').optional().isISO8601().withMessage('Valid date to copy from is required'),
+  body('stack').optional().isBoolean().withMessage('stack must be true or false'),
 ], validate, takeSupplements);
 
 router.delete('/', protect, deleteAllLogs);

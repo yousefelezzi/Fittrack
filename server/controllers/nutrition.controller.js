@@ -421,17 +421,22 @@ exports.updateGoals = async (req, res, next) => {
 // ── Hydration & supplements ─────────────────────────────────────────────────
 
 /**
- * Micronutrients from a log's ticked-off supplements, times the servings taken:
- * the built-in list's amounts, or your own supplement's.
+ * Micronutrients from a log's supplements, times the servings taken that day
+ * (older entries without them use the supplement's): the built-in list's
+ * amounts, or your own supplement's.
  */
 async function supplementMicros(log, userId) {
-  const ids = (log.supplementsTaken || []).map((t) => t.supplement);
-  if (!ids.length) return {};
-  const taken = await Supplement.find({ _id: { $in: ids }, user: userId }).populate('catalog', 'micros').lean();
+  const entries = log.supplementsTaken || [];
+  if (!entries.length) return {};
+  const found = await Supplement.find({ _id: { $in: entries.map((t) => t.supplement) }, user: userId }).populate('catalog', 'micros').lean();
+  const byId = new Map(found.map((s) => [String(s._id), s]));
   const totals = {};
-  for (const s of taken) {
+  for (const t of entries) {
+    const s = byId.get(String(t.supplement));
+    if (!s) continue;
+    const servings = t.servings || s.servings || 1;
     for (const [key, amount] of Object.entries((s.catalog ? s.catalog.micros : s.micros) || {})) {
-      totals[key] = Math.round(((totals[key] || 0) + amount * (s.servings || 1)) * 100) / 100;
+      totals[key] = Math.round(((totals[key] || 0) + amount * servings) * 100) / 100;
     }
   }
   return totals;
@@ -469,40 +474,62 @@ exports.deleteWater = async (req, res, next) => {
   }
 };
 
-// POST /api/nutrition/supplements/toggle { date, supplementId }  — tick a supplement off (or undo)
+// POST /api/nutrition/supplements/toggle { date, supplementId }  — add a supplement to that day, or take it off
+// (only that day changes)
 exports.toggleSupplement = async (req, res, next) => {
   try {
     const { date, supplementId } = req.body;
-    const supplement = await Supplement.findOne({ _id: supplementId, user: req.user.id }).select('_id').lean();
+    const supplement = await Supplement.findOne({ _id: supplementId, user: req.user.id }).select('_id servings').lean();
     if (!supplement) return res.status(404).json({ message: 'Supplement not found' });
     const existing = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date), 'supplementsTaken.supplement': supplementId }).select('_id').lean();
     const log = existing
       ? await NutritionLog.findByIdAndUpdate(existing._id, { $pull: { supplementsTaken: { supplement: supplementId } } }, { new: true })
-      : await logForDay(req.user.id, date, { $push: { supplementsTaken: { supplement: supplementId, at: new Date() } } });
+      : await logForDay(req.user.id, date, { $push: { supplementsTaken: { supplement: supplementId, servings: supplement.servings || 1, at: new Date() } } });
     res.json(log);
   } catch (err) {
     next(err);
   }
 };
 
-// POST /api/nutrition/supplements/take { date, supplementIds? , copyFrom? }
-// Tick off several supplements at once: the ones listed, or the same ones as
-// another day (copyFrom: YYYY-MM-DD) — like copying meals. Already ticked ones stay.
+// PUT /api/nutrition/supplements/servings { date, supplementId, servings }  — servings taken that day only
+exports.setSupplementServings = async (req, res, next) => {
+  try {
+    const { date, supplementId, servings } = req.body;
+    const log = await NutritionLog.findOneAndUpdate(
+      { user: req.user.id, date: sameDay(date), 'supplementsTaken.supplement': supplementId },
+      { $set: { 'supplementsTaken.$.servings': Number(servings) } },
+      { new: true, runValidators: true }
+    );
+    if (!log) return res.status(404).json({ message: 'That supplement isn\'t logged on this day' });
+    res.json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/nutrition/supplements/take { date, supplementIds? | copyFrom? | stack? }
+// Add several supplements to a day at once: the ones listed, your whole stack
+// (stack: true), or the same ones as another day (copyFrom: YYYY-MM-DD, with
+// that day's servings) — like copying meals. Ones already on the day stay as they are.
 exports.takeSupplements = async (req, res, next) => {
   try {
-    const { date, copyFrom } = req.body;
+    const { date, copyFrom, stack } = req.body;
     let ids = Array.isArray(req.body.supplementIds) ? req.body.supplementIds.map(String) : [];
+    let servingsFrom = new Map();
     if (copyFrom) {
       const from = await NutritionLog.findOne({ user: req.user.id, date: sameDay(copyFrom) }).select('supplementsTaken').lean();
       ids = (from?.supplementsTaken || []).map((t) => String(t.supplement));
-      if (!ids.length) return res.status(400).json({ message: 'Nothing was ticked off that day' });
+      servingsFrom = new Map((from?.supplementsTaken || []).filter((t) => t.servings).map((t) => [String(t.supplement), t.servings]));
+      if (!ids.length) return res.status(400).json({ message: 'No supplements were logged that day' });
     }
-    // Only your own, still-existing supplements.
-    const mine = (await Supplement.find({ _id: { $in: ids }, user: req.user.id }).select('_id').lean()).map((s) => String(s._id));
-    if (!mine.length) return res.status(400).json({ message: 'No supplements to tick off' });
+    const query = stack ? { user: req.user.id, inStack: true } : { _id: { $in: ids }, user: req.user.id };
+    // Only your own, still-existing supplements, in your order.
+    const mine = await Supplement.find(query).sort({ order: 1, createdAt: 1 }).select('_id servings').lean();
+    if (!mine.length) return res.status(400).json({ message: stack ? 'Your stack is empty: add supplements to it first' : 'No supplements to add' });
     const current = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date) }).select('supplementsTaken').lean();
     const already = new Set((current?.supplementsTaken || []).map((t) => String(t.supplement)));
-    const add = mine.filter((id) => !already.has(id)).map((supplement) => ({ supplement, at: new Date() }));
+    const add = mine.filter((s) => !already.has(String(s._id)))
+      .map((s) => ({ supplement: s._id, servings: servingsFrom.get(String(s._id)) || s.servings || 1, at: new Date() }));
     const log = await logForDay(req.user.id, date, add.length ? { $push: { supplementsTaken: { $each: add } } } : {});
     res.json(log);
   } catch (err) {

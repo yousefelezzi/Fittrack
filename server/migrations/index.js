@@ -379,6 +379,25 @@ const migrations = [
       return `${n} of ${foods.length} custom food(s) credited`;
     },
   },
+  {
+    // Supplements now have a stack (loaded onto a day in one go) and each day
+    // keeps its own list. Everything added before was the stack, and each day's
+    // entries keep the servings they had, so editing a supplement later doesn't
+    // change past days.
+    name: '2026-10-supplement-stack',
+    async up(db) {
+      const stack = await db.collection('supplements').updateMany({ inStack: { $exists: false } }, { $set: { inStack: true } });
+      const sups = await db.collection('supplements').find({}, { projection: { servings: 1 } }).toArray();
+      const servings = new Map(sups.map((s) => [String(s._id), s.servings || 1]));
+      const logs = await db.collection('nutritionlogs').find({ 'supplementsTaken.0': { $exists: true } }, { projection: { supplementsTaken: 1 } }).toArray();
+      let entries = 0;
+      for (const log of logs) {
+        const updated = log.supplementsTaken.map((t) => (t.servings ? t : (entries++, { ...t, servings: servings.get(String(t.supplement)) || 1 })));
+        await db.collection('nutritionlogs').updateOne({ _id: log._id }, { $set: { supplementsTaken: updated } });
+      }
+      return `${stack.modifiedCount} supplement(s) put in stacks, ${entries} day entr(ies) given their servings`;
+    },
+  },
 ];
 
 async function runMigrations() {

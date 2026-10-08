@@ -73,9 +73,11 @@ const nutritionLogSchema = new mongoose.Schema(
       amount: { type: Number, min: 1, max: 5000, required: true },
       at: { type: Date, default: Date.now },
     }],
-    // Supplements ticked off that day.
+    // Supplements taken that day, with the servings at the time (so editing
+    // the supplement later doesn't change past days).
     supplementsTaken: [{
       supplement: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplement', required: true },
+      servings: { type: Number, min: 0.25, max: 20 },
       at: { type: Date, default: Date.now },
       _id: false,
     }],

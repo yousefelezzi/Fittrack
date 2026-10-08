@@ -13,6 +13,7 @@ const fields = (required) => [
   body('micros').optional().isObject().withMessage('Micros must be an object of amounts'),
   body('dose').optional().isString().isLength({ max: 40 }).withMessage('Dose must be at most 40 characters'),
   body('timing').optional().isString().isLength({ max: 40 }).withMessage('Timing must be at most 40 characters'),
+  body('inStack').optional().isBoolean().withMessage('inStack must be true or false'),
 ];
 const validId = param('id').isMongoId().withMessage('Invalid supplement');
 
