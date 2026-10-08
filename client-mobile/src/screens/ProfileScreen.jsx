@@ -120,7 +120,7 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
           {form.heightUnit === 'ft' ? (
             <View style={styles.row}>
               {field('Feet', 'heightFt', { keyboardType: 'number-pad', placeholder: '5' })}
-              {field('Inches', 'heightIn', { keyboardType: 'number-pad', placeholder: '10' })}
+              {field('Inches', 'heightIn', { keyboardType: 'decimal-pad', placeholder: '10.5' })}
             </View>
           ) : field('Centimetres', 'height', { keyboardType: 'decimal-pad', placeholder: '175' })}
           <Label>Weight</Label>

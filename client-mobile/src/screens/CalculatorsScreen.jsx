@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, colors, makeStyles, Segmented, Chip, Label, Hint, LinkText, isDark } from '../components';
-import { calcFFMI, ffmiCategory, calcBMR, calcTDEE, ACTIVITY_LEVELS, calcOneRepMax, repMaxTable, ONE_RM_MAX_REPS } from '../../../client-web/src/utils/calculators';
+import { calcFFMI, ffmiCategory, ffmiScale, calcBMR, calcTDEE, ACTIVITY_LEVELS, calcOneRepMax, repMaxTable, ONE_RM_MAX_REPS } from '../../../client-web/src/utils/calculators';
 import { UNITS } from '../../../client-web/src/utils/weightUnits';
 import {
   computeWNSResult, validateFreqValue, validateMaintValue, validateSetsValue, validateStimValue,
@@ -32,12 +32,11 @@ function Info({ title, children }) {
 const ExtLink = ({ url, children }) => <Text style={styles.extLink} onPress={() => Linking.openURL(url)}>{children}</Text>;
 
 // ── FFMI ──────────────────────────────────────────────────────────────────────
-const SCALE_MIN = 14;
-const SCALE_MAX = 30;
 const SCALE_COLORS = ['#38bdf8', '#22c55e', '#a3e635', '#eab308', '#f97316', '#ef4444'];
 
-function FFMIScale({ value }) {
-  const pct = Math.min(100, Math.max(0, ((value - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100));
+function FFMIScale({ value, sex }) {
+  const { min, max, marks } = ffmiScale(sex);
+  const pct = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
   return (
     <View style={{ marginTop: 16 }}>
       <View style={{ height: 18 }}>
@@ -46,7 +45,7 @@ function FFMIScale({ value }) {
       <View style={styles.scaleBar}>
         {SCALE_COLORS.map((c) => <View key={c} style={{ flex: 1, backgroundColor: c }} />)}
       </View>
-      <View style={styles.scaleLabels}>{[14, 18, 22, 26, 30].map((v) => <Text key={v} style={styles.hintText}>{v}</Text>)}</View>
+      <View style={styles.scaleLabels}>{marks.map((v) => <Text key={v} style={styles.hintText}>{v}</Text>)}</View>
     </View>
   );
 }
@@ -55,6 +54,7 @@ function FFMI({ user }) {
   const [weight, setWeight] = useState(user?.weight ?? '');
   const [height, setHeight] = useState(user?.height ?? '');
   const [bodyFat, setBodyFat] = useState(user?.bodyFat ?? '');
+  const [sex, setSex] = useState(user?.sex || 'male');
   const result = useMemo(() => {
     const w = Number(weight), h = Number(height), bf = Number(bodyFat);
     if (!w || !h || bodyFat === '' || isNaN(bf) || w <= 0 || h <= 0 || bf < 0 || bf >= 100) return null;
@@ -65,6 +65,8 @@ function FFMI({ user }) {
     <>
       <Hint style={{ marginBottom: 8 }}>Fat-Free Mass Index estimates how much muscle you carry relative to your height, adjusted so it can be compared across heights.</Hint>
       <Card>
+        <Label>Sex</Label>
+        <Segmented value={sex} onChange={setSex} style={{ marginBottom: 10 }} options={[['male', 'Male'], ['female', 'Female']]} />
         <View style={styles.row}>
           <Field label="Weight (kg)" value={weight} onChange={setWeight} placeholder="70" />
           <Field label="Height (cm)" value={height} onChange={setHeight} placeholder="175" />
@@ -77,14 +79,14 @@ function FFMI({ user }) {
               <View style={styles.stat}><Text style={styles.statCap}>FFMI</Text><Text style={styles.statVal}>{result.ffmi.toFixed(1)}</Text></View>
               <View style={styles.stat}><Text style={styles.statCap}>NORMALIZED</Text><Text style={[styles.statVal, { color: colors.brand }]}>{result.normalizedFfmi.toFixed(1)}</Text></View>
             </View>
-            <Text style={styles.category}>{ffmiCategory(result.normalizedFfmi)}</Text>
-            <FFMIScale value={result.normalizedFfmi} />
+            <Text style={styles.category}>{ffmiCategory(result.normalizedFfmi, sex)}</Text>
+            <FFMIScale value={result.normalizedFfmi} sex={sex} />
           </View>
         ) : <Hint style={{ marginTop: 12 }}>Enter your weight, height and body fat % to see your FFMI.</Hint>}
       </Card>
       <Card>
-        <Text style={styles.body}><Text style={styles.bold}>Normalized FFMI</Text> adjusts for height so people of different heights can be compared on the same scale. The categories are calibrated for men; for women, subtract roughly 4–5 points from each threshold.</Text>
-        <Text style={[styles.body, { marginTop: 8 }]}>Most natural lifters top out around 25. Values well above that are unusual without pharmaceutical assistance — treat FFMI as a rough guide, not a verdict.</Text>
+        <Text style={styles.body}><Text style={styles.bold}>Normalized FFMI</Text> adjusts for height so people of different heights can be compared on the same scale. Women naturally carry less muscle, so their categories sit 3 points lower than men's.</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>Most natural men top out around 25, and women around 22. Values well above that are unusual without pharmaceutical assistance — treat FFMI as a rough guide, not a verdict.</Text>
       </Card>
     </>
   );

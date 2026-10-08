@@ -21,6 +21,8 @@ export function calcFFMI(weightKg, heightCm, bodyFatPct) {
   return { ffm, ffmi, normalizedFfmi };
 }
 
+/** Men's thresholds; women's natural FFMI runs about 3 points lower (same shift as training level on the server). */
+export const FFMI_FEMALE_OFFSET = 3;
 export const FFMI_CATEGORIES = [
   { max: 18, label: 'Below average' },
   { max: 20, label: 'Average' },
@@ -31,8 +33,17 @@ export const FFMI_CATEGORIES = [
   { max: Infinity, label: 'Very unlikely natural' },
 ];
 
-export function ffmiCategory(normalizedFfmi) {
-  return FFMI_CATEGORIES.find((c) => normalizedFfmi < c.max)?.label ?? 'Superior';
+/** The FFMI category for a normalized FFMI; `sex` 'female' uses the women's thresholds. */
+export function ffmiCategory(normalizedFfmi, sex = 'male') {
+  const shift = sex === 'female' ? FFMI_FEMALE_OFFSET : 0;
+  return FFMI_CATEGORIES.find((c) => normalizedFfmi < c.max - shift)?.label ?? 'Superior';
+}
+
+/** Where the FFMI scale bar starts and ends for a sex, and its labelled marks. */
+export function ffmiScale(sex = 'male') {
+  const shift = sex === 'female' ? FFMI_FEMALE_OFFSET : 0;
+  const min = 14 - shift;
+  return { min, max: 30 - shift, marks: [0, 4, 8, 12, 16].map((n) => min + n) };
 }
 
 // ── BMR (Basal Metabolic Rate) — Mifflin-St Jeor equation ──────────────────

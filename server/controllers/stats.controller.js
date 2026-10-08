@@ -23,6 +23,9 @@ const REGION_OF = {
 };
 
 // Same thresholds as the FFMI calculator page (client-web/src/utils/calculators.js).
+// These are men's; women's natural FFMI runs about 3 points lower, so their
+// thresholds are shifted down by FFMI_FEMALE_OFFSET (as in utils/trainingLevel.js).
+const FFMI_FEMALE_OFFSET = 3;
 const FFMI_CATEGORIES = [
   { max: 18, label: 'Below average' },
   { max: 20, label: 'Average' },
@@ -74,7 +77,8 @@ function ffmi(user, isOwner) {
   const ffm = user.weight * (1 - user.bodyFat / 100);
   const value = ffm / (heightM * heightM);
   const normalized = value + 6.1 * (1.8 - heightM);
-  const category = FFMI_CATEGORIES.find((c) => normalized < c.max).label;
+  const shift = user.sex === 'female' ? FFMI_FEMALE_OFFSET : 0;
+  const category = FFMI_CATEGORIES.find((c) => normalized < c.max - shift).label;
 
   // Other people see the index, not the body-fat % or weight behind it.
   return { ffmi: round1(value), normalizedFfmi: round1(normalized), category };
@@ -189,7 +193,7 @@ exports.getUserStats = async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'User not found' });
 
-    const user = await User.findById(req.params.id).select('height weight bodyFat stepGoal statsVisibility privacy followers following').lean();
+    const user = await User.findById(req.params.id).select('height weight bodyFat sex stepGoal statsVisibility privacy followers following').lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const isOwner = String(user._id) === String(req.user.id);

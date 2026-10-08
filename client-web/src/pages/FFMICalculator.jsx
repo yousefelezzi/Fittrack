@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { calcFFMI, ffmiCategory } from '../utils/calculators';
+import { calcFFMI, ffmiCategory, ffmiScale } from '../utils/calculators';
 import { Calculator } from 'lucide-react';
 
 export default function FFMICalculator() {
@@ -9,6 +9,7 @@ export default function FFMICalculator() {
   const [weight, setWeight] = useState(user?.weight ?? '');
   const [height, setHeight] = useState(user?.height ?? '');
   const [bodyFat, setBodyFat] = useState('');
+  const [sex, setSex] = useState(user?.sex || 'male');
 
   const result = useMemo(() => {
     const w = Number(weight), h = Number(height), bf = Number(bodyFat);
@@ -28,6 +29,18 @@ export default function FFMICalculator() {
       </div>
 
       <div className="card space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sex</label>
+          <div className="inline-flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+            {[['male', 'Male'], ['female', 'Female']].map(([k, l]) => (
+              <button key={k} type="button" onClick={() => setSex(k)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${sex === k
+                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Weight (kg)</label>
@@ -57,11 +70,11 @@ export default function FFMICalculator() {
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">Normalized FFMI</p>
                 <p className="text-xl font-bold text-brand-600">{result.normalizedFfmi.toFixed(1)}</p>
-                <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 mt-1">{ffmiCategory(result.normalizedFfmi)}</span>
+                <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 mt-1">{ffmiCategory(result.normalizedFfmi, sex)}</span>
               </div>
             </div>
 
-            <FFMIScale value={result.normalizedFfmi} />
+            <FFMIScale value={result.normalizedFfmi} sex={sex} />
           </div>
         ) : (
           <p className="text-sm text-gray-400 dark:text-gray-500 pt-2">Enter your weight, height and body fat % to see your FFMI.</p>
@@ -69,8 +82,8 @@ export default function FFMICalculator() {
       </div>
 
       <div className="card text-sm text-gray-500 dark:text-gray-400 space-y-2">
-        <p><strong className="text-gray-700 dark:text-gray-300">Normalized FFMI</strong> adjusts for height so people of different heights can be compared on the same scale. The category guide below is calibrated for men; for women, subtract roughly 4–5 points from each threshold.</p>
-        <p>Most natural lifters top out around 25. Values well above that are unusual without pharmaceutical assistance — treat FFMI as a rough guide, not a verdict.</p>
+        <p><strong className="text-gray-700 dark:text-gray-300">Normalized FFMI</strong> adjusts for height so people of different heights can be compared on the same scale. Women naturally carry less muscle, so their categories sit 3 points lower than men's.</p>
+        <p>Most natural men top out around 25, and women around 22. Values well above that are unusual without pharmaceutical assistance — treat FFMI as a rough guide, not a verdict.</p>
       </div>
     </div>
   );
@@ -79,11 +92,8 @@ export default function FFMICalculator() {
 // Visual scale: a color gradient from "below average" (cool blue) through
 // "average/superior" (green → orange) to "very unlikely natural" (red),
 // with a marker showing where the current normalized FFMI falls.
-const SCALE_MIN = 14;
-const SCALE_MAX = 30;
-const SCALE_MARKS = [14, 18, 22, 26, 30];
-
-function FFMIScale({ value }) {
+function FFMIScale({ value, sex }) {
+  const { min: SCALE_MIN, max: SCALE_MAX, marks: SCALE_MARKS } = ffmiScale(sex);
   const pct = Math.min(100, Math.max(0, ((value - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100));
 
   return (

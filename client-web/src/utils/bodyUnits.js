@@ -18,14 +18,17 @@ export const toKgFrom = (value, unit) => (unit === 'lb' ? Number(value) * KG_PER
 /** "80.4 kg" / "177.2 lb". */
 export const formatBodyWeight = (kg, unit = 'kg') => (kg == null || kg === '' ? '' : `${kgTo(kg, unit)} ${unit === 'lb' ? 'lb' : 'kg'}`);
 
-/** cm → { ft, in } (whole inches). */
+/** cm → { ft, in } (inches to one decimal, e.g. 10.5). */
 export function cmToFtIn(cm) {
-  const total = Math.round(Number(cm) / CM_PER_IN);
-  return { ft: Math.floor(total / 12), in: total % 12 };
+  const total = round1(Number(cm) / CM_PER_IN);
+  const ft = Math.floor(total / 12);
+  return { ft, in: round1(total - ft * 12) };
 }
-/** Feet + inches → cm (one decimal). */
-export const ftInToCm = (ft, inches) => round1(((Number(ft) || 0) * 12 + (Number(inches) || 0)) * CM_PER_IN);
-/** "180 cm" / "5'11\"". */
+/** A typed number; a comma counts as the decimal point ("10,5"). */
+const num = (v) => Number(String(v ?? '').replace(',', '.')) || 0;
+/** Feet + inches (decimals allowed) → cm (two decimals, so 0.1 in survives the round trip). */
+export const ftInToCm = (ft, inches) => Math.round((num(ft) * 12 + num(inches)) * CM_PER_IN * 100) / 100;
+/** "180 cm" / "5'11\"" / "5'10.5\"". */
 export function formatHeight(cm, unit = 'cm') {
   if (!cm) return '';
   if (unit !== 'ft') return `${Math.round(cm)} cm`;

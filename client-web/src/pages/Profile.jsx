@@ -320,7 +320,7 @@ export default function Profile() {
                       <div className="flex gap-1 items-center">
                         <input className="input" type="number" min={3} max={8} value={form.heightFt} onChange={(e) => setForm({ ...form, heightFt: e.target.value })} placeholder="5" />
                         <span className="text-xs text-gray-400">ft</span>
-                        <input className="input" type="number" min={0} max={11} value={form.heightIn} onChange={(e) => setForm({ ...form, heightIn: e.target.value })} placeholder="10" />
+                        <input className="input" type="number" min={0} max={11.9} step={0.1} value={form.heightIn} onChange={(e) => setForm({ ...form, heightIn: e.target.value })} placeholder="10" />
                         <span className="text-xs text-gray-400">in</span>
                       </div>
                     ) : (
