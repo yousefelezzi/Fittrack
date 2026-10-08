@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { format, subDays, parseISO } from 'date-fns';
-import { Pill, Trash2, Pencil, Plus, Minus, Sun, Copy, Layers, X } from 'lucide-react-native';
+import { Pill, Trash2, Pencil, Plus, Minus, Sun, Copy, Layers, X, Check, CheckCheck } from 'lucide-react-native';
 import { supplementAPI, nutritionAPI } from '../api';
 import { Card, Button, Sheet, colors, makeStyles, Hint, ErrorText, LinkText, confirm } from '../components';
 import DayNav, { useDaySwipe } from '../components/DayNav';
@@ -59,13 +59,13 @@ const detailText = (s, servings = s.servings) => [servings && servings !== 1 ? `
 const microsOf = (s) => (s.catalog ? s.catalog.micros : s.micros);
 
 /** One supplement's name, serving and micros (for `servings`). */
-function SupplementInfo({ s, servings }) {
+function SupplementInfo({ s, servings, taken = false }) {
   const micros = microsText(microsOf(s), servings || 1);
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.row}>
         {s.catalog?.category === 'sun' ? <Sun size={14} color={colors.warning} /> : <Pill size={14} color={colors.textMuted} />}
-        <Text style={[styles.name, { flexShrink: 1 }]}>{s.name}</Text>
+        <Text style={[styles.name, { flexShrink: 1 }, taken && { color: colors.textMuted }]}>{s.name}</Text>
       </View>
       {s.dose || s.timing ? <Text style={styles.small}>{[s.dose, s.timing].filter(Boolean).join(' · ')}</Text> : null}
       {micros ? <Text style={styles.micros}>{micros}{s.catalog?.category === 'sun' ? ' (estimate)' : ''}</Text> : null}
@@ -90,22 +90,28 @@ function ServingsStepper({ value, onChange }) {
 }
 
 /** Your stack in a sheet: what you usually take, loaded onto a day in one go. */
-function StackSheet({ visible, list, run, reload, onClose }) {
+function StackSheet({ visible, list, run, reload, onStackChange, onClose }) {
   const [adding, setAdding] = useState(false); // false | 'catalog' | 'custom'
   const [editing, setEditing] = useState(null);
   const stack = list.filter((s) => s.inStack);
   const others = list.filter((s) => !s.inStack);
   const close = () => { setAdding(false); setEditing(null); onClose(); };
-  const create = (body) => run(async () => { await supplementAPI.create({ ...body, inStack: true }); setAdding(false); reload(); }, 'Could not add that supplement');
-  const setInStack = (s, inStack) => run(async () => { await supplementAPI.update(s._id, { inStack }); setAdding(false); reload(); }, 'Could not update your stack');
+  const create = (body) => run(async () => {
+    const { data } = await supplementAPI.create({ ...body, inStack: true });
+    setAdding(false); await reload(); await onStackChange(data._id, true);
+  }, 'Could not add that supplement');
+  const setInStack = (s, inStack) => run(async () => {
+    await supplementAPI.update(s._id, { inStack });
+    setAdding(false); await reload(); await onStackChange(s._id, inStack);
+  }, 'Could not update your stack');
   const update = (id, body) => run(async () => { await supplementAPI.update(id, body); setEditing(null); reload(); }, 'Could not save that');
   const removeFromStack = async (s) => {
-    if (!(await confirm(`Take ${s.name} out of your stack?`, 'Days you already logged keep it.', 'Remove', true))) return;
+    if (!(await confirm(`Take ${s.name} out of your stack?`, 'Days before today keep it.', 'Remove', true))) return;
     setInStack(s, false);
   };
   return (
     <Sheet visible={visible} title={adding ? 'Add to your stack' : 'My stack'} onClose={close}
-      subtitle={adding ? null : 'What you usually take. "Load my stack" adds these to a day; changing the stack doesn\'t change days already logged.'}>
+      subtitle={adding ? null : 'What you usually take. It\'s put on every day for you to tick off; changing it only affects today and later days.'}>
       {adding === 'catalog' ? (
         <>
           <LinkText onPress={() => setAdding(false)} style={{ marginBottom: 8 }}>‹ Back to my stack</LinkText>
@@ -197,7 +203,7 @@ function SupplementForm({ initial = EMPTY, onSave, onCancel, saveLabel, withMicr
   );
 }
 
-/** Supplements: each day's own list (like the Food Log), and your stack to load onto a day. */
+/** Supplements: each day's list (your stack, put on automatically, plus extras), ticked off as you take them. */
 export default function SupplementsScreen() {
   const [date, setDate] = useState(key(new Date()));
   const swipe = useDaySwipe(date, setDate);
@@ -209,7 +215,7 @@ export default function SupplementsScreen() {
 
   const loadList = useCallback(() => supplementAPI.getAll().then(({ data }) => setList(data)).catch(() => setList([])), []);
   const fromLog = (log) => setDay(log?.supplementsTaken || []);
-  const loadDay = useCallback(() => { setDay(null); nutritionAPI.getByDate(date).then(({ data }) => fromLog(data)).catch(() => setDay([])); }, [date]);
+  const loadDay = useCallback(() => { setDay(null); nutritionAPI.supplementDay(date).then(({ data }) => fromLog(data)).catch(() => setDay([])); }, [date]);
   useEffect(() => { loadList(); }, [loadList]);
   useEffect(() => { loadDay(); }, [loadDay]);
 
@@ -220,11 +226,21 @@ export default function SupplementsScreen() {
   const byId = new Map((list || []).map((s) => [String(s._id), s]));
   const onDay = new Set((day || []).map((t) => String(t.supplement)));
   const stack = (list || []).filter((s) => s.inStack);
-  const stackMissing = stack.filter((s) => !onDay.has(String(s._id))).length;
+  const takenCount = (day || []).filter((t) => t.taken !== false).length;
+  const unticked = (day || []).filter((t) => t.taken === false).map((t) => t.supplement);
+  const editable = date >= key(new Date()); // stack changes also apply to today and later days
 
   // Only this day changes.
   const addToDay = (s) => run(async () => { fromLog((await nutritionAPI.toggleSupplement(date, s._id)).data); setAdding(false); }, 'Could not add that');
   const removeFromDay = (id) => run(async () => fromLog((await nutritionAPI.toggleSupplement(date, id)).data), 'Could not remove that');
+  const tick = (id) => run(async () => fromLog((await nutritionAPI.tickSupplement(date, id)).data), 'Could not update that');
+  const tickAll = () => run(async () => fromLog((await nutritionAPI.takeSupplements(date, { supplementIds: unticked })).data), 'Could not tick them off');
+  // A stack change shows on the day being viewed if it's today or later (unticked ones only).
+  const onStackChange = async (id, inStack) => {
+    if (!editable) return;
+    const entry = (day || []).find((t) => String(t.supplement) === String(id));
+    if (inStack ? !entry : entry && entry.taken === false) fromLog((await nutritionAPI.toggleSupplement(date, id)).data);
+  };
   const setServings = (id, servings) => run(async () => fromLog((await nutritionAPI.setSupplementServings(date, id, servings)).data), 'Could not change the servings');
   // Something new for this day only (not added to the stack).
   const createForDay = (body) => run(async () => {
@@ -233,7 +249,6 @@ export default function SupplementsScreen() {
     if (!onDay.has(String(data._id))) fromLog((await nutritionAPI.toggleSupplement(date, data._id)).data);
     setAdding(false);
   }, 'Could not add that supplement');
-  const loadStack = () => run(async () => fromLog((await nutritionAPI.takeSupplements(date, { stack: true })).data), 'Could not load your stack');
   const sameAsDayBefore = () => run(async () => {
     fromLog((await nutritionAPI.takeSupplements(date, { copyFrom: format(subDays(parseISO(date), 1), 'yyyy-MM-dd') })).data);
   }, 'Could not copy the day before');
@@ -248,7 +263,7 @@ export default function SupplementsScreen() {
       <ErrorText>{error}</ErrorText>
       <Card>
         <View style={[styles.row, { justifyContent: 'space-between' }]}>
-          <Text style={styles.small}>{day?.length ? <Text><Text style={styles.bold}>{day.length}</Text> taken</Text> : 'Nothing logged for this day.'}</Text>
+          <Text style={styles.small}>{day?.length ? <Text><Text style={styles.bold}>{takenCount} of {day.length}</Text> taken</Text> : 'No supplements on this day.'}</Text>
           {!adding ? (
             <TouchableOpacity onPress={() => setAdding('catalog')} style={styles.row} hitSlop={6}>
               <Plus size={16} color={colors.brand} /><Text style={styles.link}>Add</Text>
@@ -256,34 +271,39 @@ export default function SupplementsScreen() {
           ) : null}
         </View>
         <View style={[styles.row, { flexWrap: 'wrap', marginTop: 8 }]}>
-          {stack.length > 0 && stackMissing > 0 ? (
-            <TouchableOpacity onPress={loadStack} style={[styles.stackBtn, styles.stackBtnPrimary]}><Layers size={14} color="#fff" /><Text style={[styles.link, { color: '#fff' }]}>Load my stack</Text></TouchableOpacity>
+          {unticked.length > 0 ? (
+            <TouchableOpacity onPress={tickAll} style={styles.stackBtn}><CheckCheck size={14} color={colors.brand} /><Text style={styles.link}>Tick all</Text></TouchableOpacity>
           ) : null}
           <TouchableOpacity onPress={sameAsDayBefore} style={styles.stackBtn}><Copy size={14} color={colors.brand} /><Text style={styles.link}>Same as day before</Text></TouchableOpacity>
         </View>
         {list && stack.length === 0 && !day?.length ? (
-          <Hint style={{ marginTop: 8 }}>Tip: put what you take every day in <Text style={styles.link} onPress={() => setStackOpen(true)}>My stack</Text>, then load it onto each day in one tap.</Hint>
+          <Hint style={{ marginTop: 8 }}>Tip: put what you take every day in <Text style={styles.link} onPress={() => setStackOpen(true)}>My stack</Text> and it'll be here each day, ready to tick off.</Hint>
         ) : null}
         {adding === 'custom' ? <SupplementForm saveLabel="Add" withMicros onSave={createForDay} onCancel={() => setAdding(false)} /> : null}
 
         {day === null || list === null ? <Hint style={{ marginTop: 8 }}>Loading…</Hint> : day.map((t) => {
           const s = byId.get(String(t.supplement));
           const servings = t.servings || s?.servings || 1;
+          const isTaken = t.taken !== false;
           return (
             <View key={String(t.supplement)} style={styles.item}>
-              {s ? <SupplementInfo s={s} servings={servings} /> : <Text style={[styles.small, { flex: 1 }]}>A removed supplement</Text>}
+              <TouchableOpacity onPress={() => tick(t.supplement)} hitSlop={8} style={[styles.check, isTaken && styles.checkOn]}
+                accessibilityLabel={`${isTaken ? 'Untick' : 'Tick off'} ${s?.name || 'supplement'}`}>
+                {isTaken ? <Check size={14} color="#fff" /> : null}
+              </TouchableOpacity>
+              {s ? <SupplementInfo s={s} servings={servings} taken={isTaken} /> : <Text style={[styles.small, { flex: 1 }]}>A removed supplement</Text>}
               {s ? <ServingsStepper value={servings} onChange={(v) => setServings(s._id, v)} /> : null}
               <TouchableOpacity onPress={() => removeFromDay(t.supplement)} hitSlop={8} accessibilityLabel="Remove from this day"><X size={16} color={colors.textMuted} /></TouchableOpacity>
             </View>
           );
         })}
       </Card>
-      <Hint style={{ textAlign: 'center' }}>Supplements add their vitamins and minerals to that day's micronutrients in the Food Log. Changing servings here only changes this day. {SUN_NOTE}</Hint>
+      <Hint style={{ textAlign: 'center' }}>Ticked supplements add their vitamins and minerals to that day's micronutrients in the Food Log. Adding, removing or changing servings here only changes this day. {SUN_NOTE}</Hint>
       <Sheet visible={adding === 'catalog'} title="Add to this day" subtitle="Amounts are typical label doses; change the servings after adding it." onClose={() => setAdding(false)}>
         <CatalogList mine={available} onPickMine={addToDay}
           onPick={(c) => createForDay({ catalogId: c._id, ...(c.category === 'sun' && { timing: 'Midday' }) })} onCustom={() => setAdding('custom')} />
       </Sheet>
-      {list ? <StackSheet visible={stackOpen} list={list} run={run} reload={loadList} onClose={() => setStackOpen(false)} /> : null}
+      {list ? <StackSheet visible={stackOpen} list={list} run={run} reload={loadList} onStackChange={onStackChange} onClose={() => setStackOpen(false)} /> : null}
     </ScrollView>
     </View>
   );
@@ -301,7 +321,8 @@ const styles = makeStyles(() => ({
   microGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   microCell: { width: '47%' },
   stackBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  stackBtnPrimary: { backgroundColor: colors.brand, borderColor: colors.brand },
+  check:   { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  checkOn: { backgroundColor: colors.success, borderColor: colors.success },
   stepBtn: { width: 24, height: 24, borderRadius: 6, backgroundColor: colors.subtle, alignItems: 'center', justifyContent: 'center' },
   group:   { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5 },
   catRow:  { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.subtle },

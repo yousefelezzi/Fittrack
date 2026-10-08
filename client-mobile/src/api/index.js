@@ -215,8 +215,13 @@ export const nutritionAPI = {
   summary:     (from, to)         => api.get('/nutrition/summary', { params: { from, to } }),
   addWater:    (date, amount)     => api.post('/nutrition/water', { date, amount }),
   deleteWater: (entryId)          => api.delete(`/nutrition/water/${entryId}`),
+  // A day's supplements; your stack is put on it (unticked) the first time it's opened.
+  supplementDay: (date) => api.post('/nutrition/supplements/day', { date }),
+  // Put a supplement on the day (unticked), or take it off the day.
   toggleSupplement: (date, supplementId) => api.post('/nutrition/supplements/toggle', { date, supplementId }),
-  // Add several to the day at once: { supplementIds }, { stack: true } or { copyFrom: 'YYYY-MM-DD' } (same as that day).
+  // Tick one off as taken (or untick it).
+  tickSupplement: (date, supplementId) => api.post('/nutrition/supplements/tick', { date, supplementId }),
+  // Tick several off at once: { supplementIds } or { copyFrom: 'YYYY-MM-DD' } (what was taken that day).
   takeSupplements: (date, body) => api.post('/nutrition/supplements/take', { date, ...body }),
   // Servings of a supplement on that day only.
   setSupplementServings: (date, supplementId, servings) => api.put('/nutrition/supplements/servings', { date, supplementId, servings }),

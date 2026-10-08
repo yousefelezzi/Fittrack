@@ -28,6 +28,8 @@ const {
   getSummary,
   takeSupplements,
   setSupplementServings,
+  supplementDay,
+  tickSupplement,
 } = require('../controllers/nutrition.controller');
 
 // GET /api/nutrition?date=2024-01-15
@@ -51,10 +53,18 @@ router.post('/water', protect, [
   body('amount').isInt({ min: 1, max: 5000 }).withMessage('Amount must be between 1 and 5000 ml'),
 ], validate, addWater);
 router.delete('/water/:entryId', protect, deleteWater);
+router.post('/supplements/day', protect, [
+  body('date').isISO8601().withMessage('Valid date is required'),
+], validate, supplementDay);
 router.post('/supplements/toggle', protect, [
   body('date').isISO8601().withMessage('Valid date is required'),
   body('supplementId').isMongoId().withMessage('Invalid supplement'),
+  body('taken').optional().isBoolean().withMessage('taken must be true or false'),
 ], validate, toggleSupplement);
+router.post('/supplements/tick', protect, [
+  body('date').isISO8601().withMessage('Valid date is required'),
+  body('supplementId').isMongoId().withMessage('Invalid supplement'),
+], validate, tickSupplement);
 router.put('/supplements/servings', protect, [
   body('date').isISO8601().withMessage('Valid date is required'),
   body('supplementId').isMongoId().withMessage('Invalid supplement'),
@@ -65,7 +75,6 @@ router.post('/supplements/take', protect, [
   body('supplementIds').optional().isArray({ max: 50 }).withMessage('Supplements must be a list'),
   body('supplementIds.*').optional().isMongoId().withMessage('Invalid supplement'),
   body('copyFrom').optional().isISO8601().withMessage('Valid date to copy from is required'),
-  body('stack').optional().isBoolean().withMessage('stack must be true or false'),
 ], validate, takeSupplements);
 
 router.delete('/', protect, deleteAllLogs);

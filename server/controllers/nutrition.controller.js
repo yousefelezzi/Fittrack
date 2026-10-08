@@ -426,12 +426,13 @@ exports.updateGoals = async (req, res, next) => {
  * amounts, or your own supplement's.
  */
 async function supplementMicros(log, userId) {
-  const entries = log.supplementsTaken || [];
+  const entries = (log.supplementsTaken || []).filter((t) => t.taken !== false);
   if (!entries.length) return {};
   const found = await Supplement.find({ _id: { $in: entries.map((t) => t.supplement) }, user: userId }).populate('catalog', 'micros').lean();
   const byId = new Map(found.map((s) => [String(s._id), s]));
   const totals = {};
   for (const t of entries) {
+    if (t.taken === false) continue;
     const s = byId.get(String(t.supplement));
     if (!s) continue;
     const servings = t.servings || s.servings || 1;
@@ -474,17 +475,72 @@ exports.deleteWater = async (req, res, next) => {
   }
 };
 
-// POST /api/nutrition/supplements/toggle { date, supplementId }  — add a supplement to that day, or take it off
-// (only that day changes)
+const dayEntries = (log) => log?.supplementsTaken || [];
+
+/**
+ * Put the user's stack on a day, unticked, the first time the day is opened
+ * (once only: later changes to the stack don't change the day). Days logged
+ * before this existed are marked as loaded. Returns the day's log, or null when
+ * there's no log and no stack.
+ */
+async function ensureStack(userId, date) {
+  const log = await NutritionLog.findOne({ user: userId, date: sameDay(date) });
+  if (log?.supplementsStackLoaded) return log;
+  const stack = await Supplement.find({ user: userId, inStack: true }).sort({ order: 1, createdAt: 1 }).select('_id servings').lean();
+  if (!stack.length) return log;
+  const already = new Set(dayEntries(log).map((t) => String(t.supplement)));
+  const add = stack.filter((s) => !already.has(String(s._id))).map((s) => ({ supplement: s._id, servings: s.servings || 1, taken: false, at: new Date() }));
+  try {
+    // Only if it hasn't been loaded meanwhile (e.g. two screens opening the day at once).
+    return await NutritionLog.findOneAndUpdate(
+      { user: userId, date: sameDay(date), supplementsStackLoaded: { $ne: true } },
+      { $push: { supplementsTaken: { $each: add } }, $set: { supplementsStackLoaded: true }, $setOnInsert: { user: userId, date: startOfDay(date) } },
+      { upsert: true, new: true }
+    );
+  } catch (err) {
+    if (err.code !== 11000) throw err;
+    return NutritionLog.findOne({ user: userId, date: sameDay(date) });
+  }
+}
+
+// POST /api/nutrition/supplements/day { date }  — that day's supplements (the stack is put on it the first time)
+exports.supplementDay = async (req, res, next) => {
+  try {
+    const log = await ensureStack(req.user.id, req.body.date);
+    res.json({ date: req.body.date, supplementsTaken: dayEntries(log) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/nutrition/supplements/toggle { date, supplementId, taken? }  — put a supplement on that day
+// (unticked unless taken: true), or take it off the day. Only that day changes.
 exports.toggleSupplement = async (req, res, next) => {
   try {
     const { date, supplementId } = req.body;
     const supplement = await Supplement.findOne({ _id: supplementId, user: req.user.id }).select('_id servings').lean();
     if (!supplement) return res.status(404).json({ message: 'Supplement not found' });
+    await ensureStack(req.user.id, date);
     const existing = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date), 'supplementsTaken.supplement': supplementId }).select('_id').lean();
     const log = existing
       ? await NutritionLog.findByIdAndUpdate(existing._id, { $pull: { supplementsTaken: { supplement: supplementId } } }, { new: true })
-      : await logForDay(req.user.id, date, { $push: { supplementsTaken: { supplement: supplementId, servings: supplement.servings || 1, at: new Date() } } });
+      : await logForDay(req.user.id, date, { $push: { supplementsTaken: { supplement: supplementId, servings: supplement.servings || 1, taken: req.body.taken === true, at: new Date() } } });
+    res.json(log);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/nutrition/supplements/tick { date, supplementId }  — tick a supplement on that day off (or untick it)
+exports.tickSupplement = async (req, res, next) => {
+  try {
+    const { date, supplementId } = req.body;
+    const log = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date), 'supplementsTaken.supplement': supplementId });
+    if (!log) return res.status(404).json({ message: 'That supplement isn\'t on this day' });
+    const entry = log.supplementsTaken.find((t) => String(t.supplement) === String(supplementId));
+    entry.taken = entry.taken === false;
+    entry.at = new Date();
+    await log.save();
     res.json(log);
   } catch (err) {
     next(err);
@@ -500,37 +556,44 @@ exports.setSupplementServings = async (req, res, next) => {
       { $set: { 'supplementsTaken.$.servings': Number(servings) } },
       { new: true, runValidators: true }
     );
-    if (!log) return res.status(404).json({ message: 'That supplement isn\'t logged on this day' });
+    if (!log) return res.status(404).json({ message: 'That supplement isn\'t on this day' });
     res.json(log);
   } catch (err) {
     next(err);
   }
 };
 
-// POST /api/nutrition/supplements/take { date, supplementIds? | copyFrom? | stack? }
-// Add several supplements to a day at once: the ones listed, your whole stack
-// (stack: true), or the same ones as another day (copyFrom: YYYY-MM-DD, with
-// that day's servings) — like copying meals. Ones already on the day stay as they are.
+// POST /api/nutrition/supplements/take { date, supplementIds? | copyFrom? }
+// Tick several off at once: the ones listed (e.g. all of the day's), or the
+// ones taken on another day (copyFrom: YYYY-MM-DD, with that day's servings),
+// adding any that aren't on the day yet.
 exports.takeSupplements = async (req, res, next) => {
   try {
-    const { date, copyFrom, stack } = req.body;
+    const { date, copyFrom } = req.body;
     let ids = Array.isArray(req.body.supplementIds) ? req.body.supplementIds.map(String) : [];
     let servingsFrom = new Map();
     if (copyFrom) {
       const from = await NutritionLog.findOne({ user: req.user.id, date: sameDay(copyFrom) }).select('supplementsTaken').lean();
-      ids = (from?.supplementsTaken || []).map((t) => String(t.supplement));
-      servingsFrom = new Map((from?.supplementsTaken || []).filter((t) => t.servings).map((t) => [String(t.supplement), t.servings]));
-      if (!ids.length) return res.status(400).json({ message: 'No supplements were logged that day' });
+      const taken = dayEntries(from).filter((t) => t.taken !== false);
+      ids = taken.map((t) => String(t.supplement));
+      servingsFrom = new Map(taken.filter((t) => t.servings).map((t) => [String(t.supplement), t.servings]));
+      if (!ids.length) return res.status(400).json({ message: 'No supplements were taken that day' });
     }
-    const query = stack ? { user: req.user.id, inStack: true } : { _id: { $in: ids }, user: req.user.id };
-    // Only your own, still-existing supplements, in your order.
-    const mine = await Supplement.find(query).sort({ order: 1, createdAt: 1 }).select('_id servings').lean();
-    if (!mine.length) return res.status(400).json({ message: stack ? 'Your stack is empty: add supplements to it first' : 'No supplements to add' });
-    const current = await NutritionLog.findOne({ user: req.user.id, date: sameDay(date) }).select('supplementsTaken').lean();
-    const already = new Set((current?.supplementsTaken || []).map((t) => String(t.supplement)));
-    const add = mine.filter((s) => !already.has(String(s._id)))
-      .map((s) => ({ supplement: s._id, servings: servingsFrom.get(String(s._id)) || s.servings || 1, at: new Date() }));
-    const log = await logForDay(req.user.id, date, add.length ? { $push: { supplementsTaken: { $each: add } } } : {});
+    // Only your own, still-existing supplements.
+    const mine = await Supplement.find({ _id: { $in: ids }, user: req.user.id }).select('_id servings').lean();
+    if (!mine.length) return res.status(400).json({ message: 'No supplements to tick off' });
+    const log = (await ensureStack(req.user.id, date)) || await logForDay(req.user.id, date, {});
+    for (const s of mine) {
+      const id = String(s._id);
+      const entry = log.supplementsTaken.find((t) => String(t.supplement) === id);
+      if (entry) {
+        if (entry.taken === false) { entry.taken = true; entry.at = new Date(); }
+        if (servingsFrom.has(id)) entry.servings = servingsFrom.get(id);
+      } else {
+        log.supplementsTaken.push({ supplement: s._id, servings: servingsFrom.get(id) || s.servings || 1, taken: true, at: new Date() });
+      }
+    }
+    await log.save();
     res.json(log);
   } catch (err) {
     next(err);
@@ -575,7 +638,7 @@ exports.getSummary = async (req, res, next) => {
         fat: sum(l.meals, (m) => m.fat),
         fiber: sum(l.meals, (m) => m.micros?.fiber),
         water: sum(l.water || [], (w) => w.amount),
-        supplements: (l.supplementsTaken || []).length,
+        supplements: (l.supplementsTaken || []).filter((t) => t.taken !== false).length,
         goals: goalsFor(l),
       }))
       .filter((d) => d.calories || d.water || d.supplements);

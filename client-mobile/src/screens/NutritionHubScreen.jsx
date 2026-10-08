@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
 import { Utensils, GlassWater, Pill, ChartLine, History, Scale } from 'lucide-react-native';
-import { nutritionAPI, supplementAPI } from '../api';
+import { nutritionAPI } from '../api';
 import { Card, ListRow, colors, makeStyles, Title } from '../components';
 import { formatMl } from '../../../client-web/src/utils/nutritionProgress';
 import { MACRO_COLORS } from '../../../client-web/src/utils/foodLogic';
@@ -16,14 +16,14 @@ export default function NutritionHubScreen({ navigation }) {
   const { user } = useAuth();
   const [log, setLog] = useState(null);
   const [waterGoal, setWaterGoal] = useState(2500);
-  const [supplements, setSupplements] = useState([]);
+  const [supDay, setSupDay] = useState([]); // today's supplements (the stack is put on automatically)
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     const d = today();
     nutritionAPI.getByDate(d).then(({ data }) => setLog(data)).catch(() => {});
     nutritionAPI.summary(d, d).then(({ data }) => setWaterGoal(data.waterGoal)).catch(() => {});
-    supplementAPI.getAll().then(({ data }) => setSupplements(data)).catch(() => {});
+    nutritionAPI.supplementDay(d).then(({ data }) => setSupDay(data.supplementsTaken || [])).catch(() => {});
   }, []);
   useEffect(() => navigation.addListener('focus', load), [navigation, load]);
 
@@ -32,15 +32,13 @@ export default function NutritionHubScreen({ navigation }) {
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   const goals = log?.dailyGoals || {};
   const water = (log?.water || []).reduce((n, w) => n + w.amount, 0);
-  const takenIds = new Set((log?.supplementsTaken || []).map((t) => String(t.supplement)));
-  const taken = takenIds.size;
-  const stack = supplements.filter((s) => s.inStack);
-  const stackMissing = stack.some((s) => !takenIds.has(String(s._id)));
+  const taken = supDay.filter((t) => t.taken !== false).length;
+  const unticked = supDay.filter((t) => t.taken === false).map((t) => t.supplement);
 
-  // Your whole supplement stack onto today in one tap.
-  const takeStack = async () => {
+  // Tick off all of today's supplements in one tap.
+  const tickAll = async () => {
     setBusy(true);
-    try { setLog((await nutritionAPI.takeSupplements(today(), { stack: true })).data); } catch { /* shown on next load */ } finally { setBusy(false); }
+    try { setSupDay((await nutritionAPI.takeSupplements(today(), { supplementIds: unticked })).data.supplementsTaken || []); } catch { /* shown on next load */ } finally { setBusy(false); }
   };
   const bar = (value, goal, color) => (
     <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, goal ? (value / goal) * 100 : 0)}%`, backgroundColor: color }]} /></View>
@@ -70,11 +68,11 @@ export default function NutritionHubScreen({ navigation }) {
           <Text style={styles.statValue}>{formatMl(water)} / {formatMl(waterGoal)}</Text>
         </View>
         {bar(water, waterGoal, '#06b6d4')}
-        {supplements.length > 0 ? (
+        {supDay.length > 0 ? (
           <View style={[styles.statRow, { marginTop: 10 }]}>
-            <Text style={styles.statLabel}>Supplements: <Text style={styles.statValue}>{taken} taken</Text></Text>
-            {stackMissing ? (
-              <TouchableOpacity disabled={busy} onPress={takeStack} hitSlop={6}><Text style={styles.quickText}>Load my stack</Text></TouchableOpacity>
+            <Text style={styles.statLabel}>Supplements: <Text style={styles.statValue}>{taken} of {supDay.length} taken</Text></Text>
+            {unticked.length ? (
+              <TouchableOpacity disabled={busy} onPress={tickAll} hitSlop={6}><Text style={styles.quickText}>Tick all</Text></TouchableOpacity>
             ) : null}
           </View>
         ) : null}
@@ -83,7 +81,7 @@ export default function NutritionHubScreen({ navigation }) {
       <Card style={{ paddingVertical: 4 }}>
         <ListRow icon={Utensils} title="Food Log" subtitle="Meals, macros, the meal planner and recipes" onPress={() => navigation.navigate('FoodLog')} />
         <ListRow icon={GlassWater} title="Hydration" subtitle="Water through the day against your goal" onPress={() => navigation.navigate('Hydration')} />
-        <ListRow icon={Pill} title="Supplements" subtitle="What you take each day, and your stack" onPress={() => navigation.navigate('Supplements')} />
+        <ListRow icon={Pill} title="Supplements" subtitle="Your stack, ticked off each day" onPress={() => navigation.navigate('Supplements')} />
         <ListRow icon={Scale} title="Weight" subtitle={user?.weight ? `${formatBodyWeight(user.weight, user.bodyWeightUnit)} · 7-day average` : 'Daily weigh-ins and your 7-day average'} onPress={() => navigation.navigate('Weight')} />
         <ListRow icon={ChartLine} title="Progress" subtitle="Daily calories, macros and water over time" onPress={() => navigation.navigate('NutritionProgress')} />
         <ListRow icon={History} title="History" subtitle="Past days' meals" onPress={() => navigation.navigate('History', { tab: 'nutrition' })} last />

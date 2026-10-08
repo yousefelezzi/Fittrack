@@ -73,14 +73,20 @@ const nutritionLogSchema = new mongoose.Schema(
       amount: { type: Number, min: 1, max: 5000, required: true },
       at: { type: Date, default: Date.now },
     }],
-    // Supplements taken that day, with the servings at the time (so editing
-    // the supplement later doesn't change past days).
+    // That day's supplements: the user's stack (loaded the first time the day
+    // is opened) plus anything added that day. Ticked off when taken; only
+    // taken ones count. Servings are that day's own, so editing the
+    // supplement later doesn't change past days.
     supplementsTaken: [{
       supplement: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplement', required: true },
       servings: { type: Number, min: 0.25, max: 20 },
+      taken: { type: Boolean, default: true },
       at: { type: Date, default: Date.now },
       _id: false,
     }],
+    // The stack has been put on this day (it's done once, so later changes to
+    // the stack don't change the day).
+    supplementsStackLoaded: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

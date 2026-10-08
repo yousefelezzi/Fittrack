@@ -398,6 +398,22 @@ const migrations = [
       return `${stack.modifiedCount} supplement(s) put in stacks, ${entries} day entr(ies) given their servings`;
     },
   },
+  {
+    // The stack is now put on each day automatically, to be ticked off. Days
+    // before today that already have supplements logged keep exactly what they
+    // had (all taken); other days, today included, get the stack (unticked)
+    // the first time they're opened, next to anything already logged.
+    name: '2026-10-supplement-stack-autoload',
+    async up(db) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const res = await db.collection('nutritionlogs').updateMany(
+        { 'supplementsTaken.0': { $exists: true }, supplementsStackLoaded: { $ne: true }, date: { $lt: today } },
+        { $set: { supplementsStackLoaded: true } }
+      );
+      return `${res.modifiedCount} day(s) with supplements kept as logged`;
+    },
+  },
 ];
 
 async function runMigrations() {
