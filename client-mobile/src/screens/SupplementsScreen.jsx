@@ -4,7 +4,7 @@ import { format, subDays, parseISO } from 'date-fns';
 import { Pill, Trash2, Pencil, Check, Plus, Sun, CheckCheck, Copy } from 'lucide-react-native';
 import { supplementAPI, nutritionAPI } from '../api';
 import { Card, Button, Sheet, colors, makeStyles, Hint, ErrorText, LinkText, confirm } from '../components';
-import DayNav from '../components/DayNav';
+import DayNav, { useDaySwipe } from '../components/DayNav';
 import { microsText, SUPPLEMENT_MICROS } from '../../../client-web/src/utils/foodLogic';
 
 const SUN_NOTE = 'Sun is an estimate: roughly 1,000 IU of vitamin D per 15 minutes of midday summer sun with arms and legs bare, for lighter skin. Much less in winter, early or late in the day, with darker skin or sunscreen.';
@@ -104,6 +104,7 @@ function SupplementForm({ initial = EMPTY, onSave, onCancel, saveLabel, withMicr
 /** Supplements: your list, ticked off day by day. */
 export default function SupplementsScreen() {
   const [date, setDate] = useState(key(new Date()));
+  const swipe = useDaySwipe(date, setDate);
   const [list, setList] = useState(null);
   const [taken, setTaken] = useState(new Set());
   const [adding, setAdding] = useState(false); // false | 'catalog' | 'custom'
@@ -147,6 +148,7 @@ export default function SupplementsScreen() {
   const takenCount = (list || []).filter((s) => taken.has(String(s._id))).length;
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }} {...swipe}>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
       <DayNav date={date} onChange={setDate} />
       <ErrorText>{error}</ErrorText>
@@ -198,6 +200,7 @@ export default function SupplementsScreen() {
       <Hint style={{ textAlign: 'center' }}>Supplements from the list add their vitamins and minerals to the Food Log's micronutrients on days you tick them off. {SUN_NOTE}</Hint>
       <CatalogSheet visible={adding === 'catalog'} onPick={addFromCatalog} onCustom={() => setAdding('custom')} onClose={() => setAdding(false)} />
     </ScrollView>
+    </View>
   );
 }
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { nutritionAPI, foodAPI } from '../api';
 import MealPlanner from '../components/MealPlanner';
+import DayNav from '../components/DayNav';
 import { MEAL_TYPES, PROFILE_FIELD_NAMES } from '../constants/nutrition';
 import { format, subDays, parseISO, isToday } from 'date-fns';
 import { Plus, Trash2, Search, X, ChevronDown, ChefHat, Pencil, Check, Sparkles, Salad } from 'lucide-react';
@@ -1509,12 +1510,11 @@ export default function Nutrition() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Nutrition</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setPlannerOpen(true)} className="btn-secondary text-sm"><Sparkles size={15} /> Meal plan</button>
-          <input type="date" className="input w-auto text-sm" value={date}
-            onChange={(e) => setDate(e.target.value)} />
+          <DayNav date={date} onChange={setDate} allowFuture />
         </div>
       </div>
 

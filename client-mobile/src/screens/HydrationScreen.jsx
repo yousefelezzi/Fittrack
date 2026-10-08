@@ -5,7 +5,7 @@ import { GlassWater, Trash2, Pencil } from 'lucide-react-native';
 import { nutritionAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, BarChart, colors, makeStyles, Hint, ErrorText, LinkText } from '../components';
-import DayNav from '../components/DayNav';
+import DayNav, { useDaySwipe } from '../components/DayNav';
 import { WATER_PRESETS, formatMl, dailySeries } from '../../../client-web/src/utils/nutritionProgress';
 
 const key = (d) => format(d, 'yyyy-MM-dd');
@@ -14,6 +14,7 @@ const key = (d) => format(d, 'yyyy-MM-dd');
 export default function HydrationScreen() {
   const { updateUser } = useAuth();
   const [date, setDate] = useState(key(new Date()));
+  const swipe = useDaySwipe(date, setDate);
   const [log, setLog] = useState(null);
   const [summary, setSummary] = useState(null);
   const [custom, setCustom] = useState('');
@@ -73,6 +74,7 @@ export default function HydrationScreen() {
   }));
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }} {...swipe}>
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
       <DayNav date={date} onChange={setDate} />
       <ErrorText>{error}</ErrorText>
@@ -144,6 +146,7 @@ export default function HydrationScreen() {
         <BarChart data={week} goal={goal} height={120} />
       </Card>
     </ScrollView>
+    </View>
   );
 }
 

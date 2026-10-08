@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { format, addDays, subDays, parseISO, isToday } from 'date-fns';
+import DayNav, { useDaySwipe } from '../components/DayNav';
 import { nutritionAPI, foodAPI } from '../api';
 import { Card, Spinner, colors, makeStyles, Sheet, Chip, ChipRow, Hint, ErrorText, LinkText, confirm } from '../components';
 import {
@@ -456,22 +457,15 @@ export default function NutritionScreen({ navigation }) {
   const goals = log?.dailyGoals ?? goalInfo?.targets ?? null;
   const today = ymd(new Date());
   const isPast = date < today;
-  const shift = (n) => setDate(ymd(addDays(parseISO(date), n)));
+  const swipe = useDaySwipe(date, setDate, { allowFuture: true });
   const toProfile = () => navigation.navigate('Tabs', { screen: 'Profile' });
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }} {...swipe}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadTargets(); fetchLog(); }} tintColor={colors.brand} />}>
-        <View style={styles.dateRow}>
-          <TouchableOpacity onPress={() => shift(-1)} hitSlop={10}><Text style={styles.arrow}>‹</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => setDate(today)}>
-            <Text style={styles.dateLabel}>{date === today ? 'Today' : format(parseISO(date), 'EEE, MMM d')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => shift(1)} hitSlop={10}><Text style={styles.arrow}>›</Text></TouchableOpacity>
-          <View style={{ flex: 1 }} />
-          <Btn icon={Sparkles} title="Meal plan" variant="secondary" onPress={() => setPlannerOpen(true)} style={{ minHeight: 36 }} />
-        </View>
+        <DayNav date={date} onChange={setDate} allowFuture
+          right={<Btn icon={Sparkles} title="Meal plan" variant="secondary" onPress={() => setPlannerOpen(true)} style={{ minHeight: 36 }} />} />
 
         {!isPast && <GoalInfo info={goalInfo} onProfile={toProfile} onSteps={() => navigation.navigate('Steps')} onWeight={() => navigation.navigate('Weight')} />}
 
@@ -543,9 +537,6 @@ export default function NutritionScreen({ navigation }) {
 }
 
 const styles = makeStyles(() => ({
-  dateRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  arrow:     { fontSize: 28, color: colors.brand, fontWeight: '300', paddingHorizontal: 4 },
-  dateLabel: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
   bigNum:    { fontSize: 32, fontWeight: '800', color: colors.textPrimary },
   track:     { height: 7, backgroundColor: colors.subtle, borderRadius: 999, overflow: 'hidden' },
   thinTrack: { height: 4, backgroundColor: colors.subtle, borderRadius: 999, overflow: 'hidden', marginTop: 2 },
