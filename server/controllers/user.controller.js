@@ -34,7 +34,7 @@ exports.getUserById = async (req, res, next) => {
     const isOwner = req.params.id === String(req.user.id);
     // Body fat feeds the private FFMI stat, so only the owner gets the raw value.
     const user = await User.findById(req.params.id)
-      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType -bodyWeightUnit -heightUnit -adaptiveCalories')
+      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType -bodyWeightUnit -heightUnit -adaptiveCalories -savedFoods')
       .lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
     const counts = { followersCount: (user.followers || []).length, followingCount: (user.following || []).length };

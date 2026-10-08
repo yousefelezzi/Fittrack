@@ -150,8 +150,10 @@ function FoodPicker({ onSelect }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [mine,    setMine]    = useState([]); // your custom foods/recipes and saved ones
   const inputRef = useRef(null);
   const timerRef = useRef(null);
+  useEffect(() => { foodAPI.mine().then(({ data }) => setMine(data)).catch(() => {}); }, []);
 
   const search = useCallback(async (q) => {
     if (!q.trim()) { setResults([]); return; }
@@ -199,6 +201,25 @@ function FoodPicker({ onSelect }) {
           </button>
         )}
       </div>
+
+      {/* Before typing: your own and saved foods and recipes. */}
+      {focused && query.length === 0 && mine.length > 0 && (
+        <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg">
+          <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Your foods</p>
+          {mine.map((food) => (
+            <button key={food._id} onMouseDown={() => handleSelect(food)}
+              className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-50 dark:border-gray-700 last:border-0 transition-colors">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                {food.name}
+                <span className="ml-1.5 text-[11px] font-normal text-gray-400">{food.ingredients?.length ? 'recipe' : 'custom'}{food.saved && !food.mine ? ' · saved' : ''}</span>
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                per 100g — {food.per100g.calories} kcal · P {food.per100g.protein}g · C {food.per100g.carbs}g · F {food.per100g.fat}g
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
 
       {focused && query.length > 0 && (
         <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg">

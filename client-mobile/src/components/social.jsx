@@ -8,7 +8,8 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { format, isToday, formatDistanceToNow, formatDistanceToNowStrict } from 'date-fns';
-import { messageAPI, workoutAPI, userAPI, postAPI, planAPI, uploadUrl } from '../api';
+import { messageAPI, workoutAPI, userAPI, postAPI, planAPI, exerciseAPI, foodAPI, uploadUrl } from '../api';
+import { exerciseSummary, foodServing, isRecipe } from '../../../client-web/src/utils/sharedItems';
 import { summarizeWorkout } from '../../../client-web/src/utils/workoutSummary';
 import { colors, makeStyles, cardSurface } from './tokens';
 import { Hint, ErrorText, LinkText, Chip, ChipRow, confirm } from './ui';
@@ -17,6 +18,7 @@ import {
   Heart, MessageCircle, Pencil, Trash2, Send, Dumbbell, Check, ChevronLeft, Users, UserPlus, LogOut, Image as ImageIcon,
   BookmarkPlus,
   ClipboardList,
+  Utensils,
 } from 'lucide-react-native';
 import { typeOf } from '../../../client-web/src/utils/exerciseTypes';
 
@@ -68,6 +70,82 @@ function SaveAsTemplate({ workout, source }) {
         </TouchableOpacity>
       )}
       {state === 'error' ? <Text style={[styles.small, { color: colors.danger }]}>{error}</Text> : null}
+    </View>
+  );
+}
+
+/** Save button with saving / saved / error states, for shared exercises and foods. */
+function SaveLine({ label, savedLabel, onSave, color }) {
+  const [state, setState] = useState('idle');
+  const [error, setError] = useState('');
+  const save = async () => {
+    setState('saving');
+    try { await onSave(); setState('saved'); } catch (err) { setError(err.response?.data?.message || 'Could not save it'); setState('error'); }
+  };
+  return (
+    <View style={styles.workoutRow}>
+      {state === 'saved' ? (
+        <><Check size={14} color={colors.success} /><Text style={[styles.small, { color: colors.success }]}>{savedLabel}</Text></>
+      ) : (
+        <TouchableOpacity onPress={save} disabled={state === 'saving'} style={styles.row} hitSlop={6}>
+          <BookmarkPlus size={15} color={color} /><Text style={[styles.linkText, { color }]}>{state === 'saving' ? 'Saving…' : label}</Text>
+        </TouchableOpacity>
+      )}
+      {state === 'error' ? <Text style={[styles.small, { color: colors.danger }]}>{error}</Text> : null}
+    </View>
+  );
+}
+
+/** Someone's custom exercise in a post or message; with `source` it can be saved to your exercises. */
+export function SharedExercise({ exercise, source, me }) {
+  const [open, setOpen] = useState(false);
+  if (!exercise) return null;
+  const mine = String(exercise.createdBy) === String(me?._id);
+  return (
+    <View style={[styles.workout, { borderColor: '#a7f3d0' }]}>
+      <TouchableOpacity style={styles.workoutHead} onPress={() => setOpen(!open)}>
+        {exercise.images?.length ? <ExerciseImage images={exercise.images} style={{ width: 44, height: 34 }} />
+          : <View style={[styles.workoutIcon, { backgroundColor: '#d1fae5' }]}><Dumbbell size={18} color="#059669" /></View>}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bold} numberOfLines={1}>{exercise.name}</Text>
+          <Text style={[styles.muted, { textTransform: 'capitalize' }]} numberOfLines={2}>Exercise · {exerciseSummary(exercise)}</Text>
+        </View>
+        {exercise.instructions?.length ? <Text style={styles.muted}>{open ? '▴' : '▾'}</Text> : null}
+      </TouchableOpacity>
+      {open && (exercise.instructions || []).map((step, i) => (
+        <Text key={i} style={[styles.small, { paddingHorizontal: 12, paddingBottom: 4 }]}>{i + 1}. {step}</Text>
+      ))}
+      {source && !mine ? <SaveLine label="Save to my exercises" savedLabel="Saved to your exercises" color="#059669"
+        onSave={() => exerciseAPI.fromShared({ exerciseId: exercise._id, ...source })} /> : null}
+    </View>
+  );
+}
+
+/** A custom food or recipe in a post or message; with `source` it can be saved to your foods. */
+export function SharedFood({ food, source, me }) {
+  const [open, setOpen] = useState(false);
+  if (!food) return null;
+  const sv = foodServing(food);
+  const recipe = isRecipe(food);
+  const mine = String(food.createdBy) === String(me?._id);
+  return (
+    <View style={[styles.workout, { borderColor: '#fed7aa' }]}>
+      <TouchableOpacity style={styles.workoutHead} onPress={() => setOpen(!open)}>
+        <View style={[styles.workoutIcon, { backgroundColor: '#ffedd5' }]}><Utensils size={18} color="#ea580c" /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bold} numberOfLines={1}>{food.name}</Text>
+          <Text style={styles.muted} numberOfLines={2}>{recipe ? `Recipe · ${food.ingredients.length} ingredients` : 'Food'} · {sv.label}: {sv.kcal} kcal · P {sv.p}g · C {sv.c}g · F {sv.f}g</Text>
+        </View>
+        {recipe ? <Text style={styles.muted}>{open ? '▴' : '▾'}</Text> : null}
+      </TouchableOpacity>
+      {open && recipe && food.ingredients.map((ing, i) => (
+        <View key={i} style={[styles.row, { justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 3 }]}>
+          <Text style={[styles.small, { flex: 1 }]} numberOfLines={1}>{ing.name}</Text>
+          <Text style={styles.muted}>{Math.round(ing.grams)} g</Text>
+        </View>
+      ))}
+      {source && !mine ? <SaveLine label="Save to my foods" savedLabel="Saved: it's under Your foods when you log food" color="#ea580c"
+        onSave={() => foodAPI.save({ foodId: food._id, ...source })} /> : null}
     </View>
   );
 }
@@ -280,6 +358,8 @@ export function PostCard({ post, me, following, requested, onFollow, onLike, onU
       ) : post.caption ? <Text style={styles.caption}>{post.caption}</Text> : null}
       {post.workoutSession ? <View style={{ marginTop: 8 }}><WorkoutSummary workout={post.workoutSession} source={{ postId: post._id }} /></View> : null}
       {post.workoutPlan ? <View style={{ marginTop: 8 }}><PlanSummary plan={post.workoutPlan} source={{ postId: post._id }} /></View> : null}
+      {post.exercise ? <View style={{ marginTop: 8 }}><SharedExercise exercise={post.exercise} me={me} source={{ postId: post._id }} /></View> : null}
+      {post.food ? <View style={{ marginTop: 8 }}><SharedFood food={post.food} me={me} source={{ postId: post._id }} /></View> : null}
       {post.image ? <Image source={{ uri: uploadUrl(post.image) }} style={styles.postImage} resizeMode="cover" /> : null}
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => (liked ? onUnlike(post._id) : onLike(post._id))} style={styles.row} hitSlop={6}>
@@ -327,6 +407,10 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
   const [workoutId, setWorkoutId] = useState(initialWorkout?._id || '');
   const [plans, setPlans] = useState([]);
   const [planId, setPlanId] = useState('');
+  const [myExercises, setMyExercises] = useState([]);
+  const [exerciseId, setExerciseId] = useState('');
+  const [myFoods, setMyFoods] = useState([]);
+  const [foodId, setFoodId] = useState('');
   const [photo, setPhoto] = useState(null); // { uri, mimeType }
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
@@ -337,6 +421,8 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
       setWorkouts(initialWorkout && !list.some((w) => w._id === initialWorkout._id) ? [initialWorkout, ...list] : list);
     }).catch(() => {});
     planAPI.getAll().then(({ data }) => setPlans(data)).catch(() => {});
+    exerciseAPI.getAll().then(({ data }) => setMyExercises(data.filter((e) => e.isCustom && String(e.createdBy) === String(me?._id)))).catch(() => {});
+    foodAPI.mine().then(({ data }) => setMyFoods(data)).catch(() => {});
   }, []);
 
   const pickPhoto = async () => {
@@ -352,7 +438,9 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
 
   const selected = workouts.find((w) => w._id === workoutId);
   const selectedPlan = plans.find((p) => p._id === planId);
-  const canPost = caption.trim() || workoutId || planId || photo;
+  const selectedExercise = myExercises.find((e) => e._id === exerciseId);
+  const selectedFood = myFoods.find((f) => f._id === foodId);
+  const canPost = caption.trim() || workoutId || planId || exerciseId || foodId || photo;
 
   const submit = async () => {
     if (!canPost) return;
@@ -363,6 +451,8 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
       form.append('caption', caption.trim());
       if (workoutId) form.append('workoutSession', workoutId);
       if (planId) form.append('workoutPlan', planId);
+      if (exerciseId) form.append('exercise', exerciseId);
+      if (foodId) form.append('food', foodId);
       if (photo) {
         const type = photo.mimeType || 'image/jpeg';
         form.append('image', { uri: photo.uri, name: `photo.${type.split('/')[1] || 'jpg'}`, type });
@@ -400,6 +490,30 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
             </ChipRow>
           </ScrollView>
           {selectedPlan ? <View style={{ marginTop: 8 }}><PlanSummary plan={selectedPlan} /></View> : null}
+        </>
+      ) : null}
+      {myExercises.length > 0 ? (
+        <>
+          <View style={[styles.row, { marginTop: 10, marginBottom: 6, gap: 6 }]}><Dumbbell size={14} color={colors.textMuted} /><Text style={styles.muted}>Share one of your exercises</Text></View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ChipRow style={{ flexWrap: 'nowrap', gap: 6 }}>
+              <Chip small label="None" active={!exerciseId} onPress={() => setExerciseId('')} />
+              {myExercises.map((e) => <Chip key={e._id} small label={e.name} active={exerciseId === e._id} onPress={() => setExerciseId(e._id)} />)}
+            </ChipRow>
+          </ScrollView>
+          {selectedExercise ? <View style={{ marginTop: 8 }}><SharedExercise exercise={selectedExercise} me={me} /></View> : null}
+        </>
+      ) : null}
+      {myFoods.length > 0 ? (
+        <>
+          <View style={[styles.row, { marginTop: 10, marginBottom: 6, gap: 6 }]}><Utensils size={14} color={colors.textMuted} /><Text style={styles.muted}>Share a food or recipe</Text></View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ChipRow style={{ flexWrap: 'nowrap', gap: 6 }}>
+              <Chip small label="None" active={!foodId} onPress={() => setFoodId('')} />
+              {myFoods.map((f) => <Chip key={f._id} small label={f.name} active={foodId === f._id} onPress={() => setFoodId(f._id)} />)}
+            </ChipRow>
+          </ScrollView>
+          {selectedFood ? <View style={{ marginTop: 8 }}><SharedFood food={selectedFood} me={me} /></View> : null}
         </>
       ) : null}
       {photo ? (
@@ -740,11 +854,17 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
   // The attach panel: recent workouts and your plans (a plan is sent whole).
   const toggleWorkouts = async () => {
     if (workouts) { setWorkouts(null); return; }
-    const [w, p] = await Promise.all([
+    const [w, p, ex, fd] = await Promise.all([
       workoutAPI.getAll({ limit: 10 }).catch(() => ({ data: {} })),
       planAPI.getAll().catch(() => ({ data: [] })),
+      exerciseAPI.getAll().catch(() => ({ data: [] })),
+      foodAPI.mine().catch(() => ({ data: [] })),
     ]);
-    setWorkouts({ workouts: w.data.workouts || [], plans: p.data || [] });
+    setWorkouts({
+      workouts: w.data.workouts || [], plans: p.data || [],
+      exercises: (ex.data || []).filter((e) => e.isCustom && String(e.createdBy) === String(me._id)),
+      foods: fd.data || [],
+    });
   };
   // A group change (rename, new people) adds a note to the chat: reload it.
   const groupChanged = (updated) => { setConvo(updated); setShowMenu(false); load(); onActivity(); };
@@ -795,6 +915,8 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
               ) : null}
               {m.workoutSession ? <View style={{ width: 260 }}><WorkoutSummary workout={m.workoutSession} source={{ messageId: m._id }} /></View> : null}
               {m.workoutPlan ? <View style={{ width: 260 }}><PlanSummary plan={m.workoutPlan} source={{ messageId: m._id }} /></View> : null}
+              {m.exercise ? <View style={{ width: 260 }}><SharedExercise exercise={m.exercise} me={me} source={{ messageId: m._id }} /></View> : null}
+              {m.food ? <View style={{ width: 260 }}><SharedFood food={m.food} me={me} source={{ messageId: m._id }} /></View> : null}
               {m.text ? <Text style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>{m.text}</Text> : null}
               <Text style={styles.tiny}>
                 {format(new Date(m.createdAt), isToday(new Date(m.createdAt)) ? 'HH:mm' : 'MMM d, HH:mm')}
@@ -819,6 +941,18 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
             {workouts.plans.map((p) => (
               <TouchableOpacity key={p._id} disabled={sending} onPress={() => send({ workoutPlan: p._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
                 <Text style={styles.small}>{p.name} <Text style={styles.muted}>· {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</Text></Text>
+              </TouchableOpacity>
+            ))}
+            {workouts.exercises.length > 0 ? <Hint style={{ marginTop: 6 }}>Share one of your exercises</Hint> : null}
+            {workouts.exercises.map((e) => (
+              <TouchableOpacity key={e._id} disabled={sending} onPress={() => send({ exercise: e._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
+                <Text style={styles.small}>{e.name}</Text>
+              </TouchableOpacity>
+            ))}
+            {workouts.foods.length > 0 ? <Hint style={{ marginTop: 6 }}>Share a food or recipe</Hint> : null}
+            {workouts.foods.map((f) => (
+              <TouchableOpacity key={f._id} disabled={sending} onPress={() => send({ food: f._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
+                <Text style={styles.small}>{f.name} <Text style={styles.muted}>· {f.ingredients?.length ? 'recipe' : 'food'}</Text></Text>
               </TouchableOpacity>
             ))}
           </ScrollView>

@@ -98,3 +98,22 @@ exports.deleteExercise = async (req, res, next) => {
     next(err);
   }
 };
+
+// POST /api/exercises/from-shared { exerciseId, postId?, messageId? }
+// Save a custom exercise someone shared (in a post you can see or a message in
+// your chats) to your own exercises. Your own one with the same name is reused.
+exports.saveSharedExercise = async (req, res, next) => {
+  try {
+    const { usableExercise, canSeeShared } = require('../utils/sharing');
+    const me = String(req.user.id);
+    const { exerciseId, postId, messageId } = req.body;
+    const source = await Exercise.findById(exerciseId).lean();
+    const allowed = source && (String(source.createdBy) === me || !source.isCustom
+      || await canSeeShared(me, { postId, messageId, field: 'exercise', id: exerciseId }));
+    if (!allowed) return res.status(404).json({ message: 'Exercise not found' });
+    const mine = await usableExercise(source, me);
+    res.status(201).json(mine);
+  } catch (err) {
+    next(err);
+  }
+};

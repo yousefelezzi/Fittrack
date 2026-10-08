@@ -144,6 +144,8 @@ export const exerciseAPI = {
   create:  (data)        => api.post('/exercises', data),
   update:  (id, data)    => api.put(`/exercises/${id}`, data),
   delete:  (id)          => api.delete(`/exercises/${id}`),
+  // Save a custom exercise shared with you: { exerciseId, postId } or { exerciseId, messageId }.
+  fromShared: (body) => api.post('/exercises/from-shared', body),
 };
 
 // ── Workouts ──────────────────────────────────────────────────────────────────
@@ -224,6 +226,10 @@ export const foodAPI = {
   getById: (id)            => api.get(`/foods/${id}`),
   create:  (data)          => api.post('/foods', data),
   update:  (id, data)      => api.put(`/foods/${id}`, data),
+  // Your custom foods and recipes, plus ones you saved from posts and messages.
+  mine:    ()             => api.get('/foods/mine'),
+  save:    (body)         => api.post('/foods/saved', body), // { foodId, postId } or { foodId, messageId }
+  unsave:  (id)           => api.delete(`/foods/saved/${id}`),
 };
 
 // ── Steps ─────────────────────────────────────────────────────────────────────

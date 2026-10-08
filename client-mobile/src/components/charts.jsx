@@ -101,19 +101,20 @@ export function LineChart({ data, series, height = 160 }) {
             )}
           </Svg>
         )}
-        <Text style={[styles.yLabel, { top: -6 }]}>{shortNum(max)}</Text>
-        <Text style={[styles.yLabel, { top: height - 8 }]}>{shortNum(min)}</Text>
+        {/* Both y labels sit inside the chart so they don't overlap the dates below. */}
+        <Text style={[styles.yLabel, { top: 0 }]}>{shortNum(max)}</Text>
+        <Text style={[styles.yLabel, { top: height - 14 }]}>{shortNum(min)}</Text>
       </View>
       <View style={styles.xAxis}>
-        <Text style={styles.axis}>{data[0]?.label}</Text>
-        {data.length > 1 ? <Text style={styles.axis}>{data[data.length - 1]?.label}</Text> : null}
+        <Text style={styles.lineAxis}>{data[0]?.label}</Text>
+        {data.length > 1 ? <Text style={styles.lineAxis}>{data[data.length - 1]?.label}</Text> : null}
       </View>
       <View style={styles.legend}>
-        {active != null ? <Text style={[styles.axis, { color: colors.textPrimary }]}>{data[active].label}: </Text> : null}
+        {active != null ? <Text style={[styles.lineAxis, { color: colors.textPrimary }]}>{data[active].label}: </Text> : null}
         {series.map((s) => (
           <View key={s.key} style={styles.legendItem}>
             <View style={[styles.dot, { backgroundColor: s.color }]} />
-            <Text style={styles.axis}>{s.label}{active != null && Number.isFinite(data[active][s.key]) ? ` ${data[active][s.key]}` : ''}</Text>
+            <Text style={styles.lineAxis}>{s.label}{active != null && Number.isFinite(data[active][s.key]) ? ` ${data[active][s.key]}` : ''}</Text>
           </View>
         ))}
       </View>
@@ -149,8 +150,10 @@ const styles = makeStyles(() => ({
   goalLine:   { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed', borderColor: colors.success },
   axis:       { fontSize: 10, color: colors.textMuted, height: LABEL_H, lineHeight: LABEL_H, textTransform: 'capitalize' },
   yLabel:     { position: 'absolute', left: 0, fontSize: 9, color: colors.textMuted },
-  xAxis:      { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 34, marginTop: 2 },
-  legend:     { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 4 },
+  // Line chart labels size to their text (a fixed height cut them off with larger phone text sizes).
+  lineAxis:   { fontSize: 11, lineHeight: 15, color: colors.textMuted },
+  xAxis:      { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 34, marginTop: 6 },
+  legend:     { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 4, marginTop: 8, paddingBottom: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot:        { width: 8, height: 8, borderRadius: 4 },
   hRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },

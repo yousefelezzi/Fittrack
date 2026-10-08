@@ -24,6 +24,8 @@ const userSchema = new mongoose.Schema(
     heightUnit: { type: String, enum: ['cm', 'ft'], default: 'cm' }, // ft = feet and inches
     // Correct the calorie goal from the last two weeks' weight trend and intake (utils/adaptiveCalories.js).
     adaptiveCalories: { type: Boolean, default: true },
+    // Custom foods and recipes saved from posts and messages (shown with your own in food search).
+    savedFoods: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Food' }],
     // Which profile stats other users can see. Everything is private by default.
     statsVisibility: {
       avgCalories: { type: Boolean, default: false },

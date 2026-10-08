@@ -57,6 +57,8 @@ const foodSchema = new mongoose.Schema(
       grams: { type: Number },
     }],
     category: { type: String, default: 'general' },
+    // Who made a custom food or recipe (null for the built-in database).
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     source:   { type: String, default: 'usda' },
     fdcId:    { type: String, default: '' },
     // Present only on user-built "recipe" foods — a custom food composed of

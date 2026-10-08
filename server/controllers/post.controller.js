@@ -28,6 +28,8 @@ const populatePost = (query) =>
       select: 'name description schedule rotation days',
       populate: { path: 'days.exercises.exercise', select: 'name images type laterality' },
     })
+    .populate('exercise', 'name muscleGroups secondaryMuscles equipment laterality type category images instructions isCustom createdBy')
+    .populate('food', 'name brand per100g servings ingredients numServings category source createdBy')
     .populate('comments.user', 'name avatar');
 
 // GET /api/posts/feed?scope=following|discover&page=1&limit=10
@@ -116,7 +118,23 @@ exports.createPost = async (req, res, next) => {
       if (!plan) return res.status(400).json({ message: 'Plan not found' });
       workoutPlan = plan._id;
     }
-    if (!caption && !workoutSession && !workoutPlan && !req.file) {
+    // One of your custom exercises, or a custom food / recipe (yours or saved).
+    let exercise = null;
+    if (req.body.exercise) {
+      const Exercise = require('../models/Exercise');
+      const ex = mongoose.isValidObjectId(req.body.exercise)
+        ? await Exercise.findOne({ _id: req.body.exercise, isCustom: true, createdBy: req.user.id }).select('_id') : null;
+      if (!ex) return res.status(400).json({ message: 'Exercise not found' });
+      exercise = ex._id;
+    }
+    let food = null;
+    if (req.body.food) {
+      const Food = require('../models/Food');
+      const f = mongoose.isValidObjectId(req.body.food) ? await Food.findOne({ _id: req.body.food, source: 'custom' }).select('_id') : null;
+      if (!f) return res.status(400).json({ message: 'Food not found' });
+      food = f._id;
+    }
+    if (!caption && !workoutSession && !workoutPlan && !exercise && !food && !req.file) {
       return res.status(400).json({ message: 'Add some text, a photo, a workout or a plan' });
     }
     const post = await Post.create({
@@ -124,6 +142,8 @@ exports.createPost = async (req, res, next) => {
       caption,
       workoutSession,
       workoutPlan,
+      exercise,
+      food,
       image: req.file ? `/uploads/${req.file.filename}` : '',
     });
     res.status(201).json(await populatePost(Post.findById(post._id)));
@@ -220,7 +240,7 @@ exports.editPost = async (req, res, next) => {
     if (!post) return res.status(404).json({ message: 'Post not found' });
     const caption = String(req.body.caption ?? '').trim();
     // A post needs something in it: text, a workout or a photo.
-    if (!caption && !post.workoutSession && !post.workoutPlan && !post.image) return res.status(400).json({ message: 'A post needs some text' });
+    if (!caption && !post.workoutSession && !post.workoutPlan && !post.exercise && !post.food && !post.image) return res.status(400).json({ message: 'A post needs some text' });
     post.caption = caption;
     post.editedAt = new Date();
     await post.save();

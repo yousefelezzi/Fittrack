@@ -67,7 +67,9 @@ export function FoodSearch({ onSelect, autoFocus }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [mine, setMine] = useState([]); // your custom foods/recipes and saved ones
   const timer = useRef(null);
+  useEffect(() => { foodAPI.mine().then(({ data }) => setMine(data)).catch(() => {}); }, []);
 
   const search = useCallback(async (q) => {
     if (!q.trim()) { setResults([]); return; }
@@ -87,6 +89,20 @@ export function FoodSearch({ onSelect, autoFocus }) {
     <View>
       <TextInput style={styles.field} placeholder="Search food database…" placeholderTextColor={colors.textMuted}
         value={query} onChangeText={setQuery} autoCorrect={false} autoFocus={autoFocus} />
+      {/* Before typing: your own and saved foods and recipes. */}
+      {query.length === 0 && mine.length > 0 ? (
+        <View style={styles.results}>
+          <Text style={[styles.hintText, { paddingHorizontal: 12, paddingTop: 8, fontWeight: '700' }]}>YOUR FOODS</Text>
+          {mine.map((food) => (
+            <TouchableOpacity key={food._id} style={styles.resultRow} onPress={() => onSelect(food)}>
+              <Text style={styles.name} numberOfLines={1}>
+                {food.name}<Text style={styles.hintText}>  {food.ingredients?.length ? 'recipe' : 'custom'}{food.saved && !food.mine ? ' · saved' : ''}</Text>
+              </Text>
+              <Text style={styles.hintText}>per 100g — {food.per100g.calories} kcal · P {food.per100g.protein}g · C {food.per100g.carbs}g · F {food.per100g.fat}g</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
       {query.length > 0 && (
         <View style={styles.results}>
           {loading && <Text style={styles.empty}>Searching…</Text>}

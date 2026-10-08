@@ -83,7 +83,7 @@ export default function WeightScreen() {
         <Text style={styles.title}>Trend</Text>
         <Segmented value={days} onChange={setDays} options={RANGES} style={{ marginBottom: 10 }} />
         {!data ? <Hint>Loading…</Hint> : series.every((p) => p.average == null) ? <Hint>Log your first weigh-in to see your trend.</Hint> : (
-          <LineChart data={series} height={170} series={[
+          <LineChart data={series} height={220} series={[
             { key: 'average', label: '7-day average', color: colors.brand },
             { key: 'weight', label: 'Weigh-ins', color: '#94a3b8', dots: true, line: false },
           ]} />

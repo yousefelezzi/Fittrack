@@ -244,6 +244,7 @@ exports.create = async (req, res, next) => {
       servings: finalServings,
       category: finalCategory,
       source:   'custom',
+      createdBy: req.user.id,
       ...(ingredientDocs && { ingredients: ingredientDocs, ...recipeFields }),
       ...(!isRecipe && cookingFields(req.body)),
     });
@@ -330,6 +331,49 @@ exports.update = async (req, res, next) => {
 
     await existing.save();
     res.json(existing);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/foods/mine — the custom foods and recipes you made or saved, newest first
+exports.getMine = async (req, res, next) => {
+  try {
+    const User = require('../models/User');
+    const me = await User.findById(req.user.id).select('savedFoods').lean();
+    const saved = (me?.savedFoods || []).map(String);
+    const foods = await Food.find({ source: 'custom', $or: [{ createdBy: req.user.id }, { _id: { $in: saved } }] })
+      .sort({ createdAt: -1 }).limit(100).lean();
+    res.json(foods.map((f) => ({ ...f, saved: saved.includes(String(f._id)), mine: String(f.createdBy) === String(req.user.id) })));
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/foods/saved { foodId, postId?, messageId? } — save a custom food or
+// recipe someone shared with you (in a post you can see or a message in your chats).
+exports.saveFood = async (req, res, next) => {
+  try {
+    const User = require('../models/User');
+    const { canSeeShared } = require('../utils/sharing');
+    const { foodId, postId, messageId } = req.body;
+    const food = await Food.findOne({ _id: foodId, source: 'custom' }).select('_id createdBy').lean();
+    const allowed = food && (String(food.createdBy) === String(req.user.id)
+      || await canSeeShared(String(req.user.id), { postId, messageId, field: 'food', id: foodId }));
+    if (!allowed) return res.status(404).json({ message: 'Food not found' });
+    await User.updateOne({ _id: req.user.id }, { $addToSet: { savedFoods: food._id } });
+    res.status(201).json({ saved: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/foods/saved/:id — remove a food from your saved foods
+exports.unsaveFood = async (req, res, next) => {
+  try {
+    const User = require('../models/User');
+    await User.updateOne({ _id: req.user.id }, { $pull: { savedFoods: req.params.id } });
+    res.json({ saved: false });
   } catch (err) {
     next(err);
   }

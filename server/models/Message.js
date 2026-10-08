@@ -9,6 +9,9 @@ const messageSchema = new mongoose.Schema(
     workoutSession: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutSession', default: null },
     // Or a whole workout plan.
     workoutPlan: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkoutPlan', default: null },
+    // Or a custom exercise, or a custom food / recipe.
+    exercise: { type: mongoose.Schema.Types.ObjectId, ref: 'Exercise', default: null },
+    food: { type: mongoose.Schema.Types.ObjectId, ref: 'Food', default: null },
     readAt: { type: Date, default: null }, // one-to-one: when the other person read it
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // groups: who has read it
     // "Sam created the group", "Alex left" — shown as a note, not a bubble.

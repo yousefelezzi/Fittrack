@@ -19,6 +19,8 @@ router.post(
     body('text').optional().isString().isLength({ max: 2000 }).withMessage('Message too long (max 2000 characters)'),
     body('workoutSession').optional({ nullable: true }).isMongoId().withMessage('Invalid workout'),
     body('workoutPlan').optional({ nullable: true }).isMongoId().withMessage('Invalid plan'),
+    body('exercise').optional({ nullable: true }).isMongoId().withMessage('Invalid exercise'),
+    body('food').optional({ nullable: true }).isMongoId().withMessage('Invalid food'),
   ],
   validate,
   sendMessage

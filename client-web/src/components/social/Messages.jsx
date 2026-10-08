@@ -5,7 +5,8 @@ import { ArrowLeft, Send, Dumbbell, Users, UserPlus, Pencil, LogOut, Check, Hand
 import Avatar from '../Avatar';
 import WorkoutSummary from './WorkoutSummary';
 import PlanSummary from './PlanSummary';
-import { messageAPI, workoutAPI, userAPI, planAPI } from '../../api';
+import { SharedExercise, SharedFood } from './SharedItems';
+import { messageAPI, workoutAPI, userAPI, planAPI, exerciseAPI, foodAPI } from '../../api';
 
 const POLL_MS = 5000; // new messages show up within a few seconds
 
@@ -236,11 +237,17 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
   // The attach panel: recent workouts and your plans (a plan is sent whole).
   const openWorkouts = async () => {
     if (workouts) { setWorkouts(null); return; }
-    const [w, p] = await Promise.all([
+    const [w, p, ex, fd] = await Promise.all([
       workoutAPI.getAll({ limit: 10 }).catch(() => ({ data: {} })),
       planAPI.getAll().catch(() => ({ data: [] })),
+      exerciseAPI.getAll().catch(() => ({ data: [] })),
+      foodAPI.mine().catch(() => ({ data: [] })),
     ]);
-    setWorkouts({ workouts: w.data.workouts || [], plans: p.data || [] });
+    setWorkouts({
+      workouts: w.data.workouts || [], plans: p.data || [],
+      exercises: (ex.data || []).filter((e) => e.isCustom && String(e.createdBy) === String(me._id)),
+      foods: fd.data || [],
+    });
   };
 
   // A group change (rename, new people) adds a note to the chat: reload it.
@@ -291,6 +298,8 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
                 {showName && <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 px-1">{sender?.name ?? 'Former member'}</p>}
                 {m.workoutSession && <div className="w-64"><WorkoutSummary workout={m.workoutSession} source={{ messageId: m._id }} /></div>}
                 {m.workoutPlan && <div className="w-64"><PlanSummary plan={m.workoutPlan} source={{ messageId: m._id }} /></div>}
+                {m.exercise && <div className="w-64"><SharedExercise exercise={m.exercise} source={{ messageId: m._id }} /></div>}
+                {m.food && <div className="w-64"><SharedFood food={m.food} source={{ messageId: m._id }} /></div>}
                 {m.text && (
                   <p className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-line break-words ${mine
                     ? 'bg-brand-600 text-white rounded-br-md' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'}`}>
@@ -324,6 +333,20 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
             <button key={p._id} onClick={() => send({ workoutPlan: p._id, text: text.trim() || undefined })} disabled={sending}
               className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
               {p.name} <span className="text-xs text-gray-400">· {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</span>
+            </button>
+          ))}
+          {workouts.exercises.length > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">Share one of your exercises</p>}
+          {workouts.exercises.map((e) => (
+            <button key={e._id} onClick={() => send({ exercise: e._id, text: text.trim() || undefined })} disabled={sending}
+              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
+              {e.name}
+            </button>
+          ))}
+          {workouts.foods.length > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">Share a food or recipe</p>}
+          {workouts.foods.map((f) => (
+            <button key={f._id} onClick={() => send({ food: f._id, text: text.trim() || undefined })} disabled={sending}
+              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
+              {f.name} <span className="text-xs text-gray-400">· {f.ingredients?.length ? 'recipe' : 'food'}</span>
             </button>
           ))}
         </div>

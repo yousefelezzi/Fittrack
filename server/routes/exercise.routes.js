@@ -8,12 +8,18 @@ const {
   getExerciseById,
   createCustomExercise,
   updateExercise,
-  deleteExercise,
+  deleteExercise, saveSharedExercise,
   getSimilarExercises,
 } = require('../controllers/exercise.controller');
 
 // GET /api/exercises?muscle=pecs&equipment=barbell&search=bench
 router.get('/', protect, getAllExercises);
+// Save a custom exercise shared with you in a post or message.
+router.post('/from-shared', protect, [
+  body('exerciseId').isMongoId().withMessage('Invalid exercise'),
+  body('postId').optional().isMongoId().withMessage('Invalid post'),
+  body('messageId').optional().isMongoId().withMessage('Invalid message'),
+], validate, saveSharedExercise);
 router.get('/:id/similar', protect, getSimilarExercises);
 router.get('/:id', protect, getExerciseById);
 

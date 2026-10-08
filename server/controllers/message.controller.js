@@ -19,7 +19,11 @@ const planPopulate = {
   select: 'name description schedule rotation days',
   populate: { path: 'days.exercises.exercise', select: 'name images type laterality' },
 };
-const attachments = [workoutPopulate, planPopulate];
+const attachments = [
+  workoutPopulate, planPopulate,
+  { path: 'exercise', select: 'name muscleGroups secondaryMuscles equipment laterality type category images instructions isCustom createdBy' },
+  { path: 'food', select: 'name brand per100g servings ingredients numServings category source createdBy' },
+];
 
 // A conversation the current user is part of, or null.
 const myConversation = (id, userId) =>
@@ -279,10 +283,26 @@ exports.sendMessage = async (req, res, next) => {
       if (!plan) return res.status(400).json({ message: 'Plan not found' });
       workoutPlan = plan._id;
     }
-    if (!text && !workoutSession && !workoutPlan) return res.status(400).json({ message: 'Message is empty' });
+    // One of your custom exercises, or a custom food / recipe.
+    let exercise = null;
+    if (req.body.exercise) {
+      const Exercise = require('../models/Exercise');
+      const ex = isId(req.body.exercise) ? await Exercise.findOne({ _id: req.body.exercise, isCustom: true, createdBy: me }).select('_id') : null;
+      if (!ex) return res.status(400).json({ message: 'Exercise not found' });
+      exercise = ex._id;
+    }
+    let food = null;
+    if (req.body.food) {
+      const Food = require('../models/Food');
+      const f = isId(req.body.food) ? await Food.findOne({ _id: req.body.food, source: 'custom' }).select('_id ingredients') : null;
+      if (!f) return res.status(400).json({ message: 'Food not found' });
+      food = f;
+    }
+    if (!text && !workoutSession && !workoutPlan && !exercise && !food) return res.status(400).json({ message: 'Message is empty' });
 
-    const message = await Message.create({ conversation: convo._id, sender: me, text, workoutSession, workoutPlan, readBy: [me] });
-    convo.lastMessage = { text: text || (workoutPlan ? 'Shared a plan' : 'Shared a workout'), sender: me, sentAt: message.createdAt };
+    const message = await Message.create({ conversation: convo._id, sender: me, text, workoutSession, workoutPlan, exercise, food: food?._id ?? null, readBy: [me] });
+    const shared = workoutPlan ? 'Shared a plan' : exercise ? 'Shared an exercise' : food ? (food.ingredients?.length ? 'Shared a recipe' : 'Shared a food') : 'Shared a workout';
+    convo.lastMessage = { text: text || shared, sender: me, sentAt: message.createdAt };
     await convo.save();
     await message.populate(attachments);
     res.status(201).json(message);

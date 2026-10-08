@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { ImagePlus, X, Dumbbell, ClipboardList } from 'lucide-react';
+import { ImagePlus, X, Dumbbell, ClipboardList, Utensils } from 'lucide-react';
 import Avatar from '../Avatar';
 import WorkoutSummary from './WorkoutSummary';
 import PlanSummary from './PlanSummary';
-import { postAPI, workoutAPI, planAPI } from '../../api';
+import { SharedExercise, SharedFood } from './SharedItems';
+import { postAPI, workoutAPI, planAPI, exerciseAPI, foodAPI } from '../../api';
 
 /** New post: text, an optional workout from your history and/or one of your plans, and an optional photo. */
 export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
@@ -13,6 +14,10 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
   const [workoutId, setWorkoutId] = useState(initialWorkoutId || '');
   const [plans, setPlans] = useState([]);
   const [planId, setPlanId] = useState('');
+  const [myExercises, setMyExercises] = useState([]);
+  const [exerciseId, setExerciseId] = useState('');
+  const [myFoods, setMyFoods] = useState([]);
+  const [foodId, setFoodId] = useState('');
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState('');
   const [posting, setPosting] = useState(false);
@@ -22,6 +27,8 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
   useEffect(() => {
     workoutAPI.getAll({ limit: 15 }).then(({ data }) => setWorkouts(data.workouts || [])).catch(() => setWorkouts([]));
     planAPI.getAll().then(({ data }) => setPlans(data)).catch(() => setPlans([]));
+    exerciseAPI.getAll().then(({ data }) => setMyExercises(data.filter((e) => e.isCustom && String(e.createdBy) === String(me?._id)))).catch(() => {});
+    foodAPI.mine().then(({ data }) => setMyFoods(data)).catch(() => {});
   }, []);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -36,7 +43,9 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
 
   const selected = workouts.find((w) => w._id === workoutId);
   const selectedPlan = plans.find((p) => p._id === planId);
-  const canPost = caption.trim() || workoutId || planId || photo;
+  const selectedExercise = myExercises.find((e) => e._id === exerciseId);
+  const selectedFood = myFoods.find((f) => f._id === foodId);
+  const canPost = caption.trim() || workoutId || planId || exerciseId || foodId || photo;
 
   const submit = async () => {
     if (!canPost) return;
@@ -47,6 +56,8 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
       form.append('caption', caption.trim());
       if (workoutId) form.append('workoutSession', workoutId);
       if (planId) form.append('workoutPlan', planId);
+      if (exerciseId) form.append('exercise', exerciseId);
+      if (foodId) form.append('food', foodId);
       if (photo) form.append('image', photo);
       const { data } = await postAPI.create(form);
       onPosted(data);
@@ -92,6 +103,31 @@ export default function Composer({ me, initialWorkoutId, onPosted, onCancel }) {
           {selectedPlan && <div className="mt-2"><PlanSummary plan={selectedPlan} /></div>}
         </div>
       )}
+
+      {(myExercises.length > 0 || myFoods.length > 0) && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          {myExercises.length > 0 && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><Dumbbell size={13} /> Share one of your exercises</label>
+              <select className="input text-sm" value={exerciseId} onChange={(e) => setExerciseId(e.target.value)}>
+                <option value="">None</option>
+                {myExercises.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
+              </select>
+            </div>
+          )}
+          {myFoods.length > 0 && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><Utensils size={13} /> Share a food or recipe</label>
+              <select className="input text-sm" value={foodId} onChange={(e) => setFoodId(e.target.value)}>
+                <option value="">None</option>
+                {myFoods.map((f) => <option key={f._id} value={f._id}>{f.name}{f.ingredients?.length ? ' (recipe)' : ''}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+      {selectedExercise && <SharedExercise exercise={selectedExercise} />}
+      {selectedFood && <SharedFood food={selectedFood} />}
 
       {preview ? (
         <div className="relative">

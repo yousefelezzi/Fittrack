@@ -362,6 +362,23 @@ const migrations = [
       return `${res.modifiedCount} exercise(s) updated`;
     },
   },
+  {
+    // Custom foods now remember who made them. Older ones didn't, so credit
+    // each to whoever logged it first (it's then listed under "Your foods").
+    name: '2026-10-custom-foods-created-by',
+    async up(db) {
+      const foods = await db.collection('foods').find({ source: 'custom', createdBy: { $in: [null, undefined] } }, { projection: { _id: 1 } }).toArray();
+      let n = 0;
+      for (const f of foods) {
+        const log = await db.collection('nutritionlogs').find({ $or: [{ 'meals.food': f._id }, { 'meals.ingredients.food': f._id }] })
+          .sort({ date: 1 }).limit(1).project({ user: 1 }).next();
+        if (!log) continue;
+        await db.collection('foods').updateOne({ _id: f._id }, { $set: { createdBy: log.user } });
+        n++;
+      }
+      return `${n} of ${foods.length} custom food(s) credited`;
+    },
+  },
 ];
 
 async function runMigrations() {

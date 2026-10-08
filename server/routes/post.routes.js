@@ -31,6 +31,8 @@ router.post(
     body('caption').optional().trim().isLength({ max: 500 }).withMessage('Caption too long'),
     body('workoutSession').optional().isMongoId().withMessage('Invalid workout session ID'),
     body('workoutPlan').optional().isMongoId().withMessage('Invalid plan'),
+    body('exercise').optional().isMongoId().withMessage('Invalid exercise'),
+    body('food').optional().isMongoId().withMessage('Invalid food'),
   ],
   validate,
   createPost
