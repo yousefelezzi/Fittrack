@@ -64,7 +64,7 @@ export function weightSeries(entries = [], before = null, days = 90, today = new
     out.push({
       date: key,
       weight: logged.get(key) ?? null,
-      average: window.length ? round1(window.reduce((a, b) => a + b, 0) / window.length) : null,
+      average: window.length ? Math.round((window.reduce((a, b) => a + b, 0) / window.length) * 100) / 100 : null,
     });
   }
   return out;

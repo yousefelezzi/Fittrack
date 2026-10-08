@@ -85,7 +85,7 @@ export default function WeightScreen() {
         {!data ? <Hint>Loading…</Hint> : series.every((p) => p.average == null) ? <Hint>Log your first weigh-in to see your trend.</Hint> : (
           <LineChart data={series} height={170} series={[
             { key: 'average', label: '7-day average', color: colors.brand },
-            { key: 'weight', label: 'Weigh-ins', color: '#94a3b8' },
+            { key: 'weight', label: 'Weigh-ins', color: '#94a3b8', dots: true, line: false },
           ]} />
         )}
       </Card>

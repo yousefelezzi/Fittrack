@@ -9,7 +9,8 @@ const User = require('../models/User');
 
 const DAY = 86400000;
 const dayStart = (d) => { const x = new Date(d); x.setUTCHours(0, 0, 0, 0); return x; };
-const round1 = (n) => Math.round(n * 10) / 10;
+// Two decimals, so a weight typed in lb comes back the same (150 lb = 68.04 kg, not 68.0 = 149.9 lb).
+const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
  * 7-day average ending on `asOf`. `entries` are { date, weight } sorted by date,
@@ -25,7 +26,7 @@ function weeklyAverage(entries, asOf) {
     }
     if (latest) values.push(latest.weight);
   }
-  return values.length ? round1(values.reduce((a, b) => a + b, 0) / values.length) : null;
+  return values.length ? round2(values.reduce((a, b) => a + b, 0) / values.length) : null;
 }
 
 /** The weigh-ins the 7-day average ending on `asOf` needs. */

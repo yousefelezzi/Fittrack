@@ -41,12 +41,15 @@ export function BarChart({ data, height = 140, goal, onPress, selectedKey, color
 }
 
 /**
- * Line chart. data: [{ label, [seriesKey]: number }]; series: [{ key, label, color }].
+ * Line chart. data: [{ label, [seriesKey]: number }]; series: [{ key, label, color, dots?, line? }]
+ * (dots: draw each point; line: false for dots only).
  * Tap anywhere on the chart to read the nearest point's values.
  */
 export function LineChart({ data, series, height = 160 }) {
   const [width, setWidth] = useState(0);
-  const [active, setActive] = useState(null);
+  const [tapped, setActive] = useState(null);
+  // The tapped point, if it's still in the data (switching ranges can shorten it).
+  const active = tapped != null && tapped < data.length ? tapped : null;
   const values = data.flatMap((d) => series.map((s) => d[s.key])).filter((v) => Number.isFinite(v));
   if (!values.length) return null;
   const lo = Math.min(...values);
@@ -55,12 +58,14 @@ export function LineChart({ data, series, height = 160 }) {
   const min = Math.max(0, lo - pad);
   const max = hi + pad;
   const AXIS_W = 34;
-  const plotW = Math.max(0, width - AXIS_W);
-  const x = (i) => AXIS_W + (data.length === 1 ? plotW / 2 : (i / (data.length - 1)) * plotW);
-  const y = (v) => height - ((v - min) / (max - min)) * height;
+  // Points stay INSET inside the edges so dots at the ends aren't cut off.
+  const INSET = 5;
+  const plotW = Math.max(0, width - AXIS_W - INSET * 2);
+  const x = (i) => AXIS_W + INSET + (data.length === 1 ? plotW / 2 : (i / (data.length - 1)) * plotW);
+  const y = (v) => height - INSET - ((v - min) / (max - min)) * (height - INSET * 2);
   const pick = (px) => {
     if (!data.length || plotW <= 0) return;
-    const i = data.length === 1 ? 0 : Math.round(((px - AXIS_W) / plotW) * (data.length - 1));
+    const i = data.length === 1 ? 0 : Math.round(((px - AXIS_W - INSET) / plotW) * (data.length - 1));
     setActive(Math.min(data.length - 1, Math.max(0, i)));
   };
 
@@ -76,8 +81,15 @@ export function LineChart({ data, series, height = 160 }) {
               <SvgLine key={f} x1={AXIS_W} x2={width} y1={height * f} y2={height * f} stroke={colors.border} strokeDasharray="3,3" />
             ))}
             {series.map((s) => {
-              const pts = data.map((d, i) => (Number.isFinite(d[s.key]) ? `${x(i)},${y(d[s.key])}` : null)).filter(Boolean);
-              return <Polyline key={s.key} points={pts.join(' ')} fill="none" stroke={s.color} strokeWidth={2} />;
+              const pts = data.map((d, i) => (Number.isFinite(d[s.key]) ? [x(i), y(d[s.key])] : null)).filter(Boolean);
+              // `dots: true` draws each point (e.g. weigh-ins); a line with one point is drawn as a dot too.
+              const showDots = s.dots || pts.length === 1;
+              return (
+                <React.Fragment key={s.key}>
+                  {s.line !== false && pts.length > 1 ? <Polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke={s.color} strokeWidth={2} /> : null}
+                  {showDots ? pts.map(([cx, cy], i) => <Circle key={i} cx={cx} cy={cy} r={3.5} fill={s.color} />) : null}
+                </React.Fragment>
+              );
             })}
             {active != null && (
               <>
