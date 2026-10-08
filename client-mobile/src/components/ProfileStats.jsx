@@ -155,6 +155,7 @@ export default function ProfileStats({ userId, refreshKey, onEditProfile, onNavi
                     <Hint>
                       {m.isEstimate ? `Est. from ${oneRepMaxSourceLabel(m.fromSet)}` : 'Actual single'}
                       {m.fromSet.side ? ` (${m.fromSet.side})` : ''} · {format(new Date(m.date), 'MMM d, yyyy')}
+                      {m.best ? `\nBest: ${m.best.oneRepMax} kg on ${format(new Date(m.best.date), 'MMM d')}` : ''}
                     </Hint>
                   </View>
                   <Text style={styles.title}>{m.oneRepMax} kg</Text>

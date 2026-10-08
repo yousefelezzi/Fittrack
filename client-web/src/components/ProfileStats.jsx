@@ -138,6 +138,7 @@ function MaxesBody({ data, isOwner }) {
               <p className="text-[11px] text-gray-400 dark:text-gray-500">
                 {m.isEstimate ? `Est. from ${oneRepMaxSourceLabel(m.fromSet)}` : 'Actual single'}{m.fromSet.side ? ` (${m.fromSet.side})` : ''} · {format(new Date(m.date), 'MMM d, yyyy')}
               </p>
+              {m.best && <p className="text-[11px] text-gray-400 dark:text-gray-500">Best: {m.best.oneRepMax} kg on {format(new Date(m.best.date), 'MMM d')}</p>}
             </div>
             <p className="text-sm font-bold text-gray-900 dark:text-gray-100 shrink-0">{m.oneRepMax} kg</p>
           </li>

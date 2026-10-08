@@ -126,14 +126,22 @@ async function split(userId) {
   };
 }
 
+/**
+ * Each exercise's current 1RM: the best estimate from the most recent session
+ * with a usable set, so it goes down as well as up. When an older session
+ * estimated higher, that all-time best comes along as `best`.
+ */
 async function oneRepMaxes(userId) {
   const sessions = await WorkoutSession.find({ user: userId })
     .select('date exercises')
+    .sort({ date: 1 })
     .populate('exercises.exercise', 'name type')
     .lean();
 
-  const best = new Map();
+  const byExercise = new Map(); // id → { current, best }
   for (const session of sessions) {
+    // This session's best set per exercise (an exercise split by "do it later" counts once).
+    const sessionBest = new Map();
     for (const ex of session.exercises) {
       if (!ex.exercise) continue; // exercise was deleted from the library
       // Holds count 2 seconds as 1 rep; overcoming isometrics have no 1RM.
@@ -145,8 +153,8 @@ async function oneRepMaxes(userId) {
         // Reps in reserve count as reps (5 @ 1 RIR = 6-rep max). Same as the Progress page.
         const e1rm = estimateOneRepMax(set);
         const id = String(ex.exercise._id);
-        if (!best.has(id) || e1rm > best.get(id).oneRepMax) {
-          best.set(id, {
+        if (!sessionBest.has(id) || e1rm > sessionBest.get(id).oneRepMax) {
+          sessionBest.set(id, {
             exerciseId: id,
             name: ex.exercise.name,
             oneRepMax: round1(e1rm),
@@ -161,10 +169,18 @@ async function oneRepMaxes(userId) {
         }
       }
     }
+    // Sessions are oldest first, so each one becomes the current 1RM.
+    for (const [id, entry] of sessionBest) {
+      const prev = byExercise.get(id);
+      const best = !prev || entry.oneRepMax >= prev.best.oneRepMax ? { oneRepMax: entry.oneRepMax, date: entry.date } : prev.best;
+      byExercise.set(id, { current: entry, best });
+    }
   }
 
-  if (best.size === 0) return null;
-  return [...best.values()].sort((a, b) => b.oneRepMax - a.oneRepMax);
+  if (byExercise.size === 0) return null;
+  return [...byExercise.values()]
+    .map(({ current, best }) => ({ ...current, ...(best.oneRepMax > current.oneRepMax && { best }) }))
+    .sort((a, b) => b.oneRepMax - a.oneRepMax);
 }
 
 // ── GET /api/users/:id/stats ────────────────────────────────────────────────
