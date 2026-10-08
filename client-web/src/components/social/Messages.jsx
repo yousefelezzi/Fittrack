@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format, isToday, formatDistanceToNowStrict } from 'date-fns';
-import { ArrowLeft, Send, Dumbbell, Users, UserPlus, Pencil, LogOut, Check, Hand } from 'lucide-react';
+import { ArrowLeft, Send, Dumbbell, Users, UserPlus, Pencil, LogOut, Check, Hand, CalendarDays, ClipboardList, Utensils } from 'lucide-react';
 import Avatar from '../Avatar';
 import WorkoutSummary from './WorkoutSummary';
 import PlanSummary from './PlanSummary';
 import { SharedExercise, SharedFood } from './SharedItems';
 import { messageAPI, workoutAPI, userAPI, planAPI, exerciseAPI, foodAPI } from '../../api';
+import { attachList, ATTACH_EMPTY } from '../../utils/sharedItems';
+
+const ATTACH_TYPES = [['workout', 'Workout', Dumbbell], ['plan', 'Plan', CalendarDays], ['exercise', 'Exercise', ClipboardList], ['food', 'Food', Utensils]];
 
 const POLL_MS = 5000; // new messages show up within a few seconds
 
@@ -173,6 +176,7 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [workouts, setWorkouts] = useState(null); // shown when attaching a workout
+  const [attachType, setAttachType] = useState(null); // which kind of thing is being picked
   const [showMenu, setShowMenu] = useState(false);
   const bottomRef = useRef();
   const lastCount = useRef(0);
@@ -234,8 +238,9 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
     }
   };
 
-  // The attach panel: recent workouts and your plans (a plan is sent whole).
+  // The attach panel: pick a type (workout, plan, exercise, food), then one of them (a plan is sent whole).
   const openWorkouts = async () => {
+    setAttachType(null);
     if (workouts) { setWorkouts(null); return; }
     const [w, p, ex, fd] = await Promise.all([
       workoutAPI.getAll({ limit: 10 }).catch(() => ({ data: {} })),
@@ -249,6 +254,8 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
       foods: fd.data || [],
     });
   };
+
+  const attachItems = workouts && attachType ? attachList(workouts, attachType) : [];
 
   // A group change (rename, new people) adds a note to the chat: reload it.
   const groupChanged = (updated) => { setConvo(updated); load(); onActivity(); };
@@ -319,36 +326,27 @@ function Chat({ convo: initialConvo, me, onBack, onActivity }) {
       </div>
 
       {workouts && (
-        <div className="border-t border-gray-100 dark:border-gray-800 max-h-48 overflow-y-auto px-3 py-2 space-y-1">
-          <p className="text-xs text-gray-400 dark:text-gray-500">Share a workout</p>
-          {workouts.workouts.length === 0 && <p className="text-xs text-gray-400">No workouts logged yet.</p>}
-          {workouts.workouts.map((w) => (
-            <button key={w._id} onClick={() => send({ workoutSession: w._id, text: text.trim() || undefined })} disabled={sending}
-              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
-              {w.name} <span className="text-xs text-gray-400">· {format(new Date(w.date), 'MMM d')}</span>
-            </button>
-          ))}
-          {workouts.plans.length > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">Share a plan (all its days)</p>}
-          {workouts.plans.map((p) => (
-            <button key={p._id} onClick={() => send({ workoutPlan: p._id, text: text.trim() || undefined })} disabled={sending}
-              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
-              {p.name} <span className="text-xs text-gray-400">· {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</span>
-            </button>
-          ))}
-          {workouts.exercises.length > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">Share one of your exercises</p>}
-          {workouts.exercises.map((e) => (
-            <button key={e._id} onClick={() => send({ exercise: e._id, text: text.trim() || undefined })} disabled={sending}
-              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
-              {e.name}
-            </button>
-          ))}
-          {workouts.foods.length > 0 && <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">Share a food or recipe</p>}
-          {workouts.foods.map((f) => (
-            <button key={f._id} onClick={() => send({ food: f._id, text: text.trim() || undefined })} disabled={sending}
-              className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
-              {f.name} <span className="text-xs text-gray-400">· {f.ingredients?.length ? 'recipe' : 'food'}</span>
-            </button>
-          ))}
+        <div className="border-t border-gray-100 dark:border-gray-800 px-3 py-2">
+          <div className="flex flex-wrap gap-1.5">
+            {ATTACH_TYPES.map(([key, label, Icon]) => (
+              <button key={key} onClick={() => setAttachType(attachType === key ? null : key)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${attachType === key
+                  ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
+                <Icon size={13} /> {label}
+              </button>
+            ))}
+          </div>
+          {attachType && (
+            <div className="max-h-44 overflow-y-auto mt-2 space-y-0.5">
+              {attachItems.length === 0 && <p className="text-xs text-gray-400 px-2 py-1">{ATTACH_EMPTY[attachType]}</p>}
+              {attachItems.map(({ id, name, detail, body }) => (
+                <button key={id} onClick={() => send({ ...body, text: text.trim() || undefined })} disabled={sending}
+                  className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200">
+                  {name} {detail && <span className="text-xs text-gray-400">· {detail}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {error && <p className="text-xs text-red-500 px-4">{error}</p>}

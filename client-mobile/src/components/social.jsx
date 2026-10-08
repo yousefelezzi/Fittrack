@@ -9,7 +9,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { format, isToday, formatDistanceToNow, formatDistanceToNowStrict } from 'date-fns';
 import { messageAPI, workoutAPI, userAPI, postAPI, planAPI, exerciseAPI, foodAPI, uploadUrl } from '../api';
-import { exerciseSummary, foodServing, isRecipe } from '../../../client-web/src/utils/sharedItems';
+import { exerciseSummary, foodServing, isRecipe, attachList, ATTACH_EMPTY } from '../../../client-web/src/utils/sharedItems';
 import { summarizeWorkout } from '../../../client-web/src/utils/workoutSummary';
 import { colors, makeStyles, cardSurface } from './tokens';
 import { Hint, ErrorText, LinkText, Chip, ChipRow, confirm } from './ui';
@@ -19,6 +19,7 @@ import {
   BookmarkPlus,
   ClipboardList,
   Utensils,
+  CalendarDays,
 } from 'lucide-react-native';
 import { typeOf } from '../../../client-web/src/utils/exerciseTypes';
 
@@ -149,6 +150,8 @@ export function SharedFood({ food, source, me }) {
     </View>
   );
 }
+
+const ATTACH_TYPES = [['workout', 'Workout', Dumbbell], ['plan', 'Plan', CalendarDays], ['exercise', 'Exercise', ClipboardList], ['food', 'Food', Utensils]];
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const planDayName = (plan, d) => d.label || (plan.schedule === 'rotation' ? `Workout ${d.dayOfWeek + 1}` : DAY_NAMES[d.dayOfWeek]);
@@ -798,6 +801,7 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [workouts, setWorkouts] = useState(null);
+  const [attachType, setAttachType] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const listRef = useRef();
   const firstLoad = useRef(true);
@@ -851,8 +855,9 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
       setSending(false);
     }
   };
-  // The attach panel: recent workouts and your plans (a plan is sent whole).
+  // The attach panel: pick a type (workout, plan, exercise, food), then one of them (a plan is sent whole).
   const toggleWorkouts = async () => {
+    setAttachType(null);
     if (workouts) { setWorkouts(null); return; }
     const [w, p, ex, fd] = await Promise.all([
       workoutAPI.getAll({ limit: 10 }).catch(() => ({ data: {} })),
@@ -868,6 +873,8 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
   };
   // A group change (rename, new people) adds a note to the chat: reload it.
   const groupChanged = (updated) => { setConvo(updated); setShowMenu(false); load(); onActivity(); };
+
+  const attachItems = workouts && attachType ? attachList(workouts, attachType) : [];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={120}>
@@ -929,33 +936,28 @@ function Chat({ convo: initialConvo, me, onBack, onActivity, onOpenProfile }) {
       />
       {workouts && (
         <View style={styles.workoutPick}>
-          <ScrollView style={{ maxHeight: 200 }}>
-            <Hint>Share a workout</Hint>
-            {workouts.workouts.length === 0 && <Hint>No workouts logged yet.</Hint>}
-            {workouts.workouts.map((w) => (
-              <TouchableOpacity key={w._id} disabled={sending} onPress={() => send({ workoutSession: w._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
-                <Text style={styles.small}>{w.name} <Text style={styles.muted}>· {format(new Date(w.date), 'MMM d')}</Text></Text>
-              </TouchableOpacity>
-            ))}
-            {workouts.plans.length > 0 ? <Hint style={{ marginTop: 6 }}>Share a plan (all its days)</Hint> : null}
-            {workouts.plans.map((p) => (
-              <TouchableOpacity key={p._id} disabled={sending} onPress={() => send({ workoutPlan: p._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
-                <Text style={styles.small}>{p.name} <Text style={styles.muted}>· {p.days.length} workout{p.days.length !== 1 ? 's' : ''}</Text></Text>
-              </TouchableOpacity>
-            ))}
-            {workouts.exercises.length > 0 ? <Hint style={{ marginTop: 6 }}>Share one of your exercises</Hint> : null}
-            {workouts.exercises.map((e) => (
-              <TouchableOpacity key={e._id} disabled={sending} onPress={() => send({ exercise: e._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
-                <Text style={styles.small}>{e.name}</Text>
-              </TouchableOpacity>
-            ))}
-            {workouts.foods.length > 0 ? <Hint style={{ marginTop: 6 }}>Share a food or recipe</Hint> : null}
-            {workouts.foods.map((f) => (
-              <TouchableOpacity key={f._id} disabled={sending} onPress={() => send({ food: f._id, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
-                <Text style={styles.small}>{f.name} <Text style={styles.muted}>· {f.ingredients?.length ? 'recipe' : 'food'}</Text></Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={[styles.row, { flexWrap: 'wrap', gap: 6 }]}>
+            {ATTACH_TYPES.map(([key, label, Icon]) => {
+              const on = attachType === key;
+              return (
+                <TouchableOpacity key={key} onPress={() => setAttachType(on ? null : key)}
+                  style={[styles.row, { gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: on ? colors.brand : colors.subtle }]}>
+                  <Icon size={13} color={on ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.small, { fontWeight: '600', color: on ? '#fff' : colors.textPrimary }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {attachType ? (
+            <ScrollView style={{ maxHeight: 180, marginTop: 6 }}>
+              {attachItems.length === 0 ? <Hint>{ATTACH_EMPTY[attachType]}</Hint> : null}
+              {attachItems.map(({ id, name, detail, body }) => (
+                <TouchableOpacity key={id} disabled={sending} onPress={() => send({ ...body, text: text.trim() || undefined })} style={{ paddingVertical: 6 }}>
+                  <Text style={styles.small}>{name}{detail ? <Text style={styles.muted}> · {detail}</Text> : null}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : null}
         </View>
       )}
       <ErrorText>{error}</ErrorText>
