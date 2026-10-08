@@ -140,7 +140,8 @@ exports.getExerciseProgress = async (req, res, next) => {
       const maxWeight = Math.max(...sets.map((s) => s.weight));
       const totalVolume = sets.reduce((sum, s) => sum + s.reps * s.weight, 0);
       // Best estimated 1RM of the session, counting reps in reserve.
-      const oneRM = Math.round(Math.max(0, ...sets.map(estimateOneRepMax)));
+      // To one decimal: whole kg hid small changes (15 kg × 7 → 18.5 showed as 19, same as × 8).
+      const oneRM = Math.round(Math.max(0, ...sets.map(estimateOneRepMax)) * 10) / 10;
 
       return { date: session.date, maxWeight, totalVolume, oneRM };
     });
