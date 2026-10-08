@@ -11,6 +11,8 @@ import { MEAL_TYPES, DIETS, PROFILE_FIELD_NAMES } from '../../../client-web/src/
 import { MACRO_COLORS, MICRO_CONFIG, sumMicros, addMicros, r, r0, GOAL_NAMES } from '../../../client-web/src/utils/foodLogic';
 import { formatServing } from '../../../client-web/src/utils/servings';
 import { ChefHat, Plus, Sparkles, RefreshCw, Salad, X } from 'lucide-react-native';
+import { useAuth } from '../context/AuthContext';
+import { adaptiveText } from '../../../client-web/src/utils/nutritionProgress';
 
 const ymd = (d) => format(d, 'yyyy-MM-dd');
 
@@ -97,7 +99,8 @@ function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
 }
 
 // ── Goal explanation ─────────────────────────────────────────────────────────
-function GoalInfo({ info, onProfile, onSteps }) {
+function GoalInfo({ info, onProfile, onSteps, onWeight }) {
+  const { user } = useAuth();
   if (!info) return null;
   if (!info.targets) {
     const list = info.missing.map((m) => PROFILE_FIELD_NAMES[m]);
@@ -112,6 +115,11 @@ function GoalInfo({ info, onProfile, onSteps }) {
         {basis.adjustment === 'maintenance' ? `maintenance, about ${basis.maintenance.toLocaleString()} kcal.` : `${basis.adjustment} from about ${basis.maintenance.toLocaleString()} kcal maintenance.`}
       </Text>
       {basis.stepCalories > 0 && <Hint>Includes +{basis.stepCalories} kcal for today's {basis.steps.toLocaleString()} <Text style={styles.link} onPress={onSteps}>steps</Text>.</Hint>}
+      {adaptiveText(basis.adaptive, user?.bodyWeightUnit) ? (
+        <Hint style={basis.adaptive?.reason ? null : { color: '#0ea5e9' }}>
+          {adaptiveText(basis.adaptive, user?.bodyWeightUnit)} <Text style={styles.link} onPress={onWeight}>Weight log</Text>
+        </Hint>
+      ) : null}
       {basis.floored && <Hint>Raised to the minimum recommended intake rather than going lower.</Hint>}
       {basis.activityAssumed && <Hint>Assuming you're moderately active. <Text style={styles.link} onPress={onProfile}>Set your activity level</Text> for a more accurate goal.</Hint>}
       <Hint>Change your goal, weight or activity level in your <Text style={styles.link} onPress={onProfile}>profile</Text> and today's goals update automatically.</Hint>
@@ -465,7 +473,7 @@ export default function NutritionScreen({ navigation }) {
           <Btn icon={Sparkles} title="Meal plan" variant="secondary" onPress={() => setPlannerOpen(true)} style={{ minHeight: 36 }} />
         </View>
 
-        {!isPast && <GoalInfo info={goalInfo} onProfile={toProfile} onSteps={() => navigation.navigate('Steps')} />}
+        {!isPast && <GoalInfo info={goalInfo} onProfile={toProfile} onSteps={() => navigation.navigate('Steps')} onWeight={() => navigation.navigate('Weight')} />}
 
         <Card style={{ alignItems: 'center' }}>
           <Text style={styles.bigNum}>{r0(totals.calories)}</Text>

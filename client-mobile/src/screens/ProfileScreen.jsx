@@ -13,14 +13,18 @@ import { PostCard } from '../components/social';
 import { usePostActions } from '../components/usePostActions';
 import { ACTIVITY_LEVELS } from '../../../client-web/src/utils/calculators';
 import { Footprints, Calculator, History, Settings, Lock, FileText, Pencil, Camera } from 'lucide-react-native';
+import { cmToFtIn, ftInToCm, kgTo, toKgFrom, formatHeight, formatBodyWeight } from '../../../client-web/src/utils/bodyUnits';
 
 const GOAL_LABELS = {
   lose_weight: 'Lose Weight', build_muscle: 'Build Muscle', improve_endurance: 'Improve Endurance', stay_active: 'Stay Active', other: 'Other',
 };
 const idOf = (x) => String(x?._id ?? x);
+// Today as YYYY-MM-DD in the phone's time zone.
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime());
 
 function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children }) {
+  const { user: me } = useAuth();
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -31,8 +35,14 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
     setForm({
       name: profile?.name ?? '',
       bio: profile?.bio ?? '',
+      // Height and weight are typed in the user's units (cm or ft + in, kg or lb).
+      heightUnit: me?.heightUnit === 'ft' ? 'ft' : 'cm',
       height: profile?.height?.toString() ?? '',
-      weight: profile?.weight?.toString() ?? '',
+      heightFt: profile?.height ? String(cmToFtIn(profile.height).ft) : '',
+      heightIn: profile?.height ? String(cmToFtIn(profile.height).in) : '',
+      weightUnit: me?.bodyWeightUnit === 'lb' ? 'lb' : 'kg',
+      weight: profile?.weight ? String(kgTo(profile.weight, me?.bodyWeightUnit)) : '',
+      weightShown: profile?.weight ? String(kgTo(profile.weight, me?.bodyWeightUnit)) : '',
       dateOfBirth: profile?.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().slice(0, 10) : '',
       fitnessGoal: profile?.fitnessGoal ?? 'stay_active',
       bodyFat: profile?.bodyFat?.toString() ?? '',
@@ -52,12 +62,19 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
     if (!(stepGoal >= 1000 && stepGoal <= 50000)) { setErr('Step goal must be between 1,000 and 50,000'); return; }
     setSaving(true);
     try {
+      const heightCm = form.heightUnit === 'ft'
+        ? (form.heightFt !== '' || form.heightIn !== '' ? ftInToCm(form.heightFt, form.heightIn) : null)
+        : (form.height ? Number(form.height) : null);
       await onSave({
         name: form.name.trim(),
         bio: form.bio.trim(),
         fitnessGoal: form.fitnessGoal,
-        ...(form.height ? { height: Number(form.height) } : {}),
-        ...(form.weight ? { weight: Number(form.weight) } : {}),
+        ...(heightCm ? { height: heightCm } : {}),
+        // Only when changed: it's logged as today's weigh-in; the profile weight is the 7-day average.
+        ...(form.weight !== '' && form.weight !== form.weightShown
+          ? { weight: Math.round(toKgFrom(form.weight, form.weightUnit) * 100) / 100, weightDate: todayKey() } : {}),
+        heightUnit: form.heightUnit,
+        bodyWeightUnit: form.weightUnit,
         ...(form.dateOfBirth ? { dateOfBirth: form.dateOfBirth } : {}),
         // Empty clears it, so FFMI can be turned off again.
         bodyFat: form.bodyFat === '' ? null : Number(form.bodyFat),
@@ -98,10 +115,23 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
           </TouchableOpacity>
           {field('Name', 'name')}
           {field('Bio', 'bio', { multiline: true, maxLength: 200, placeholder: 'Short bio…', style: [styles.field, { height: 70, textAlignVertical: 'top', paddingTop: 8 }] })}
-          <View style={styles.row}>
-            {field('Height (cm)', 'height', { keyboardType: 'decimal-pad', placeholder: '175' })}
-            {field('Weight (kg)', 'weight', { keyboardType: 'decimal-pad', placeholder: '70' })}
-          </View>
+          <Label>Height</Label>
+          <Segmented value={form.heightUnit} onChange={(u) => setForm((f) => ({ ...f, heightUnit: u }))} options={[['cm', 'cm'], ['ft', 'ft-in']]} style={{ width: 140, marginBottom: 6 }} />
+          {form.heightUnit === 'ft' ? (
+            <View style={styles.row}>
+              {field('Feet', 'heightFt', { keyboardType: 'number-pad', placeholder: '5' })}
+              {field('Inches', 'heightIn', { keyboardType: 'number-pad', placeholder: '10' })}
+            </View>
+          ) : field('Centimetres', 'height', { keyboardType: 'decimal-pad', placeholder: '175' })}
+          <Label>Weight</Label>
+          <Segmented value={form.weightUnit} style={{ width: 140, marginBottom: 6 }} options={[['kg', 'kg'], ['lb', 'lb']]}
+            onChange={(u) => setForm((f) => {
+              // Same weight in the other unit; an unchanged weight stays unchanged.
+              const conv = (v) => (v === '' ? '' : String(kgTo(toKgFrom(v, f.weightUnit), u)));
+              return { ...f, weightUnit: u, weight: f.weight === f.weightShown ? conv(f.weightShown) : conv(f.weight), weightShown: conv(f.weightShown) };
+            })} />
+          {field(form.weightUnit === 'lb' ? 'Pounds' : 'Kilograms', 'weight', { keyboardType: 'decimal-pad', placeholder: form.weightUnit === 'lb' ? '160' : '70' })}
+          <Hint>Changing your weight logs today's weigh-in; your weight is your 7-day average (Nutrition → Weight).</Hint>
           <View style={styles.row}>
             {field('Date of birth', 'dateOfBirth', { placeholder: 'YYYY-MM-DD', keyboardType: 'numbers-and-punctuation' })}
             {field('Body fat (%)', 'bodyFat', { keyboardType: 'decimal-pad', placeholder: '15' })}
@@ -292,8 +322,8 @@ export default function ProfileScreen({ route, navigation }) {
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           <View style={styles.metaRow}>
             {age !== null && <Text style={styles.meta}>{age} yrs</Text>}
-            {profile.height ? <Text style={styles.meta}>{profile.height} cm</Text> : null}
-            {profile.weight ? <Text style={styles.meta}>{profile.weight} kg</Text> : null}
+            {profile.height ? <Text style={styles.meta}>{formatHeight(profile.height, me?.heightUnit)}</Text> : null}
+            {profile.weight ? <Text style={styles.meta}>{formatBodyWeight(profile.weight, me?.bodyWeightUnit)}</Text> : null}
             {isOwn ? <Text style={styles.meta}>{(profile.stepGoal ?? 10000).toLocaleString()} steps/day</Text> : null}
           </View>
 

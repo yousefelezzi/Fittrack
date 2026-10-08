@@ -76,3 +76,27 @@ export const formatMl = (ml) => (ml >= 1000 ? `${Math.round(ml / 100) / 10} L` :
 
 /** Quick-add amounts for water, in ml. */
 export const WATER_PRESETS = [250, 330, 500, 750];
+
+/**
+ * What the calorie goal's weight-trend adjustment did, in words (targets
+ * basis.adaptive from the server, utils/adaptiveCalories.js), or null when it's
+ * off. Weight change in the user's unit ('kg' | 'lb').
+ */
+export function adaptiveText(adaptive, unit = 'kg') {
+  if (!adaptive) return null;
+  if (adaptive.reason === 'food') {
+    return `To fine-tune your goal from your real results, log your food on at least ${adaptive.needed} of the last 14 days (${adaptive.foodDays} so far).`;
+  }
+  if (adaptive.reason === 'weight') {
+    const [a, b] = adaptive.weighIns || [0, 0];
+    return `To fine-tune your goal from your real results, weigh in at least ${adaptive.needed} times in each of the last two weeks (${a} and ${b} so far).`;
+  }
+  if (adaptive.reason) return null;
+  const change = Math.abs(unit === 'lb' ? adaptive.weightChange / 0.45359237 : adaptive.weightChange);
+  const moved = adaptive.weightChange < 0 ? `went down ${change.toFixed(1)} ${unit}` : adaptive.weightChange > 0 ? `went up ${change.toFixed(1)} ${unit}` : 'held steady';
+  const balance = adaptive.dailyBalance < 0 ? `a ${Math.abs(adaptive.dailyBalance)} kcal daily deficit` : adaptive.dailyBalance > 0 ? `a ${adaptive.dailyBalance} kcal daily surplus` : 'no surplus or deficit';
+  const verdict = adaptive.offset === 0
+    ? 'which matches the formula, so no change.'
+    : `so your maintenance looks ${Math.abs(adaptive.offset)} kcal ${adaptive.offset > 0 ? 'higher' : 'lower'} than the formula and your goal is adjusted${adaptive.limited ? ' (capped for now; it keeps adjusting as more data comes in)' : ''}.`;
+  return `Over the last 2 weeks you ate about ${adaptive.avgIntake.toLocaleString()} kcal a day and your weight ${moved} (${balance}), ${verdict}`;
+}

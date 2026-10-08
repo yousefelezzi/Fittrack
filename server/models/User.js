@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema(
     waterGoal: { type: Number, min: 500, max: 8000, default: null }, // ml a day; null = worked out from weight
     waterType: { type: String, enum: ['tap', 'mineral', 'filtered'], default: 'tap' }, // for the minerals in water
     weightUnit: { type: String, enum: ['kg', 'lb'], default: 'kg' }, // default unit when logging lifts
+    // How body weight and height are shown and typed (stored in kg and cm).
+    bodyWeightUnit: { type: String, enum: ['kg', 'lb'], default: 'kg' },
+    heightUnit: { type: String, enum: ['cm', 'ft'], default: 'cm' }, // ft = feet and inches
+    // Correct the calorie goal from the last two weeks' weight trend and intake (utils/adaptiveCalories.js).
+    adaptiveCalories: { type: Boolean, default: true },
     // Which profile stats other users can see. Everything is private by default.
     statsVisibility: {
       avgCalories: { type: Boolean, default: false },

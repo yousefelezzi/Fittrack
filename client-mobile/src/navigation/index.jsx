@@ -21,6 +21,7 @@ import NutritionHubScreen  from '../screens/NutritionHubScreen';
 import HydrationScreen     from '../screens/HydrationScreen';
 import SupplementsScreen   from '../screens/SupplementsScreen';
 import NutritionProgressScreen from '../screens/NutritionProgressScreen';
+import WeightScreen        from '../screens/WeightScreen';
 import FeedScreen          from '../screens/FeedScreen';
 import ProfileScreen       from '../screens/ProfileScreen';
 import LogWorkoutScreen    from '../screens/LogWorkoutScreen';
@@ -83,6 +84,7 @@ const STACK_SCREENS = [
   ['Hydration', HydrationScreen, 'Hydration'],
   ['Supplements', SupplementsScreen, 'Supplements'],
   ['NutritionProgress', NutritionProgressScreen, 'Nutrition Progress'],
+  ['Weight', WeightScreen, 'Weight'],
   ['Plans', PlansScreen, 'Workout Plans'],
   ['PlanGenerator', PlanGeneratorScreen, 'Workout Planner'],
   ['Exercises', ExercisesScreen, 'Exercise Library'],

@@ -17,7 +17,17 @@ const endOfDay   = (date) => { const d = new Date(date); d.setHours(23,59,59,999
 const sameDay    = (date) => ({ $gte: startOfDay(date), $lte: endOfDay(date) });
 
 // The profile fields nutritionTargets() works from.
-const TARGET_PROFILE_FIELDS = 'weight height dateOfBirth sex activityLevel fitnessGoal';
+const TARGET_PROFILE_FIELDS = 'weight height dateOfBirth sex activityLevel fitnessGoal adaptiveCalories';
+
+/**
+ * The user's targets for a day: the profile formula, corrected by their real
+ * weight trend over the last two weeks unless they've turned that off.
+ */
+async function targetsFor(user, steps) {
+  const { adaptiveMaintenance } = require('../utils/adaptiveCalories');
+  const adaptive = user && user.adaptiveCalories !== false ? await adaptiveMaintenance(user) : null;
+  return nutritionTargets(user, { steps, adaptive });
+}
 
 /** The user's log for `date`, created (with `fields`) if there isn't one yet. */
 async function findOrCreateLog(userId, date, fields = {}) {
@@ -43,7 +53,7 @@ async function syncGoals(log, userId) {
     User.findById(userId).select(TARGET_PROFILE_FIELDS).lean(),
     stepsOn(userId, log.date),
   ]);
-  const { targets } = nutritionTargets(user, { steps });
+  const { targets } = await targetsFor(user, steps);
   if (!targets) return log;
   const g = log.dailyGoals || {};
   if (MACRO_KEYS.every((k) => g[k] === targets[k])) return log;
@@ -112,7 +122,7 @@ exports.getTargets = async (req, res, next) => {
       User.findById(req.user.id).select(TARGET_PROFILE_FIELDS).lean(),
       stepsOn(req.user.id, req.query.date ? new Date(req.query.date) : new Date()),
     ]);
-    res.json(nutritionTargets(user, { steps }));
+    res.json(await targetsFor(user, steps));
   } catch (err) {
     next(err);
   }
@@ -220,7 +230,7 @@ exports.upsertLog = async (req, res, next) => {
 exports.createMealPlan = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select(TARGET_PROFILE_FIELDS).lean();
-    const { targets, missing, basis } = nutritionTargets(user);
+    const { targets, missing, basis } = await targetsFor(user);
     if (!targets) return res.status(400).json({ message: 'Complete your profile to get calorie targets first', missing });
 
     const foods = await Food.find({ name: { $in: catalogFoodNames() }, source: { $ne: 'custom' } })

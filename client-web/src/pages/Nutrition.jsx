@@ -13,6 +13,8 @@ import {
   sumIngredients, ingredientPayload, useRecipeServing, GOAL_NAMES,
   buildVirtualRecipe, customFoodDraft, fmtCount,
 } from '../utils/foodLogic';
+import { useAuth } from '../context/AuthContext';
+import { adaptiveText } from '../utils/nutritionProgress';
 
 // ── Macro Pie + Micronutrient hover card ─────────────────────────────────────
 // `supplementMicros` / `waterMicros`: vitamins and minerals from the supplements
@@ -1287,6 +1289,7 @@ function AddMealModal({ open, onClose, onAdd }) {
 
 // ── Goal explanation ─────────────────────────────────────────────────────────
 function GoalInfo({ info }) {
+  const { user } = useAuth();
   if (!info) return null;
   if (!info.targets) {
     const list = info.missing.map((m) => PROFILE_FIELD_NAMES[m]);
@@ -1308,6 +1311,11 @@ function GoalInfo({ info }) {
       </p>
       {basis.stepCalories > 0 && (
         <p className="text-xs">Includes +{basis.stepCalories} kcal for today's {basis.steps.toLocaleString()} <Link to="/steps" className="text-brand-600">steps</Link>.</p>
+      )}
+      {adaptiveText(basis.adaptive, user?.bodyWeightUnit) && (
+        <p className={`text-xs ${basis.adaptive?.reason ? '' : 'text-sky-700 dark:text-sky-300'}`}>
+          {adaptiveText(basis.adaptive, user?.bodyWeightUnit)} <Link to="/nutrition/weight" className="text-brand-600">Weight log</Link>
+        </p>
       )}
       {basis.floored && <p className="text-xs">Raised to the minimum recommended intake rather than going lower.</p>}
       {basis.activityAssumed && (

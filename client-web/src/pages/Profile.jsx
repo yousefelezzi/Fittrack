@@ -9,6 +9,7 @@ import { usePostActions } from '../components/social/usePostActions';
 import { ACTIVITY_LEVELS } from '../utils/calculators';
 import { Camera, Edit2, Check, X, UserPlus, UserMinus, MessageSquare, Settings as SettingsIcon, Lock, Clock } from 'lucide-react';
 import { format, differenceInYears } from 'date-fns';
+import { cmToFtIn, ftInToCm, kgTo, toKgFrom, formatHeight, formatBodyWeight } from '../utils/bodyUnits';
 
 const GOAL_LABELS = {
   lose_weight:       'Lose Weight',
@@ -25,6 +26,20 @@ function Avatar({ user, size = 'lg' }) {
     : <div className={`${dim} rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold`}>
         {user?.name?.[0] ?? '?'}
       </div>;
+}
+
+/** Small unit switch (kg | lb, cm | ft-in) next to a field label. */
+function UnitPills({ value, options, onChange }) {
+  return (
+    <span className="inline-flex p-0.5 bg-gray-100 dark:bg-gray-800 rounded-md">
+      {options.map(([k, l]) => (
+        <button key={k} type="button" onClick={() => k !== value && onChange(k)}
+          className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${value === k ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-400'}`}>
+          {l}
+        </button>
+      ))}
+    </span>
+  );
 }
 
 function StatPill({ label, value, onClick }) {
@@ -123,8 +138,14 @@ export default function Profile() {
     setForm({
       name:        profile.name ?? '',
       bio:         profile.bio ?? '',
+      // Height and weight are typed in the user's units (cm or ft + in, kg or lb).
+      heightUnit:  me?.heightUnit === 'ft' ? 'ft' : 'cm',
       height:      profile.height ?? '',
-      weight:      profile.weight ?? '',
+      heightFt:    profile.height ? cmToFtIn(profile.height).ft : '',
+      heightIn:    profile.height ? cmToFtIn(profile.height).in : '',
+      weightUnit:  me?.bodyWeightUnit === 'lb' ? 'lb' : 'kg',
+      weight:      profile.weight ? String(kgTo(profile.weight, me?.bodyWeightUnit)) : '',
+      weightShown: profile.weight ? String(kgTo(profile.weight, me?.bodyWeightUnit)) : '',
       dateOfBirth: profile.dateOfBirth ? format(new Date(profile.dateOfBirth), 'yyyy-MM-dd') : '',
       fitnessGoal: profile.fitnessGoal ?? 'stay_active',
       bodyFat:     profile.bodyFat ?? '',
@@ -142,14 +163,22 @@ export default function Profile() {
     if (!form.name?.trim()) { setFormErr('Name is required'); return; }
     const stepGoal = Number(form.stepGoal);
     if (!(stepGoal >= 1000 && stepGoal <= 50000)) { setFormErr('Step goal must be between 1,000 and 50,000'); return; }
+    const heightCm = form.heightUnit === 'ft'
+      ? (form.heightFt !== '' || form.heightIn !== '' ? ftInToCm(form.heightFt, form.heightIn) : null)
+      : (form.height ? Number(form.height) : null);
+    // The weight is only sent when it was changed: it's logged as today's
+    // weigh-in, and the profile weight becomes the 7-day average.
+    const weightChanged = form.weight !== '' && form.weight !== form.weightShown;
     setSaving(true);
     try {
       const payload = {
         name:        form.name.trim(),
         bio:         form.bio.trim(),
         fitnessGoal: form.fitnessGoal,
-        ...(form.height      ? { height: Number(form.height) }      : {}),
-        ...(form.weight      ? { weight: Number(form.weight) }      : {}),
+        ...(heightCm ? { height: heightCm } : {}),
+        ...(weightChanged ? { weight: Math.round(toKgFrom(form.weight, form.weightUnit) * 100) / 100, weightDate: format(new Date(), 'yyyy-MM-dd') } : {}),
+        heightUnit: form.heightUnit,
+        bodyWeightUnit: form.weightUnit,
         ...(form.dateOfBirth ? { dateOfBirth: form.dateOfBirth }    : {}),
         // Empty clears it, so FFMI can be turned off again.
         bodyFat: form.bodyFat === '' ? null : Number(form.bodyFat),
@@ -284,12 +313,31 @@ export default function Profile() {
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Height (cm)</label>
-                    <input className="input" type="number" value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} placeholder="175" />
+                    <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                      Height <UnitPills value={form.heightUnit} options={[['cm', 'cm'], ['ft', 'ft-in']]} onChange={(u) => setForm({ ...form, heightUnit: u })} />
+                    </label>
+                    {form.heightUnit === 'ft' ? (
+                      <div className="flex gap-1 items-center">
+                        <input className="input" type="number" min={3} max={8} value={form.heightFt} onChange={(e) => setForm({ ...form, heightFt: e.target.value })} placeholder="5" />
+                        <span className="text-xs text-gray-400">ft</span>
+                        <input className="input" type="number" min={0} max={11} value={form.heightIn} onChange={(e) => setForm({ ...form, heightIn: e.target.value })} placeholder="10" />
+                        <span className="text-xs text-gray-400">in</span>
+                      </div>
+                    ) : (
+                      <input className="input" type="number" value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} placeholder="175" />
+                    )}
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Weight (kg)</label>
-                    <input className="input" type="number" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} placeholder="70" />
+                    <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                      Weight <UnitPills value={form.weightUnit} options={[['kg', 'kg'], ['lb', 'lb']]}
+                        onChange={(u) => setForm((f) => {
+                          // Same weight in the other unit; an unchanged weight stays unchanged.
+                          const conv = (v) => (v === '' ? '' : String(kgTo(toKgFrom(v, f.weightUnit), u)));
+                          return { ...f, weightUnit: u, weight: f.weight === f.weightShown ? conv(f.weightShown) : conv(f.weight), weightShown: conv(f.weightShown) };
+                        })} />
+                    </label>
+                    <input className="input" type="number" step="0.1" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} placeholder={form.weightUnit === 'lb' ? '160' : '70'} />
+                    <p className="text-[10px] text-gray-400 mt-0.5">Changing it logs today's weigh-in; your weight is your 7-day average.</p>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Date of birth</label>
@@ -347,8 +395,8 @@ export default function Profile() {
                 {profile.bio && <p className="text-sm text-gray-500 mt-1">{profile.bio}</p>}
                 <div className="flex flex-wrap gap-3 mt-2">
                   {age !== null && <span className="text-xs text-gray-400 dark:text-gray-500">{age} yrs</span>}
-                  {profile.height && <span className="text-xs text-gray-400 dark:text-gray-500">{profile.height} cm</span>}
-                  {profile.weight && <span className="text-xs text-gray-400 dark:text-gray-500">{profile.weight} kg</span>}
+                  {profile.height && <span className="text-xs text-gray-400 dark:text-gray-500">{formatHeight(profile.height, me?.heightUnit)}</span>}
+                  {profile.weight && <span className="text-xs text-gray-400 dark:text-gray-500">{formatBodyWeight(profile.weight, me?.bodyWeightUnit)}</span>}
                 </div>
               </>
             )}

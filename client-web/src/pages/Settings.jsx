@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut } from 'lucide-react';
+import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, authAPI } from '../api';
 
@@ -123,6 +123,13 @@ export default function Settings() {
         </Row>
         <Row title="Show me in search and suggestions" hint="When off, people can only find you through someone who follows you.">
           <Toggle checked={privacy.discoverable} disabled={busy === 'discoverable'} onChange={(v) => save('discoverable', { privacy: { discoverable: v } })} />
+        </Row>
+      </Section>
+
+      <Section icon={Apple} title="Nutrition">
+        <Row title="Adjust my calorie goal from my weight trend"
+          hint="Compares what you ate with how your weight moved over the last 2 weeks and corrects your maintenance. Needs food logged on 10 of 14 days and a couple of weigh-ins each week.">
+          <Toggle checked={user?.adaptiveCalories !== false} disabled={busy === 'adaptiveCalories'} onChange={(v) => save('adaptiveCalories', { adaptiveCalories: v })} />
         </Row>
       </Section>
 

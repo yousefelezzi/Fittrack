@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { userAPI, authAPI } from '../api';
 import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented } from '../components';
-import { Lock, MessageCircle, KeyRound, LogOut, Moon } from 'lucide-react-native';
+import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad } from 'lucide-react-native';
 
 const MESSAGE_OPTIONS = [
   ['connections', 'People I follow or who follow me'],
@@ -122,6 +122,14 @@ export default function SettingsScreen() {
         </Row>
         <Row title="Show me in search and suggestions" hint="When off, people can only find you through someone who follows you." last>
           {toggle('discoverable', privacy.discoverable, (v) => ({ privacy: { discoverable: v } }))}
+        </Row>
+      </Card>
+
+      <SectionHead icon={Salad}>Nutrition</SectionHead>
+      <Card style={{ paddingVertical: 4 }}>
+        <Row title="Adjust my calorie goal from my weight trend" last
+          hint="Compares what you ate with how your weight moved over the last 2 weeks and corrects your maintenance. Needs food logged on 10 of 14 days and a couple of weigh-ins each week.">
+          {toggle('adaptiveCalories', user?.adaptiveCalories !== false, (v) => ({ adaptiveCalories: v }))}
         </Row>
       </Card>
 

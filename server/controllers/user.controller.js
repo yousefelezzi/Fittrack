@@ -34,7 +34,7 @@ exports.getUserById = async (req, res, next) => {
     const isOwner = req.params.id === String(req.user.id);
     // Body fat feeds the private FFMI stat, so only the owner gets the raw value.
     const user = await User.findById(req.params.id)
-      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType')
+      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType -bodyWeightUnit -heightUnit -adaptiveCalories')
       .lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
     const counts = { followersCount: (user.followers || []).length, followingCount: (user.following || []).length };
@@ -63,7 +63,7 @@ exports.getUserById = async (req, res, next) => {
 // PUT /api/users/me
 exports.updateMe = async (req, res, next) => {
   try {
-    const allowed = ['name', 'bio', 'height', 'weight', 'dateOfBirth', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType'];
+    const allowed = ['name', 'bio', 'height', 'weight', 'dateOfBirth', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories'];
     const updates = {};
     allowed.forEach((field) => { if (req.body[field] !== undefined) updates[field] = req.body[field]; });
 
@@ -92,7 +92,26 @@ exports.updateMe = async (req, res, next) => {
       }
     }
 
-    const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true });
+    // The profile weight is the 7-day average of weigh-ins, so a weight typed
+    // in the profile is logged as today's weigh-in (weightDate: the user's
+    // today) and the average is worked out from there.
+    let loggedWeight = false;
+    if (updates.weight !== undefined && updates.weight !== null && updates.weight !== '') {
+      const WeightLog = require('../models/WeightLog');
+      const { dayStart } = require('../utils/bodyWeight');
+      const date = dayStart(req.body.weightDate || new Date());
+      await WeightLog.findOneAndUpdate(
+        { user: req.user.id, date },
+        { $set: { weight: Number(updates.weight) }, $setOnInsert: { user: req.user.id, date } },
+        { upsert: true, runValidators: true }
+      );
+      delete updates.weight;
+      loggedWeight = true;
+    }
+
+    await User.updateOne({ _id: req.user.id }, updates, { runValidators: true });
+    if (loggedWeight) await require('../utils/bodyWeight').syncProfileWeight(req.user.id);
+    const user = await User.findById(req.user.id);
     res.json(user);
   } catch (err) {
     next(err);

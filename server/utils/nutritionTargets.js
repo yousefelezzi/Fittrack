@@ -6,6 +6,8 @@
  * BMR & TDEE calculator page (client-web/src/utils/calculators.js).
  * On days with more steps than the activity level assumes, the calories they
  * burn are added on top (see utils/steps.js); the extra goes to carbs and fat.
+ * With `adaptive` (utils/adaptiveCalories.js), maintenance is corrected by how
+ * the user's weight actually moved over the last two weeks.
  */
 const { stepCalories } = require('./steps');
 
@@ -34,11 +36,21 @@ function ageFrom(dob) {
   return age;
 }
 
+/** BMR × activity (kcal), or null if the profile is missing something. */
+function formulaMaintenance(user) {
+  if (!user?.weight || !user?.height || !user?.dateOfBirth || !user?.sex) return null;
+  const activity = ACTIVITY_LEVELS.includes(user.activityLevel) ? user.activityLevel : DEFAULT_ACTIVITY;
+  const bmr = 10 * user.weight + 6.25 * user.height - 5 * ageFrom(user.dateOfBirth) + (user.sex === 'female' ? -161 : 5);
+  return bmr * activity;
+}
+
 /**
- * @param opts.steps  steps walked that day, if logged
+ * @param opts.steps     steps walked that day, if logged
+ * @param opts.adaptive  result of adaptiveMaintenance(): its `offset` (kcal) is
+ *                       added to maintenance before the goal is applied
  * @returns {{ targets: {calories, protein, carbs, fat} | null, missing: string[], basis?: object }}
  */
-function nutritionTargets(user, { steps } = {}) {
+function nutritionTargets(user, { steps, adaptive } = {}) {
   const missing = [];
   if (!user?.weight) missing.push('weight');
   if (!user?.height) missing.push('height');
@@ -51,7 +63,10 @@ function nutritionTargets(user, { steps } = {}) {
   const rule = GOAL_RULES[user.fitnessGoal] || GOAL_RULES.stay_active;
 
   const bmr = 10 * user.weight + 6.25 * user.height - 5 * age + (user.sex === 'female' ? -161 : 5);
-  const maintenance = bmr * activity;
+  const formula = bmr * activity;
+  // Corrected by the user's real weight trend when there's enough data.
+  const offset = adaptive?.offset || 0;
+  const maintenance = formula + offset;
 
   let calories = maintenance * (1 + rule.calorieAdjust);
   const floored = calories < MIN_CALORIES[user.sex];
@@ -70,6 +85,8 @@ function nutritionTargets(user, { steps } = {}) {
       goal: user.fitnessGoal || 'stay_active',
       adjustment: rule.label,
       maintenance: Math.round(maintenance / 10) * 10,
+      formulaMaintenance: Math.round(formula / 10) * 10,
+      adaptive: adaptive || null,
       activityLevel: activity,
       activityAssumed: !ACTIVITY_LEVELS.includes(user.activityLevel),
       floored,
@@ -79,4 +96,4 @@ function nutritionTargets(user, { steps } = {}) {
   };
 }
 
-module.exports = { nutritionTargets, ACTIVITY_LEVELS };
+module.exports = { nutritionTargets, formulaMaintenance, ACTIVITY_LEVELS };

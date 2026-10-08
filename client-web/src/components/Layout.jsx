@@ -6,6 +6,7 @@ import {
   Apple, Users, LogOut, Menu, X, Moon, Sun,
   Calculator, History, Dumbbell as WorkoutsIcon, ChevronDown, PlusCircle, Footprints,
   Utensils, GlassWater, Pill, TrendingUp,
+  Scale,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { messageAPI } from '../api';
@@ -25,6 +26,7 @@ const nutritionNav = [
   { to: '/nutrition',             label: 'Food Log',    icon: Utensils, end: true },
   { to: '/nutrition/hydration',   label: 'Hydration',   icon: GlassWater },
   { to: '/nutrition/supplements', label: 'Supplements', icon: Pill },
+  { to: '/nutrition/weight',      label: 'Weight',      icon: Scale },
   { to: '/nutrition/progress',    label: 'Progress',    icon: TrendingUp },
 ];
 

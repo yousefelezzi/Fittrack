@@ -69,6 +69,13 @@ export const planAPI = {
 };
 
 // ── Nutrition ─────────────────────────────────────────────────────────────────
+// Body weight: daily weigh-ins (kg); the profile weight is their 7-day average.
+export const weightAPI = {
+  list:   (days)         => api.get('/weight', { params: { days } }),
+  log:    (date, weight) => api.post('/weight', { date, weight }),
+  delete: (id)           => api.delete(`/weight/${id}`),
+};
+
 export const supplementAPI = {
   getAll: ()         => api.get('/supplements'),
   catalog: ()        => api.get('/supplements/catalog'), // built-in list with micros per serving

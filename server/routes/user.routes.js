@@ -37,7 +37,11 @@ router.put(
   [
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
     body('height').optional().isNumeric().withMessage('Height must be a number'),
-    body('weight').optional().isNumeric().withMessage('Weight must be a number'),
+    body('weight').optional().isFloat({ min: 20, max: 400 }).withMessage('Weight must be between 20 and 400 kg'),
+    body('weightDate').optional().isISO8601().withMessage('Invalid date'),
+    body('bodyWeightUnit').optional().isIn(['kg', 'lb']).withMessage('Unit must be kg or lb'),
+    body('adaptiveCalories').optional().isBoolean().withMessage('Must be true or false'),
+    body('heightUnit').optional().isIn(['cm', 'ft']).withMessage('Height unit must be cm or ft'),
     body('bodyFat').optional({ nullable: true }).isFloat({ min: 3, max: 70 }).withMessage('Body fat must be between 3 and 70%'),
     body('sex').optional({ nullable: true }).isIn(['male', 'female']).withMessage('Sex must be male or female'),
     body('activityLevel').optional({ nullable: true }).isIn([1.2, 1.375, 1.55, 1.725, 1.9]).withMessage('Invalid activity level'),

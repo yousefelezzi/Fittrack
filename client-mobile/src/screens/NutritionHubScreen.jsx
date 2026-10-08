@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
-import { Utensils, GlassWater, Pill, ChartLine, History } from 'lucide-react-native';
+import { Utensils, GlassWater, Pill, ChartLine, History, Scale } from 'lucide-react-native';
 import { nutritionAPI, supplementAPI } from '../api';
 import { Card, ListRow, colors, makeStyles, Title } from '../components';
 import { formatMl } from '../../../client-web/src/utils/nutritionProgress';
 import { MACRO_COLORS } from '../../../client-web/src/utils/foodLogic';
+import { formatBodyWeight } from '../../../client-web/src/utils/bodyUnits';
+import { useAuth } from '../context/AuthContext';
 
 const today = () => format(new Date(), 'yyyy-MM-dd');
 
 /** Everything about nutrition in one place, like Train: today at a glance, then the sections. */
 export default function NutritionHubScreen({ navigation }) {
+  const { user } = useAuth();
   const [log, setLog] = useState(null);
   const [waterGoal, setWaterGoal] = useState(2500);
   const [supplements, setSupplements] = useState([]);
@@ -79,6 +82,7 @@ export default function NutritionHubScreen({ navigation }) {
         <ListRow icon={Utensils} title="Food Log" subtitle="Meals, macros, the meal planner and recipes" onPress={() => navigation.navigate('FoodLog')} />
         <ListRow icon={GlassWater} title="Hydration" subtitle="Water through the day against your goal" onPress={() => navigation.navigate('Hydration')} />
         <ListRow icon={Pill} title="Supplements" subtitle="Your supplements, ticked off each day" onPress={() => navigation.navigate('Supplements')} />
+        <ListRow icon={Scale} title="Weight" subtitle={user?.weight ? `${formatBodyWeight(user.weight, user.bodyWeightUnit)} · 7-day average` : 'Daily weigh-ins and your 7-day average'} onPress={() => navigation.navigate('Weight')} />
         <ListRow icon={ChartLine} title="Progress" subtitle="Daily calories, macros and water over time" onPress={() => navigation.navigate('NutritionProgress')} />
         <ListRow icon={History} title="History" subtitle="Past days' meals" onPress={() => navigation.navigate('History', { tab: 'nutrition' })} last />
       </Card>
