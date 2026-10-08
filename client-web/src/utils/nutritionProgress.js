@@ -98,5 +98,8 @@ export function adaptiveText(adaptive, unit = 'kg') {
   const verdict = adaptive.offset === 0
     ? 'which matches the formula, so no change.'
     : `so your maintenance looks ${Math.abs(adaptive.offset)} kcal ${adaptive.offset > 0 ? 'higher' : 'lower'} than the formula and your goal is adjusted${adaptive.limited ? ' (capped for now; it keeps adjusting as more data comes in)' : ''}.`;
-  return `Over the last 2 weeks you ate about ${adaptive.avgIntake.toLocaleString()} kcal a day and your weight ${moved} (${balance}), ${verdict}`;
+  const walked = adaptive.avgSteps != null
+    ? ` That already allows for the ${adaptive.avgSteps.toLocaleString()} steps a day you walked; each day's goal adds that day's own steps, so walking less lowers it.`
+    : '';
+  return `Over the last 2 weeks you ate about ${adaptive.avgIntake.toLocaleString()} kcal a day and your weight ${moved} (${balance}), ${verdict}${walked}`;
 }

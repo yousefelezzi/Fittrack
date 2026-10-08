@@ -9,6 +9,14 @@
  * predicts a maintenance too; the difference is how far off it is for this
  * person, and that correction is added to their calorie goal.
  *
+ * Steps are kept out of the correction: the period's walking is in the
+ * formula's side, and each day's goal adds that day's own steps (see
+ * nutritionTargets). So if the user walks less from now on, the goal drops by
+ * those steps' calories instead of still carrying the last two weeks' walking.
+ * Days with no steps logged count as the period's average logged day (the
+ * user still walked; it just wasn't recorded), so their walking isn't mistaken
+ * for a faster metabolism.
+ *
  * Only used with enough data: food logged on at least MIN_FOOD_DAYS days (days
  * under MIN_DAY_KCAL look unfinished and are skipped) and at least
  * MIN_WEIGH_INS weigh-ins in each of the two weeks. The correction is limited
@@ -73,7 +81,10 @@ async function adaptiveMaintenance(user, asOf = new Date()) {
   const dailyBalance = (weightChange * KCAL_PER_KG) / DAYS;
   const measured = avgIntake - dailyBalance;
   // The formula's maintenance for those days, with the calories from the steps walked.
-  const avgStepCalories = steps.length ? steps.reduce((n, s) => n + stepCalories(user, s.steps), 0) / DAYS : 0;
+  // Each logged day's steps; unlogged days count as the average logged day.
+  const logged = steps.filter((s) => s.steps > 0);
+  const avgSteps = logged.length ? logged.reduce((n, s) => n + s.steps, 0) / logged.length : null;
+  const avgStepCalories = logged.length ? logged.reduce((n, s) => n + stepCalories(user, s.steps), 0) / logged.length : 0;
   const expected = expectedBase + avgStepCalories;
 
   const limit = Math.min(MAX_OFFSET, expectedBase * MAX_OFFSET_PCT);
@@ -88,6 +99,8 @@ async function adaptiveMaintenance(user, asOf = new Date()) {
     dailyBalance: Math.round(dailyBalance),
     foodDays: intakes.length,
     weighIns: [firstWeek, lastWeek],
+    avgSteps: avgSteps == null ? null : Math.round(avgSteps / 10) * 10,
+    avgStepCalories: Math.round(avgStepCalories),
   };
 }
 
