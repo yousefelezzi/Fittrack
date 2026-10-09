@@ -28,6 +28,8 @@ const microsSchema = new mongoose.Schema({
   sugar:     { type: Number, default: 0 },   // g
   cholesterol:{ type: Number, default: 0 },  // mg
   omega3:    { type: Number, default: 0 },   // g
+  saturatedFat: { type: Number, default: 0 }, // g (part of fat)
+  creatine:  { type: Number, default: 0 },   // g (meat and fish; the supplement)
 }, { _id: false });
 
 // One line of a recipe: an existing Food used as an ingredient, at a given

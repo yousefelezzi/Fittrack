@@ -16,5 +16,6 @@ module.exports = { MACRO_KEYS, MEAL_TYPES, DIETS };
 const MICRO_KEYS = [
   'vitaminA', 'vitaminC', 'vitaminD', 'vitaminE', 'vitaminK', 'vitaminB1', 'vitaminB2', 'vitaminB3', 'vitaminB6', 'vitaminB12',
   'folate', 'calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'sodium', 'zinc', 'selenium', 'fiber', 'sugar', 'cholesterol', 'omega3',
+  'saturatedFat', 'creatine',
 ];
 module.exports.MICRO_KEYS = MICRO_KEYS;

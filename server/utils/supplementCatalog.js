@@ -50,7 +50,7 @@ const CATALOG = [
   { name: 'Psyllium husk', serving: '1 tbsp (about 5 g)', category: 'fats & fiber', micros: { fiber: 4 } },
 
   // ── Performance ──────────────────────────────────────────────────────────
-  { name: 'Creatine monohydrate', serving: '5 g', category: 'performance', micros: {} },
+  { name: 'Creatine monohydrate', serving: '5 g', category: 'performance', micros: { creatine: 5 } },
   { name: 'Caffeine', serving: '1 tablet (200 mg)', category: 'performance', micros: {} },
   { name: 'Pre-workout', serving: '1 scoop', category: 'performance', micros: {} },
   { name: 'Beta-alanine', serving: '3.2 g', category: 'performance', micros: {} },

@@ -16,6 +16,8 @@ import { adaptiveText } from '../../../client-web/src/utils/nutritionProgress';
 
 const ymd = (d) => format(d, 'yyyy-MM-dd');
 
+const SATURATED_LIMIT = 20; // g a day (FDA daily value)
+
 // ── Macro donut + micronutrients ────────────────────────────────────────────
 // `supplementMicros` / `waterMicros`: vitamins and minerals from the supplements
 // ticked off today and the water drunk.
@@ -408,6 +410,7 @@ export default function NutritionScreen({ navigation }) {
   useEffect(() => navigation.addListener('focus', () => { loadTargets(); fetchLog(); }), [navigation, fetchLog]);
 
   const meals = log?.meals || [];
+  const saturated = meals.reduce((n, m) => n + (m.micros?.saturatedFat || 0), 0);
   const totals = meals.reduce((a, m) => ({ calories: a.calories + m.calories, protein: a.protein + m.protein, carbs: a.carbs + m.carbs, fat: a.fat + m.fat }),
     { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
@@ -459,10 +462,18 @@ export default function NutritionScreen({ navigation }) {
               const val = r0(totals[m]);
               const goal = r0(goals?.[m]) || (m === 'protein' ? 150 : m === 'carbs' ? 200 : 65);
               return (
-                <View key={m} style={styles.legendRow}>
-                  <Text style={[styles.small, { width: 56, textTransform: 'capitalize' }]}>{m}</Text>
-                  <View style={[styles.track, { flex: 1 }]}><View style={[styles.fill, { width: `${Math.min(100, Math.round((val / goal) * 100))}%`, backgroundColor: MACRO_COLORS[m] }]} /></View>
-                  <Text style={[styles.muted, { width: 78, textAlign: 'right' }]}>{val}g / {goal}g</Text>
+                <View key={m}>
+                  <View style={styles.legendRow}>
+                    <Text style={[styles.small, { width: 56, textTransform: 'capitalize' }]}>{m}</Text>
+                    <View style={[styles.track, { flex: 1 }]}><View style={[styles.fill, { width: `${Math.min(100, Math.round((val / goal) * 100))}%`, backgroundColor: MACRO_COLORS[m] }]} /></View>
+                    <Text style={[styles.muted, { width: 78, textAlign: 'right' }]}>{val}g / {goal}g</Text>
+                  </View>
+                  {/* Like a nutrition label: the saturated part of the fat, against the 20 g daily limit. */}
+                  {m === 'fat' ? (
+                    <Text style={[styles.muted, { marginLeft: 64, marginTop: 2 }, saturated > SATURATED_LIMIT && { color: colors.warning }]}>
+                      of which saturated: {r(saturated)}g (limit {SATURATED_LIMIT}g)
+                    </Text>
+                  ) : null}
                 </View>
               );
             })}

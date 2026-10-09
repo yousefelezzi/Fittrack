@@ -60,6 +60,8 @@ export const MICRO_CONFIG = [
   { key: 'sugar',      label: 'Sugar',       unit: 'g',   dv: null },
   { key: 'cholesterol',label: 'Cholesterol', unit: 'mg',  dv: 300  },
   { key: 'omega3',     label: 'Omega-3',     unit: 'g',   dv: 1.6  },
+  { key: 'saturatedFat', label: 'Saturated fat', unit: 'g', dv: 20 }, // a limit, like sodium
+  { key: 'creatine',   label: 'Creatine',    unit: 'g',   dv: null }, // meat, fish and the supplement
 ];
 
 // Sum micros across all meals, plus `extra` (e.g. the day's supplements: the
@@ -82,8 +84,8 @@ export const addMicros = (...sources) => {
   return out;
 };
 
-/** Micronutrients you can enter for your own supplement (sugar and cholesterol left out). */
-export const SUPPLEMENT_MICROS = MICRO_CONFIG.filter((c) => !['sugar', 'cholesterol'].includes(c.key));
+/** Micronutrients you can enter for your own supplement (sugar, cholesterol and saturated fat left out). */
+export const SUPPLEMENT_MICROS = MICRO_CONFIG.filter((c) => !['sugar', 'cholesterol', 'saturatedFat'].includes(c.key));
 
 /** "Vitamin D 25 mcg · Calcium 500 mg" for a supplement's micros per serving × servings. */
 export const microsText = (micros = {}, servings = 1) => MICRO_CONFIG

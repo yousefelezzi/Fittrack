@@ -25,6 +25,8 @@ const mealMicrosSchema = new mongoose.Schema({
   sugar:      { type: Number, default: 0 },
   cholesterol:{ type: Number, default: 0 },
   omega3:     { type: Number, default: 0 },
+  saturatedFat: { type: Number, default: 0 },
+  creatine:   { type: Number, default: 0 },
 }, { _id: false });
 
 const mealSchema = new mongoose.Schema(

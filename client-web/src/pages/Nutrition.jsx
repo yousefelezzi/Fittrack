@@ -17,6 +17,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { adaptiveText } from '../utils/nutritionProgress';
 
+const SATURATED_LIMIT = 20; // g a day (FDA daily value)
+
 // ── Macro Pie + Micronutrient hover card ─────────────────────────────────────
 // `supplementMicros` / `waterMicros`: vitamins and minerals from the supplements
 // ticked off today and the water drunk.
@@ -1462,6 +1464,7 @@ export default function Nutrition() {
 
   useEffect(() => { fetchLog(); }, [fetchLog]);
 
+  const saturated = (log?.meals || []).reduce((n, m) => n + (m.micros?.saturatedFat || 0), 0);
   const totals = log?.meals?.reduce(
     (acc, m) => ({
       calories: acc.calories + m.calories,
@@ -1549,13 +1552,21 @@ export default function Nutrition() {
         const goal = r0(goals?.[macro]) || (macro === 'protein' ? 150 : macro === 'carbs' ? 200 : 65);
         const pct  = Math.min(100, Math.round((val / goal) * 100));
         return (
-          <div key={macro} className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400 capitalize w-16">{macro}</span>
-            <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${pct}%`, background: MACRO_COLORS[macro] }} />
+          <div key={macro}>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400 capitalize w-16">{macro}</span>
+              <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, background: MACRO_COLORS[macro] }} />
+              </div>
+              <span className="text-xs text-gray-400 dark:text-gray-500 w-20 text-right">{val}g / {goal}g</span>
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500 w-20 text-right">{val}g / {goal}g</span>
+            {/* Like a nutrition label: the saturated part of the fat, against the 20 g daily limit. */}
+            {macro === 'fat' && (
+              <p className={`text-xs ml-[76px] mt-0.5 ${saturated > SATURATED_LIMIT ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                of which saturated: {r(saturated)}g (limit {SATURATED_LIMIT}g)
+              </p>
+            )}
           </div>
         );
       })}

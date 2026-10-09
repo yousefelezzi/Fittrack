@@ -1105,4 +1105,72 @@ for (const f of foods) {
   if (sizes) f.servings = [...sizes.map(([label, grams]) => ({ label: `${label} (${grams}g)`, grams })), { label: '100g', grams: 100 }];
 }
 
-module.exports = { foods };
+// Saturated fat (g) and creatine (g) per 100 g, as the foods are listed above.
+// Saturated fat: USDA FoodData Central reference values (rounded). Creatine
+// occurs naturally only in meat and fish (roughly 0.3–0.5 g per 100 g, a bit
+// less once cooked); shellfish, dairy, eggs and plants have next to none.
+// [saturatedFat, creatine]
+const FATS_AND_CREATINE = {
+  'Chicken Breast, cooked': [1.0, 0.4], 'Chicken Thigh, cooked': [3.0, 0.3], 'Salmon, Atlantic, cooked': [3.1, 0.45],
+  'Tuna, canned in water': [0.2, 0.3], 'Tuna, canned in oil': [1.5, 0.3], 'Ground Beef, 80/20, cooked': [6.6, 0.35],
+  'Ground Beef, 90/10, cooked': [3.9, 0.4], 'Sirloin Steak, cooked': [3.5, 0.4], 'Tilapia, cooked': [0.9, 0.3],
+  'Shrimp, cooked': [0.1, 0], 'Turkey Breast, cooked': [2.1, 0.4], 'Pork Tenderloin, cooked': [1.5, 0.4], 'Cod, cooked': [0.2, 0.3],
+  'Eggs, whole, large': [3.3, 0], 'Egg Whites': [0, 0],
+  'Greek Yogurt, plain, 0% fat': [0.1, 0], 'Greek Yogurt, plain, 2% fat': [1.2, 0], 'Cottage Cheese, 1% fat': [0.6, 0],
+  'Cottage Cheese, 4% fat': [1.7, 0], 'Milk, whole': [1.9, 0], 'Milk, 2% fat': [1.3, 0], 'Milk, skimmed': [0.1, 0],
+  'Cheddar Cheese': [19, 0], 'Mozzarella, part-skim': [10, 0], 'Whey Protein Powder': [2.0, 0],
+  'White Rice, cooked': [0.1, 0], 'Brown Rice, cooked': [0.2, 0], 'Oats, dry': [1.2, 0], 'Oatmeal, cooked': [0.3, 0],
+  'Pasta, cooked': [0.2, 0], 'Whole Wheat Pasta, cooked': [0.1, 0], 'Bread, white': [0.7, 0], 'Bread, whole wheat': [0.7, 0],
+  'Quinoa, cooked': [0.2, 0], 'Tortilla, flour (20cm)': [2.0, 0], 'Bagel, plain': [0.2, 0], 'Crackers, whole wheat': [2.8, 0],
+  'Black Beans, cooked': [0.1, 0], 'Chickpeas, cooked': [0.3, 0], 'Lentils, cooked': [0.1, 0], 'Kidney Beans, cooked': [0.1, 0],
+  'Edamame, shelled': [0.6, 0], 'Peanut Butter': [10, 0],
+  'Broccoli, raw': [0, 0], 'Spinach, raw': [0.1, 0], 'Sweet Potato, cooked': [0, 0], 'White Potato, baked': [0, 0],
+  'Carrots, raw': [0, 0], 'Cucumber, raw': [0, 0], 'Tomato, raw': [0, 0], 'Bell Pepper, red': [0.1, 0], 'Kale, raw': [0.1, 0],
+  'Corn, cooked': [0.2, 0], 'Peas, cooked': [0.1, 0], 'Avocado': [2.1, 0], 'Mushrooms, raw': [0, 0],
+  'Banana': [0.1, 0], 'Apple': [0, 0], 'Blueberries': [0, 0], 'Strawberries': [0, 0], 'Orange': [0, 0], 'Grapes': [0.1, 0],
+  'Watermelon': [0, 0], 'Mango': [0.1, 0], 'Pineapple': [0, 0],
+  'Olive Oil': [14, 0], 'Butter': [51, 0], 'Almonds': [3.8, 0], 'Walnuts': [6.1, 0], 'Cashews': [7.8, 0],
+  'Pizza, cheese, 1 slice': [4.8, 0], 'Burger, beef patty + bun': [4.0, 0.2], 'French Fries': [2.3, 0], 'Hot Dog, in bun': [5.0, 0.1],
+  'Dark Chocolate (70-85%)': [24, 0], 'Milk Chocolate': [18, 0], 'Granola Bar': [6, 0], 'Potato Chips': [3.5, 0], 'Rice Cakes': [0.6, 0],
+  'Hummus': [1.4, 0], 'Protein Bar (generic)': [4.0, 0],
+  'Orange Juice': [0, 0], 'Almond Milk, unsweetened': [0.1, 0], 'Coconut Water': [0.2, 0], 'Protein Shake (with water)': [0.4, 0],
+  'Coffee, black': [0, 0], 'Tea, black, brewed': [0, 0], 'Soda, Cola': [0, 0], 'Diet Soda': [0, 0], 'Beer, regular': [0, 0],
+  'Wine, red': [0, 0], 'Sports Drink (Gatorade-style)': [0, 0], 'Energy Drink': [0, 0], 'Apple Juice': [0, 0], 'Cranberry Juice': [0, 0],
+  'Oat Milk, unsweetened': [0.2, 0], 'Soy Milk, unsweetened': [0.2, 0],
+  'Honey': [0, 0], 'Maple Syrup': [0, 0], 'White Sugar': [0, 0], 'Brown Sugar': [0, 0], 'Stevia (powder/packet)': [0, 0], 'Agave Nectar': [0, 0],
+  'Dates, Medjool': [0, 0], 'Raisins': [0.1, 0], 'Dried Apricots': [0, 0], 'Prunes (dried plums)': [0.1, 0], 'Dried Cranberries': [0.1, 0],
+  'Dried Figs': [0.1, 0], 'Lemon': [0, 0], 'Lime': [0, 0], 'Pear': [0, 0], 'Peach': [0, 0], 'Plum': [0, 0], 'Cherries': [0, 0],
+  'Kiwi': [0, 0], 'Grapefruit': [0, 0], 'Pomegranate Seeds': [0.1, 0],
+  'Coconut, shredded, unsweetened': [57, 0], 'Coconut Milk, canned': [21, 0],
+  'Peanuts, roasted, unsalted': [7.0, 0], 'Pistachios': [5.9, 0], 'Pecans': [6.2, 0], 'Hazelnuts': [4.5, 0], 'Brazil Nuts': [15, 0],
+  'Chia Seeds': [3.3, 0], 'Flax Seeds, ground': [3.7, 0], 'Sesame Seeds': [7.0, 0], 'Sunflower Seeds': [4.5, 0], 'Pumpkin Seeds': [8.7, 0],
+  'Tahini': [7.5, 0], 'Almond Butter': [4.2, 0],
+  'Garlic, raw': [0.1, 0], 'Onion, raw': [0, 0], 'Ginger, raw': [0.2, 0], 'Zucchini, raw': [0.1, 0], 'Cauliflower, raw': [0.1, 0],
+  'Green Beans, raw': [0, 0], 'Asparagus, raw': [0, 0], 'Brussels Sprouts, raw': [0.1, 0], 'Cabbage, raw': [0, 0], 'Lettuce, romaine': [0, 0],
+  'Beets, raw': [0, 0], 'Celery, raw': [0, 0], 'Butternut Squash, cooked': [0, 0], 'Pumpkin, canned': [0, 0], 'Radish, raw': [0, 0],
+  'Tofu, firm': [1.3, 0], 'Tempeh': [2.5, 0], 'Seitan': [0.3, 0],
+  'Bacon, cooked': [14, 0.2], 'Ham, sliced': [1.8, 0.3], 'Sausage, pork': [9.0, 0.2], 'Deli Turkey, sliced': [0.8, 0.3], 'Salami': [10, 0.2],
+  'Duck Breast, cooked': [3.7, 0.3], 'Lamb, cooked': [7.3, 0.4], 'Bison, cooked': [0.9, 0.4], 'Halibut, cooked': [0.4, 0.3],
+  'Sardines, canned in oil': [1.5, 0.5], 'Mackerel, cooked': [4.2, 0.5], 'Crab, cooked': [0.2, 0], 'Scallops, cooked': [0.1, 0],
+  'Mussels, cooked': [0.9, 0], 'Clams, cooked': [0.2, 0],
+  'Sour Cream': [11, 0], 'Cream Cheese': [20, 0], 'Heavy Cream': [23, 0], 'Half and Half': [7.0, 0], 'Parmesan Cheese': [16, 0],
+  'Feta Cheese': [15, 0], 'Swiss Cheese': [18, 0], 'Ricotta Cheese, part-skim': [4.9, 0], 'Buttermilk': [0.5, 0],
+  'Yogurt, plain, whole milk': [2.1, 0], 'Ice Cream, vanilla': [6.8, 0],
+  'Couscous, cooked': [0, 0], 'Barley, cooked': [0.1, 0], 'Buckwheat, cooked': [0.1, 0], 'Sourdough Bread': [0.3, 0], 'Rye Bread': [0.6, 0],
+  'English Muffin': [0.3, 0], 'Pita Bread': [0.2, 0], 'Naan': [2.9, 0], 'All-Purpose Flour': [0.2, 0], 'Whole Wheat Flour': [0.4, 0],
+  'Cornstarch': [0, 0], 'Popcorn, air-popped': [0.6, 0],
+  'Ketchup': [0, 0], 'Mustard, yellow': [0.2, 0], 'Mayonnaise': [11.7, 0], 'BBQ Sauce': [0.1, 0], 'Soy Sauce': [0.1, 0], 'Salsa': [0, 0],
+  'Ranch Dressing': [7.0, 0], 'Balsamic Vinegar': [0, 0], 'Hot Sauce': [0.1, 0], 'Guacamole': [1.9, 0],
+  'Cinnamon, ground': [0.3, 0], 'Black Pepper, ground': [1.4, 0], 'Salt': [0, 0], 'Vanilla Extract': [0, 0], 'Cocoa Powder, unsweetened': [8.1, 0],
+  'Baking Powder': [0, 0], 'Baking Soda': [0, 0],
+  'Coconut Oil': [82, 0], 'Canola Oil': [7.4, 0], 'Vegetable Oil': [15.6, 0], 'Sesame Oil': [14, 0], 'Ghee': [62, 0], 'Margarine': [16, 0],
+  'Pretzels': [0.4, 0], 'Tortilla Chips': [3.5, 0], 'Trail Mix': [5.5, 0], 'Beef Jerky': [11, 0.4],
+};
+for (const f of foods) {
+  const extra = FATS_AND_CREATINE[f.name];
+  if (!extra) continue;
+  const [saturatedFat, creatine] = extra;
+  f.per100g.micros = { ...(f.per100g.micros || {}), saturatedFat, ...(creatine ? { creatine } : {}) };
+}
+
+module.exports = { foods, FATS_AND_CREATINE };

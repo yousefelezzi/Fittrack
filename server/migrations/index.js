@@ -444,6 +444,63 @@ const migrations = [
       return `${users.length} username(s) created`;
     },
   },
+  {
+    // Saturated fat and creatine are now tracked. The built-in foods get them
+    // from the seed (which runs before the server starts); here custom recipes
+    // are recomputed from their ingredients, and logged meals that remember
+    // their food and grams get them filled in.
+    name: '2026-10-saturated-fat-creatine',
+    async up(db) {
+      const { per100gFor } = require('../utils/foodState');
+      const KEYS = ['saturatedFat', 'creatine'];
+      const foods = db.collection('foods');
+      const round = (n) => Math.round(n * 1000) / 1000;
+      const byId = new Map((await foods.find({}).toArray()).map((f) => [String(f._id), f]));
+      // Sum of the new keys (and calories, to scale) over a list of { food, grams, state }.
+      const sumOf = (items) => {
+        const out = { calories: 0, saturatedFat: 0, creatine: 0 };
+        for (const it of items || []) {
+          const f = byId.get(String(it.food));
+          if (!f || !(it.grams > 0)) continue;
+          const p = per100gFor(f, it.state);
+          out.calories += (p.calories || 0) * it.grams / 100;
+          for (const k of KEYS) out[k] += (p.micros?.[k] || 0) * it.grams / 100;
+        }
+        return out;
+      };
+
+      // Recipes: per 100 g scales with the ingredients the same way calories do.
+      let recipes = 0;
+      for (const f of byId.values()) {
+        if (!f.ingredients?.length) continue;
+        const t = sumOf(f.ingredients);
+        if (!(t.calories > 0) || !(f.per100g?.calories > 0)) continue;
+        const scale = f.per100g.calories / t.calories;
+        const set = Object.fromEntries(KEYS.map((k) => [`per100g.micros.${k}`, round(t[k] * scale)]));
+        await foods.updateOne({ _id: f._id }, { $set: set });
+        Object.assign(f.per100g.micros || (f.per100g.micros = {}), Object.fromEntries(KEYS.map((k) => [k, round(t[k] * scale)])));
+        recipes++;
+      }
+
+      // Logged meals.
+      let meals = 0;
+      const logs = await db.collection('nutritionlogs').find({ 'meals.0': { $exists: true } }).toArray();
+      for (const log of logs) {
+        let changed = false;
+        for (const m of log.meals) {
+          let t = null;
+          if (m.ingredients?.length) t = sumOf(m.ingredients);
+          else if (m.food && m.grams > 0) t = sumOf([{ food: m.food, grams: m.grams, state: m.state }]);
+          if (!t) continue;
+          m.micros = { ...(m.micros || {}), saturatedFat: round(t.saturatedFat), creatine: round(t.creatine) };
+          changed = true;
+          meals++;
+        }
+        if (changed) await db.collection('nutritionlogs').updateOne({ _id: log._id }, { $set: { meals: log.meals } });
+      }
+      return `${recipes} recipe(s) and ${meals} logged meal(s) updated`;
+    },
+  },
 ];
 
 async function runMigrations() {
