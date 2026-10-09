@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 
-export const MACRO_COLORS = { protein: '#0ea5e9', carbs: '#f59e0b', fat: '#ef4444' };
+export const MACRO_COLORS = { protein: '#0ea5e9', carbs: '#f59e0b', fat: '#ef4444', saturatedFat: '#991b1b' }; // saturated: a darker fat
 
 export const r = (n) => Math.round((n || 0) * 10) / 10;
 export const r0 = (n) => Math.round(n || 0);
@@ -61,7 +61,7 @@ export const MICRO_CONFIG = [
   { key: 'cholesterol',label: 'Cholesterol', unit: 'mg',  dv: 300  },
   { key: 'omega3',     label: 'Omega-3',     unit: 'g',   dv: 1.6  },
   { key: 'saturatedFat', label: 'Saturated fat', unit: 'g', dv: 20 }, // a limit, like sodium
-  { key: 'creatine',   label: 'Creatine',    unit: 'g',   dv: null }, // meat, fish and the supplement
+  { key: 'creatine',   label: 'Creatine',    unit: 'g',   dv: null, alwaysShow: true }, // meat, fish and the supplement; listed even at 0
 ];
 
 // Sum micros across all meals, plus `extra` (e.g. the day's supplements: the

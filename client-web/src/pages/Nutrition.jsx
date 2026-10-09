@@ -40,8 +40,8 @@ function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
 
   const hasData = macroData.length > 0;
 
-  // Only show micros with non-zero values
-  const activeMicros = MICRO_CONFIG.filter(cfg => (microTotals[cfg.key] || 0) > 0);
+  // Micros with a value (creatine is always listed)
+  const activeMicros = MICRO_CONFIG.filter(cfg => cfg.alwaysShow || (microTotals[cfg.key] || 0) > 0);
 
   return (
     <div

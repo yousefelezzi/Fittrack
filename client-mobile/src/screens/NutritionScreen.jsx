@@ -28,7 +28,7 @@ function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
     Object.values(supplementMicros || {}).some((v) => v > 0) && 'the supplements you took',
     Object.values(waterMicros || {}).some((v) => v > 0) && 'the minerals in your water',
   ].filter(Boolean).join(' and ');
-  const active = MICRO_CONFIG.filter((c) => (micros[c.key] || 0) > 0);
+  const active = MICRO_CONFIG.filter((c) => c.alwaysShow || (micros[c.key] || 0) > 0); // creatine is always listed
   const kcal = { protein: totals.protein * 4, carbs: totals.carbs * 4, fat: totals.fat * 9 };
   const kcalTotal = kcal.protein + kcal.carbs + kcal.fat;
   if (kcalTotal === 0) return <Card><Text style={styles.muted}>Add meals to see the macro breakdown.</Text></Card>;

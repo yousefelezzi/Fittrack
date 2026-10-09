@@ -610,7 +610,7 @@ exports.getSummary = async (req, res, next) => {
     if (!from || !to) return res.status(400).json({ message: 'from and to dates are required' });
     const [logs, user, stepLogs] = await Promise.all([
       NutritionLog.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } })
-        .select('date meals.calories meals.protein meals.carbs meals.fat meals.micros.fiber water supplementsTaken dailyGoals')
+        .select('date meals.calories meals.protein meals.carbs meals.fat meals.micros.fiber meals.micros.saturatedFat water supplementsTaken dailyGoals')
         .sort({ date: 1 })
         .lean(),
       User.findById(req.user.id).select(`${TARGET_PROFILE_FIELDS} waterGoal waterType`).lean(),
@@ -637,6 +637,7 @@ exports.getSummary = async (req, res, next) => {
         carbs: sum(l.meals, (m) => m.carbs),
         fat: sum(l.meals, (m) => m.fat),
         fiber: sum(l.meals, (m) => m.micros?.fiber),
+        saturatedFat: sum(l.meals, (m) => m.micros?.saturatedFat),
         water: sum(l.water || [], (w) => w.amount),
         supplements: (l.supplementsTaken || []).filter((t) => t.taken !== false).length,
         goals: goalsFor(l),

@@ -74,18 +74,23 @@ export function macroSplit(grams) {
 /**
  * Average macros over the days with food logged in the period, as a share of
  * calories: { daysLogged, kcal, slices: macroSplit of the average grams,
- * goal: macroSplit of the latest day's goals (or null) }.
+ * saturated: { grams, kcal, pct } (part of the fat), goal: macroSplit of the
+ * latest day's goals (or null) }.
  */
 export function averageMacros(summary) {
   const logged = (summary?.days || []).filter((d) => d.calories > 0);
-  if (!logged.length) return { daysLogged: 0, kcal: 0, slices: macroSplit(null), goal: null };
+  if (!logged.length) return { daysLogged: 0, kcal: 0, slices: macroSplit(null), saturated: { grams: 0, kcal: 0, pct: 0 }, goal: null };
   const avg = (k) => logged.reduce((n, d) => n + (d[k] || 0), 0) / logged.length;
   const grams = { protein: avg('protein'), carbs: avg('carbs'), fat: avg('fat') };
   const goals = [...(summary.days || [])].reverse().find((d) => d.goals?.protein && d.goals?.carbs && d.goals?.fat)?.goals;
+  const slices = macroSplit(grams);
+  const macroKcal = slices.reduce((n, m) => n + m.kcal, 0);
+  const satGrams = Math.min(avg('saturatedFat'), grams.fat);
   return {
     daysLogged: logged.length,
     kcal: Math.round(avg('calories')),
-    slices: macroSplit(grams),
+    slices,
+    saturated: { grams: satGrams, kcal: satGrams * 9, pct: macroKcal ? Math.round((satGrams * 9 / macroKcal) * 100) : 0 },
     goal: goals ? macroSplit(goals) : null,
   };
 }

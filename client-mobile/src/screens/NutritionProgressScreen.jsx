@@ -69,7 +69,7 @@ export default function NutritionProgressScreen() {
         {!summary ? <Spinner /> : macros.daysLogged === 0 ? <Hint>Nothing logged in the last {days} days.</Hint> : (
           <View style={styles.macroRow}>
             <View>
-              <MacroDonut grams={Object.fromEntries(macros.slices.map((m) => [m.key, m.grams]))} size={120} />
+              <MacroDonut grams={{ ...Object.fromEntries(macros.slices.map((m) => [m.key, m.grams])), saturatedFat: macros.saturated.grams }} size={120} />
               <View style={styles.donutCenter} pointerEvents="none">
                 <Text style={styles.value}>{macros.kcal.toLocaleString()}</Text>
                 <Text style={styles.cap}>kcal / day</Text>
@@ -86,6 +86,18 @@ export default function NutritionProgressScreen() {
                   <Text style={[styles.cap, { marginLeft: 16 }]}>
                     {Math.round(m.grams)} g · {Math.round(m.kcal)} kcal{macros.goal ? ` · goal ${macros.goal[i].pct}%` : ''}
                   </Text>
+                  {m.key === 'fat' ? (
+                    <View style={{ marginLeft: 16, marginTop: 4 }}>
+                      <View style={styles.legendRow}>
+                        <View style={[styles.dot, { backgroundColor: MACRO_COLORS.saturatedFat }]} />
+                        <Text style={[styles.cap, { flex: 1, color: colors.textPrimary }]}>Saturated</Text>
+                        <Text style={styles.cap}>{macros.saturated.pct}%</Text>
+                      </View>
+                      <Text style={[styles.cap, { marginLeft: 16 }, macros.saturated.grams > 20 && { color: colors.warning }]}>
+                        {Math.round(macros.saturated.grams * 10) / 10} g · limit 20 g
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ))}
             </View>

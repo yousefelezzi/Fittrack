@@ -29,6 +29,12 @@ export default function NutritionProgress() {
   const fmt = (v) => (v == null ? '–' : metric === 'water' ? formatMl(v) : `${Math.round(v).toLocaleString()} ${unit}`);
   const data = series.map((p) => ({ ...p, label: format(new Date(`${p.date}T00:00`), days > 30 ? 'MMM d' : 'EEE d') }));
   const macros = averageMacros(summary);
+  // The donut's slices: fat split into its saturated part (darker) and the rest.
+  const pieSlices = [
+    ...macros.slices.filter((m) => m.key !== 'fat'),
+    { ...macros.slices[2], kcal: macros.slices[2].kcal - macros.saturated.kcal, label: 'Other fat', pct: macros.slices[2].pct - macros.saturated.pct },
+    { key: 'saturatedFat', label: 'Saturated fat', grams: macros.saturated.grams, kcal: macros.saturated.kcal, pct: macros.saturated.pct },
+  ].filter((m) => m.kcal > 0);
   const pill = (active) => `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active
     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`;
 
@@ -91,8 +97,8 @@ export default function NutritionProgress() {
             <div className="relative w-44 h-44 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={macros.slices.filter((m) => m.kcal > 0)} dataKey="kcal" nameKey="label" innerRadius="62%" outerRadius="100%" paddingAngle={2} stroke="none" isAnimationActive={false}>
-                    {macros.slices.filter((m) => m.kcal > 0).map((m) => <Cell key={m.key} fill={MACRO_COLORS[m.key]} />)}
+                  <Pie data={pieSlices} dataKey="kcal" nameKey="label" innerRadius="62%" outerRadius="100%" paddingAngle={2} stroke="none" isAnimationActive={false}>
+                    {pieSlices.map((m) => <Cell key={m.key} fill={MACRO_COLORS[m.key]} />)}
                   </Pie>
                   <Tooltip wrapperStyle={{ zIndex: 20 }} content={<ChartTooltip title={(_, m) => m.label} format={(v, _, m) => [`${Math.round(v).toLocaleString()} kcal (${m.pct}%)`, `${Math.round(m.grams)} g`]} />} />
                 </PieChart>
@@ -113,6 +119,18 @@ export default function NutritionProgress() {
                   <p className="text-xs text-gray-400 dark:text-gray-500 ml-[18px]">
                     {Math.round(m.grams)} g · {Math.round(m.kcal).toLocaleString()} kcal{macros.goal ? ` · goal ${macros.goal[i].pct}%` : ''}
                   </p>
+                  {m.key === 'fat' && (
+                    <div className="ml-[18px] mt-1.5">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: MACRO_COLORS.saturatedFat }} />
+                        <span className="text-gray-700 dark:text-gray-300 flex-1">Saturated</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300 tabular-nums">{macros.saturated.pct}%</span>
+                      </div>
+                      <p className={`text-xs ml-4 ${macros.saturated.grams > 20 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                        {Math.round(macros.saturated.grams * 10) / 10} g · limit 20 g
+                      </p>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
