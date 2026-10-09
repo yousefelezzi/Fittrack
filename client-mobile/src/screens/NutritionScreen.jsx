@@ -105,7 +105,7 @@ function GoalInfo({ info, onProfile, onSteps, onWeight }) {
       <Hint>
         {basis.dynamic
           ? 'Dynamic goal on: worked out from your weight change, steps and workouts. Turn it off in Settings to use your activity level instead.'
-          : <>Worked out from your profile and activity level. Change them in your <Text style={styles.link} onPress={onProfile}>profile</Text> and today's goals update automatically.</>}
+          : <>Worked out from your profile and activity level{basis.dynamicPending ? ' (the dynamic goal takes over after 2 weeks of data)' : ''}. Change them in your <Text style={styles.link} onPress={onProfile}>profile</Text> and today's goals update automatically.</>}
       </Hint>
     </Card>
   );

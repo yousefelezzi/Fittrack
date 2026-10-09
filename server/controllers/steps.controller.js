@@ -8,21 +8,28 @@ const startOfDay = (date) => { const d = new Date(date); d.setHours(0,0,0,0); re
 const endOfDay   = (date) => { const d = new Date(date); d.setHours(23,59,59,999); return d; };
 const sameDay    = (date) => ({ $gte: startOfDay(date), $lte: endOfDay(date) });
 
-const USER_FIELDS = 'weight activityLevel stepGoal adaptiveCalories';
+const USER_FIELDS = 'weight height dateOfBirth sex activityLevel fitnessGoal stepGoal adaptiveCalories';
+
+/** 'on' (steps count), 'pending' (turned on, waiting for 2 weeks of data) or 'off'. */
+async function dynamicState(user) {
+  if (user?.adaptiveCalories === false) return 'off';
+  const { adaptiveMaintenance } = require('../utils/adaptiveCalories');
+  return (await adaptiveMaintenance(user)).reason ? 'pending' : 'on';
+}
 
 // What the client needs to explain the numbers: the goal, and whether steps
-// count toward the calorie goal (only with the dynamic goal on).
-const settingsFor = (user) => ({
+// count toward the calorie goal (only once the dynamic goal is active).
+const settingsFor = (user, state) => ({
   goal: user?.stepGoal || DEFAULT_STEP_GOAL,
-  dynamic: user?.adaptiveCalories !== false,
+  dynamic: state,
   canAdjustCalories: !!user?.weight,
 });
 
-const entryFor = (log, user) => ({
+const entryFor = (log, user, state) => ({
   _id: log._id,
   date: log.date,
   steps: log.steps,
-  calories: stepCalories(user, log.steps), // added to the day's calorie goal (dynamic goal only)
+  calories: state === 'on' ? stepCalories(user, log.steps) : 0, // added to the day's calorie goal
   burned: stepBurn(user, log.steps),        // all calories burned walking them
 });
 
@@ -35,7 +42,8 @@ exports.getSteps = async (req, res, next) => {
       User.findById(req.user.id).select(USER_FIELDS).lean(),
       StepLog.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } }).sort({ date: 1 }).lean(),
     ]);
-    res.json({ ...settingsFor(user), days: logs.map((l) => entryFor(l, user)) });
+    const state = await dynamicState(user);
+    res.json({ ...settingsFor(user, state), days: logs.map((l) => entryFor(l, user, state)) });
   } catch (err) {
     next(err);
   }
@@ -89,7 +97,8 @@ exports.setSteps = async (req, res, next) => {
     await syncGoals(nutrition, req.user.id);
 
     const user = await User.findById(req.user.id).select(USER_FIELDS).lean();
-    res.json({ ...settingsFor(user), entry: log ? entryFor(log, user) : null });
+    const state = await dynamicState(user);
+    res.json({ ...settingsFor(user, state), entry: log ? entryFor(log, user, state) : null });
   } catch (err) {
     next(err);
   }

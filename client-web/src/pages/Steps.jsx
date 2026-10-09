@@ -117,7 +117,9 @@ export default function Steps() {
             <Flame size={13} className="mt-0.5 shrink-0 text-orange-500" />
             {!canAdjustCalories
               ? <>Add your weight to your <Link to="/profile" className="text-brand-600">profile</Link> so your steps can count toward your calorie goal.</>
-              : !dynamic
+              : dynamic === 'pending'
+                ? <>{today?.burned > 0 && <>About {today.burned.toLocaleString()} kcal burned walking today. </>}Steps start counting toward your calorie goal once the dynamic goal has 2 weeks of data; until then your activity level covers them.</>
+              : dynamic === 'off'
                 ? <>{today?.burned > 0 && <>About {today.burned.toLocaleString()} kcal burned walking today. </>}Steps don't change your calorie goal while the dynamic goal is off (your activity level covers them). Turn it on in <Link to="/settings" className="text-brand-600">Settings</Link>.</>
                 : today?.burned > 0
                   ? <>About {today.burned.toLocaleString()} kcal burned walking today, all added to today's <Link to="/nutrition" className="text-brand-600">calorie goal</Link>.</>

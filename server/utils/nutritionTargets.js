@@ -7,15 +7,15 @@
  * That's all with the dynamic goal off: a plain calculator from the profile
  * and the chosen activity level, with no steps, cardio or workouts.
  *
- * With the dynamic goal on (the default), the activity level isn't used:
+ * The dynamic goal (on by default) takes over once there are 2 weeks of data
+ * (utils/adaptiveCalories.js); until then the goal stays the calculator one.
+ * Then the activity level isn't used:
  *   maintenance = what the user's weight change says they burn (food eaten
- *                 minus the surplus or deficit, utils/adaptiveCalories.js),
- *                 minus the daily average of the steps, workouts and cardio
- *                 they did in those two weeks
- *   until there's enough data for that: BMR × 1.1 (resting and digesting)
- * and then each day gets back what it actually has: that day's steps (from
- * the first step) and that day's workouts and cardio (the extra goes to carbs
- * and fat). Training or walking less lowers that day's goal.
+ *                 minus the surplus or deficit), minus the daily average of
+ *                 the steps, workouts and cardio they did in those two weeks
+ * and each day gets back what it actually has: that day's steps (from the
+ * first step) and that day's workouts and cardio (the extra goes to carbs and
+ * fat). Training or walking less lowers that day's goal.
  */
 const { stepCalories } = require('./steps');
 
@@ -82,13 +82,12 @@ function nutritionTargets(user, { steps, workouts, adaptive } = {}) {
 
   const bmr = 10 * user.weight + 6.25 * user.height - 5 * age + (user.sex === 'female' ? -161 : 5);
   const formula = bmr * activity;
-  // Dynamic: no activity-level guess. From the weight change (without the
-  // period's steps and workouts) when there's enough data, else BMR × 1.1;
-  // the day's own steps and workouts are added below.
-  const dynamic = user.adaptiveCalories !== false;
-  const measured = dynamic && adaptive && adaptive.offset != null && !adaptive.reason;
-  const offset = measured ? adaptive.offset : 0;
-  const maintenance = !dynamic ? formula : bmr * DYNAMIC_BASE + offset;
+  // Dynamic (turned on, and 2 weeks of data): from the weight change, without
+  // the period's steps and workouts, which are added back per day below.
+  // Otherwise the calculator: BMR × activity level.
+  const wanted = user.adaptiveCalories !== false;
+  const dynamic = wanted && !!adaptive && adaptive.offset != null && !adaptive.reason;
+  const maintenance = dynamic ? bmr * DYNAMIC_BASE + adaptive.offset : formula;
 
   let calories = maintenance * (1 + rule.calorieAdjust);
   const floored = calories < MIN_CALORIES[user.sex];
@@ -111,7 +110,9 @@ function nutritionTargets(user, { steps, workouts, adaptive } = {}) {
       maintenance: Math.round(maintenance / 10) * 10,
       formulaMaintenance: Math.round(formula / 10) * 10,
       dynamic,
-      adaptive: dynamic ? adaptive || null : null,
+      // Turned on but waiting for enough data: `adaptive` says what's missing.
+      dynamicPending: wanted && !dynamic,
+      adaptive: wanted ? adaptive || null : null,
       activityLevel: activity,
       activityAssumed: !ACTIVITY_LEVELS.includes(user.activityLevel),
       floored,

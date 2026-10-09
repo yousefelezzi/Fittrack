@@ -105,7 +105,9 @@ export default function StepsScreen({ navigation }) {
         <Text style={[styles.small, { marginTop: 8 }]}>
           {!canAdjustCalories
             ? 'Add your weight to your profile so your steps can count toward your calorie goal.'
-            : !dynamic
+            : dynamic === 'pending'
+              ? `${today?.burned > 0 ? `About ${fmt(today.burned)} kcal burned walking today. ` : ''}Steps start counting toward your calorie goal once the dynamic goal has 2 weeks of data; until then your activity level covers them.`
+            : dynamic === 'off'
               ? `${today?.burned > 0 ? `About ${fmt(today.burned)} kcal burned walking today. ` : ''}Steps don't change your calorie goal while the dynamic goal is off (your activity level covers them). Turn it on in Settings.`
               : today?.burned > 0
                 ? `About ${fmt(today.burned)} kcal burned walking today, all added to today's calorie goal.`

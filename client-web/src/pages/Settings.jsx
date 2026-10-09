@@ -232,7 +232,7 @@ export default function Settings() {
 
       <Section icon={Apple} title="Nutrition">
         <Row title="Dynamic calorie goal"
-          hint="On: each day's steps are added, and your last 2 weeks of workouts, food and weight trend tune your maintenance (needs food on 10 of 14 days and a couple of weigh-ins a week). Off: a plain calculator from your profile and activity level, with no steps or workouts.">
+          hint="Once you have 2 weeks of data (food on 10 of 14 days, a couple of weigh-ins a week), your maintenance comes from your weight change, and each day's steps, workouts and cardio are added on top. Until then, or when off: a plain calculator from your profile and activity level.">
           <Toggle checked={user?.adaptiveCalories !== false} disabled={busy === 'adaptiveCalories'} onChange={(v) => save('adaptiveCalories', { adaptiveCalories: v })} />
         </Row>
       </Section>

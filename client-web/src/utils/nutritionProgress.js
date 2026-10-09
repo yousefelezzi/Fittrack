@@ -117,13 +117,13 @@ export const WATER_PRESETS = [250, 330, 500, 750];
  */
 export function adaptiveText(adaptive, unit = 'kg') {
   if (!adaptive) return null;
-  const meanwhile = "For now your maintenance is your resting burn, and each day's steps, workouts and cardio are added on top when you do them.";
+  const meanwhile = 'The dynamic goal starts once there are 2 weeks of data; until then your goal comes from your activity level.';
   if (adaptive.reason === 'food') {
-    return `${meanwhile} To work it out from your real results, log your food on at least ${adaptive.needed} of the last 14 days (${adaptive.foodDays} so far).`;
+    return `${meanwhile} Log your food on at least ${adaptive.needed} of the last 14 days (${adaptive.foodDays} so far).`;
   }
   if (adaptive.reason === 'weight') {
     const [a, b] = adaptive.weighIns || [0, 0];
-    return `${meanwhile} To work it out from your real results, weigh in at least ${adaptive.needed} times in each of the last two weeks (${a} and ${b} so far).`;
+    return `${meanwhile} Weigh in at least ${adaptive.needed} times in each of the last two weeks (${a} and ${b} so far).`;
   }
   if (adaptive.reason) return null;
   const change = Math.abs(unit === 'lb' ? adaptive.weightChange / 0.45359237 : adaptive.weightChange);

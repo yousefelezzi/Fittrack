@@ -1351,7 +1351,7 @@ function GoalInfo({ info }) {
       <p className="text-xs">
         {basis.dynamic
           ? <>Dynamic goal on: worked out from your weight change, steps and workouts. Turn it off in <Link to="/settings" className="text-brand-600">Settings</Link> to use your activity level instead.</>
-          : <>Worked out from your profile and activity level. Change them in your <Link to="/profile" className="text-brand-600">profile</Link> and today's goals update automatically.</>}
+          : <>Worked out from your profile and activity level{basis.dynamicPending ? ' (the dynamic goal takes over after 2 weeks of data)' : ''}. Change them in your <Link to="/profile" className="text-brand-600">profile</Link> and today's goals update automatically.</>}
       </p>
     </div>
   );
