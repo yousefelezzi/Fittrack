@@ -86,7 +86,7 @@ function FFMI({ user }) {
       </Card>
       <Card>
         <Text style={styles.body}><Text style={styles.bold}>Normalized FFMI</Text> adjusts for height so people of different heights can be compared on the same scale. Women naturally carry less muscle, so their categories sit 3 points lower than men's.</Text>
-        <Text style={[styles.body, { marginTop: 8 }]}>Most natural men top out around 25, and women around 22. Values well above that are unusual without pharmaceutical assistance — treat FFMI as a rough guide, not a verdict.</Text>
+        <Text style={[styles.body, { marginTop: 8 }]}>Most natural men top out around 25, and women around 22. Values well above that are unusual without pharmaceutical assistance. Treat FFMI as a rough guide, not a verdict.</Text>
       </Card>
     </>
   );

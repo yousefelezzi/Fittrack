@@ -6,8 +6,37 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import Svg, { Polyline, Line as SvgLine, Circle } from 'react-native-svg';
 import { colors, makeStyles } from './tokens';
+import { MACRO_COLORS } from '../../../client-web/src/utils/foodLogic';
 
 const LABEL_H = 16;
+
+/**
+ * Donut of the calories from protein, carbs and fat (fat is 9 kcal/g, the
+ * others 4). grams: { protein, carbs, fat }.
+ */
+export function MacroDonut({ grams, size = 90 }) {
+  const data = [['protein', (grams?.protein || 0) * 4], ['carbs', (grams?.carbs || 0) * 4], ['fat', (grams?.fat || 0) * 9]].filter(([, v]) => v > 0);
+  const total = data.reduce((s, [, v]) => s + v, 0);
+  const c = size / 2;
+  const stroke = size * 0.155;
+  const R = c - stroke / 2 - 4;
+  const C = 2 * Math.PI * R;
+  let offset = 0;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={c} cy={c} r={R} stroke={colors.subtle} strokeWidth={stroke} fill="none" />
+      {data.map(([k, v]) => {
+        const len = (v / total) * C;
+        const el = (
+          <Circle key={k} cx={c} cy={c} r={R} stroke={MACRO_COLORS[k]} strokeWidth={stroke} fill="none"
+            strokeDasharray={`${Math.max(0, len - 2)} ${C}`} strokeDashoffset={-offset} rotation={-90} origin={`${c}, ${c}`} />
+        );
+        offset += len;
+        return el;
+      })}
+    </Svg>
+  );
+}
 const shortNum = (v) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : `${Math.round(v * 10) / 10}`);
 
 /**

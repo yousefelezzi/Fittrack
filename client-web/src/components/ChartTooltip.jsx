@@ -12,7 +12,7 @@ export default function ChartTooltip({ active, payload, label, format, title }) 
   if (!active || !rows.length) return null;
   const point = rows[0].payload;
   return (
-    <div className="rounded-lg border px-3 py-2 text-xs shadow-sm"
+    <div className="rounded-lg border px-3 py-2 text-xs shadow-sm whitespace-nowrap"
       style={{ backgroundColor: 'var(--tooltip-bg, #fff)', borderColor: 'var(--tooltip-border, #e5e7eb)', color: 'var(--tooltip-text, #111)' }}>
       <p className="font-semibold">{title ? title(label, point) : label}</p>
       <ul className="mt-1 space-y-0.5">

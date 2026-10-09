@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { format } from 'date-fns';
 import { nutritionAPI } from '../api';
-import { Card, BarChart, Segmented, colors, makeStyles, Hint, ErrorText, Spinner } from '../components';
+import { Card, BarChart, MacroDonut, Segmented, colors, makeStyles, Hint, ErrorText, Spinner } from '../components';
 import {
-  NUTRITION_METRICS, NUTRITION_RANGES, rangeDates, dailySeries, seriesStats, TARGET_RULE, formatMl,
+  NUTRITION_METRICS, NUTRITION_RANGES, rangeDates, dailySeries, seriesStats, TARGET_RULE, formatMl, averageMacros,
 } from '../../../client-web/src/utils/nutritionProgress';
+import { MACRO_COLORS } from '../../../client-web/src/utils/foodLogic';
 
 const COLORS = { calories: '#f97316', protein: '#0ea5e9', carbs: '#eab308', fat: '#a855f7', water: '#06b6d4' };
 
@@ -32,6 +33,7 @@ export default function NutritionProgressScreen() {
   const goal = [...series].reverse().find((p) => p.target)?.target || null;
   const bars = series.map((p) => ({ key: p.date, label: format(new Date(`${p.date}T00:00`), days > 7 ? 'd' : 'EEE'), value: p.value || 0, raw: p }));
   const pick = selected && series.find((p) => p.date === selected);
+  const macros = averageMacros(summary);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16 }}>
@@ -60,6 +62,36 @@ export default function NutritionProgressScreen() {
           </>
         )}
       </Card>
+
+      <Card>
+        <Text style={styles.title}>Average macros</Text>
+        <Hint style={{ marginBottom: 10 }}>Where your calories came from on an average logged day in the last {days} days.</Hint>
+        {!summary ? <Spinner /> : macros.daysLogged === 0 ? <Hint>Nothing logged in the last {days} days.</Hint> : (
+          <View style={styles.macroRow}>
+            <View>
+              <MacroDonut grams={Object.fromEntries(macros.slices.map((m) => [m.key, m.grams]))} size={120} />
+              <View style={styles.donutCenter} pointerEvents="none">
+                <Text style={styles.value}>{macros.kcal.toLocaleString()}</Text>
+                <Text style={styles.cap}>kcal / day</Text>
+              </View>
+            </View>
+            <View style={{ flex: 1, gap: 8 }}>
+              {macros.slices.map((m, i) => (
+                <View key={m.key}>
+                  <View style={styles.legendRow}>
+                    <View style={[styles.dot, { backgroundColor: MACRO_COLORS[m.key] }]} />
+                    <Text style={[styles.valueSmall, { flex: 1 }]}>{m.label}</Text>
+                    <Text style={styles.valueSmall}>{m.pct}%</Text>
+                  </View>
+                  <Text style={[styles.cap, { marginLeft: 16 }]}>
+                    {Math.round(m.grams)} g · {Math.round(m.kcal)} kcal{macros.goal ? ` · goal ${macros.goal[i].pct}%` : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </Card>
     </ScrollView>
   );
 }
@@ -71,4 +103,8 @@ const styles = makeStyles(() => ({
   value:      { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   valueSmall: { fontWeight: '700', color: colors.textPrimary },
   title:      { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  macroRow:   { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  donutCenter:{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  legendRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot:        { width: 8, height: 8, borderRadius: 4 },
 }));

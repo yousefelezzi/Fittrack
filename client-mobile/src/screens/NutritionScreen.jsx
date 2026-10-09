@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
 import { format, addDays, subDays, parseISO, isToday } from 'date-fns';
 import DayNav, { useDaySwipe } from '../components/DayNav';
 import { nutritionAPI, foodAPI } from '../api';
-import { Card, Spinner, colors, makeStyles, Sheet, Chip, ChipRow, Hint, ErrorText, LinkText, confirm } from '../components';
+import { Card, Spinner, MacroDonut, colors, makeStyles, Sheet, Chip, ChipRow, Hint, ErrorText, LinkText, confirm } from '../components';
 import {
   FoodSearch, PortionSelector, ManualEntry, CustomFoodForm, RecipeBuilder, RecipeEditor, RecipeMealEditor, QuickAddEditor, Btn,
 } from '../components/nutrition/FoodForms';
@@ -18,29 +17,6 @@ import { adaptiveText } from '../../../client-web/src/utils/nutritionProgress';
 const ymd = (d) => format(d, 'yyyy-MM-dd');
 
 // ── Macro donut + micronutrients ────────────────────────────────────────────
-function MacroDonut({ totals }) {
-  // Split by calories, not grams: fat is 9 kcal/g, protein and carbs 4.
-  const data = [['protein', totals.protein * 4], ['carbs', totals.carbs * 4], ['fat', totals.fat * 9]].filter(([, v]) => v > 0);
-  const total = data.reduce((s, [, v]) => s + v, 0);
-  const R = 34;
-  const C = 2 * Math.PI * R;
-  let offset = 0;
-  return (
-    <Svg width={90} height={90} viewBox="0 0 90 90">
-      <Circle cx={45} cy={45} r={R} stroke={colors.subtle} strokeWidth={14} fill="none" />
-      {data.map(([k, v]) => {
-        const len = (v / total) * C;
-        const el = (
-          <Circle key={k} cx={45} cy={45} r={R} stroke={MACRO_COLORS[k]} strokeWidth={14} fill="none"
-            strokeDasharray={`${Math.max(0, len - 2)} ${C}`} strokeDashoffset={-offset} rotation={-90} origin="45, 45" />
-        );
-        offset += len;
-        return el;
-      })}
-    </Svg>
-  );
-}
-
 // `supplementMicros` / `waterMicros`: vitamins and minerals from the supplements
 // ticked off today and the water drunk.
 function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
@@ -59,7 +35,7 @@ function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
     <Card>
       {!showMicros ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <MacroDonut totals={totals} />
+          <MacroDonut grams={totals} />
           <View style={{ flex: 1, gap: 6 }}>
             {['protein', 'carbs', 'fat'].map((k) => (
               <View key={k} style={styles.legendRow}>

@@ -62,6 +62,34 @@ export function seriesStats(series, metric) {
   return { average: avg, daysLogged: logged.length, onTarget: withTarget.filter(hit).length, daysWithTarget: withTarget.length };
 }
 
+const MACROS = [['protein', 'Protein', 4], ['carbs', 'Carbs', 4], ['fat', 'Fat', 9]];
+
+/** Each macro's share of the calories in { protein, carbs, fat } grams: [{ key, label, grams, kcal, pct }]. */
+export function macroSplit(grams) {
+  const rows = MACROS.map(([key, label, perGram]) => ({ key, label, grams: grams?.[key] || 0, kcal: (grams?.[key] || 0) * perGram }));
+  const total = rows.reduce((n, m) => n + m.kcal, 0);
+  return rows.map((m) => ({ ...m, pct: total ? Math.round((m.kcal / total) * 100) : 0 }));
+}
+
+/**
+ * Average macros over the days with food logged in the period, as a share of
+ * calories: { daysLogged, kcal, slices: macroSplit of the average grams,
+ * goal: macroSplit of the latest day's goals (or null) }.
+ */
+export function averageMacros(summary) {
+  const logged = (summary?.days || []).filter((d) => d.calories > 0);
+  if (!logged.length) return { daysLogged: 0, kcal: 0, slices: macroSplit(null), goal: null };
+  const avg = (k) => logged.reduce((n, d) => n + (d[k] || 0), 0) / logged.length;
+  const grams = { protein: avg('protein'), carbs: avg('carbs'), fat: avg('fat') };
+  const goals = [...(summary.days || [])].reverse().find((d) => d.goals?.protein && d.goals?.carbs && d.goals?.fat)?.goals;
+  return {
+    daysLogged: logged.length,
+    kcal: Math.round(avg('calories')),
+    slices: macroSplit(grams),
+    goal: goals ? macroSplit(goals) : null,
+  };
+}
+
 /** "On target" wording per metric, for the stats line. */
 export const TARGET_RULE = {
   calories: 'within 10% of your goal',
