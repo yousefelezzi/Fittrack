@@ -29,12 +29,7 @@ export default function NutritionProgress() {
   const fmt = (v) => (v == null ? '–' : metric === 'water' ? formatMl(v) : `${Math.round(v).toLocaleString()} ${unit}`);
   const data = series.map((p) => ({ ...p, label: format(new Date(`${p.date}T00:00`), days > 30 ? 'MMM d' : 'EEE d') }));
   const macros = averageMacros(summary);
-  // The donut's slices: fat split into its saturated part (darker) and the rest.
-  const pieSlices = [
-    ...macros.slices.filter((m) => m.key !== 'fat'),
-    { ...macros.slices[2], kcal: macros.slices[2].kcal - macros.saturated.kcal, label: 'Other fat', pct: macros.slices[2].pct - macros.saturated.pct },
-    { key: 'saturatedFat', label: 'Saturated fat', grams: macros.saturated.grams, kcal: macros.saturated.kcal, pct: macros.saturated.pct },
-  ].filter((m) => m.kcal > 0);
+  const pieSlices = macros.slices.filter((m) => m.kcal > 0);
   const pill = (active) => `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active
     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`;
 

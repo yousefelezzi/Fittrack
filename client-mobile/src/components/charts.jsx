@@ -12,16 +12,10 @@ const LABEL_H = 16;
 
 /**
  * Donut of the calories from protein, carbs and fat (fat is 9 kcal/g, the
- * others 4). grams: { protein, carbs, fat, saturatedFat? }; with saturatedFat
- * the fat slice is split into its saturated (darker) and other part.
+ * others 4). grams: { protein, carbs, fat }.
  */
 export function MacroDonut({ grams, size = 90 }) {
-  const fat = grams?.fat || 0;
-  const sat = Math.min(grams?.saturatedFat || 0, fat);
-  const data = [
-    ['protein', (grams?.protein || 0) * 4], ['carbs', (grams?.carbs || 0) * 4],
-    ['fat', (fat - sat) * 9], ['saturatedFat', sat * 9],
-  ].filter(([, v]) => v > 0);
+  const data = [['protein', (grams?.protein || 0) * 4], ['carbs', (grams?.carbs || 0) * 4], ['fat', (grams?.fat || 0) * 9]].filter(([, v]) => v > 0);
   const total = data.reduce((s, [, v]) => s + v, 0);
   const c = size / 2;
   const stroke = size * 0.155;

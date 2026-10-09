@@ -69,7 +69,7 @@ export default function NutritionProgressScreen() {
         {!summary ? <Spinner /> : macros.daysLogged === 0 ? <Hint>Nothing logged in the last {days} days.</Hint> : (
           <View style={styles.macroRow}>
             <View>
-              <MacroDonut grams={{ ...Object.fromEntries(macros.slices.map((m) => [m.key, m.grams])), saturatedFat: macros.saturated.grams }} size={120} />
+              <MacroDonut grams={Object.fromEntries(macros.slices.map((m) => [m.key, m.grams]))} size={120} />
               <View style={styles.donutCenter} pointerEvents="none">
                 <Text style={styles.value}>{macros.kcal.toLocaleString()}</Text>
                 <Text style={styles.cap}>kcal / day</Text>
