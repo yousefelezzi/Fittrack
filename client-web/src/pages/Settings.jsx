@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple, Bell } from 'lucide-react';
-import { WEEK, remindersOf } from '../utils/reminders';
+import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, authAPI } from '../api';
 
@@ -41,46 +40,74 @@ function Section({ icon: Icon, title, children }) {
   );
 }
 
-// Same rule as sign-up (server/routes/auth.routes.js).
-const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&#]+$/;
-
-function ChangePassword() {
-  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+/** Emails a link to choose a new password (the change happens on that page). */
+function ChangePassword({ email }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null); // { ok, text }
-  const set = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); setMessage(null); };
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (form.next.length < 8 || !PASSWORD_RULE.test(form.next)) {
-      setMessage({ ok: false, text: 'Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol (@$!%*?&).' });
-      return;
-    }
-    if (form.next !== form.confirm) { setMessage({ ok: false, text: "The new passwords don't match." }); return; }
+  const send = async () => {
     setBusy(true);
+    setMessage(null);
     try {
-      await authAPI.changePassword(form.current, form.next);
-      setForm({ current: '', next: '', confirm: '' });
-      setMessage({ ok: true, text: 'Password changed.' });
+      const { data } = await authAPI.requestPasswordChange();
+      setMessage({ ok: true, text: data.message });
     } catch (err) {
-      setMessage({ ok: false, text: err.response?.data?.message || 'Could not change your password' });
+      setMessage({ ok: false, text: err.response?.data?.message || 'Could not send the email' });
     } finally {
       setBusy(false);
     }
   };
+  return (
+    <div className="space-y-3 pt-2">
+      <p className="text-sm text-gray-500 dark:text-gray-400">We'll email a link to <span className="font-medium text-gray-700 dark:text-gray-300">{email}</span>. Open it to choose your new password. You'll then be signed out everywhere.</p>
+      {message && <p className={`text-sm ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{message.text}</p>}
+      <button onClick={send} disabled={busy} className="btn-primary">{busy ? 'Sending…' : 'Email me a link'}</button>
+    </div>
+  );
+}
 
+/** New email + password; a link sent to the new address confirms it. */
+function ChangeEmail({ user, updateUser }) {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null); // { ok, text }
+  const set = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); setMessage(null); };
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { data } = await authAPI.requestEmailChange(form.email.trim(), form.password);
+      updateUser({ ...user, pendingEmail: data.pendingEmail });
+      setForm({ email: '', password: '' });
+      setMessage({ ok: true, text: data.message });
+    } catch (err) {
+      setMessage({ ok: false, text: err.response?.data?.errors?.[0]?.message || err.response?.data?.message || 'Could not send the email' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const cancel = async () => {
+    try { await authAPI.cancelEmailChange(); updateUser({ ...user, pendingEmail: null }); setMessage(null); } catch { /* stays pending */ }
+  };
   return (
     <form onSubmit={submit} className="space-y-3 pt-2">
-      {[['current', 'Current password', 'current-password'], ['next', 'New password', 'new-password'], ['confirm', 'Confirm new password', 'new-password']].map(([k, label, auto]) => (
-        <div key={k}>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
-          <input type="password" className="input" autoComplete={auto} value={form[k]} onChange={set(k)} />
+      <p className="text-sm text-gray-500 dark:text-gray-400">You sign in with <span className="font-medium text-gray-700 dark:text-gray-300">{user?.email}</span>.</p>
+      {user?.pendingEmail && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300">
+          <span>Waiting for you to confirm <span className="font-medium">{user.pendingEmail}</span> from the link we sent there.</span>
+          <button type="button" onClick={cancel} className="text-xs font-medium underline shrink-0">Cancel</button>
         </div>
-      ))}
+      )}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">New email</label>
+        <input type="email" className="input" autoComplete="email" value={form.email} onChange={set('email')} />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Your password</label>
+        <input type="password" className="input" autoComplete="current-password" value={form.password} onChange={set('password')} />
+      </div>
       {message && <p className={`text-sm ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{message.text}</p>}
-      <button type="submit" disabled={busy || !form.current || !form.next || !form.confirm} className="btn-primary">
-        {busy ? 'Changing…' : 'Change password'}
-      </button>
+      <button type="submit" disabled={busy || !form.email.trim() || !form.password} className="btn-primary">{busy ? 'Sending…' : 'Send confirmation link'}</button>
     </form>
   );
 }
@@ -93,9 +120,6 @@ export default function Settings() {
   const [error, setError] = useState('');
 
   const privacy = { privateAccount: false, messages: 'connections', discoverable: true, ...(user?.privacy || {}) };
-  const reminders = remindersOf(user);
-  const workoutDays = user?.workoutDays || [];
-  const toggleDay = (d) => save('workoutDays', { workoutDays: workoutDays.includes(d) ? workoutDays.filter((x) => x !== d) : [...workoutDays, d] });
 
 
   // Saves one setting; the server sends the updated user back.
@@ -130,34 +154,6 @@ export default function Settings() {
         </Row>
       </Section>
 
-      <Section icon={Bell} title="Reminders">
-        <div className="py-3 border-b border-gray-100 dark:border-gray-800">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">My workout days</p>
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {WEEK.map(([d, label]) => (
-              <button key={d} onClick={() => toggleDay(d)} disabled={busy === 'workoutDays'} aria-pressed={workoutDays.includes(d)}
-                className={`min-w-[3rem] px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-60 ${workoutDays.includes(d)
-                  ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        {[['workout', 'Remind me on workout days', workoutDays.length ? "Skipped once you've logged a workout that day." : 'Pick your workout days above.'],
-          ['supplements', 'Remind me to tick off supplements', "Skipped once everything's ticked off for the day."]].map(([kind, title, hint]) => (
-          <Row key={kind} title={title} hint={hint}>
-            <div className="flex items-center gap-3 shrink-0">
-              {reminders[kind].enabled && (
-                <input type="time" className="input w-auto py-1.5 text-sm" value={reminders[kind].time} aria-label={`${title}: time`}
-                  onChange={(e) => e.target.value && save(kind, { reminders: { [kind]: { time: e.target.value } } })} />
-              )}
-              <Toggle checked={reminders[kind].enabled} disabled={busy === kind} onChange={(v) => save(kind, { reminders: { [kind]: { enabled: v } } })} />
-            </div>
-          </Row>
-        ))}
-        <p className="text-xs text-gray-400 dark:text-gray-500 pt-2">On your phone, the FitTrack app sends these as notifications. Here they show on your dashboard once it's time.</p>
-      </Section>
-
       <Section icon={Apple} title="Nutrition">
         <Row title="Adjust my calorie goal from my weight trend"
           hint="Compares what you ate with how your weight moved over the last 2 weeks and corrects your maintenance. Needs food logged on 10 of 14 days and a couple of weigh-ins each week.">
@@ -178,8 +174,12 @@ export default function Settings() {
         <p className="text-xs text-gray-400 dark:text-gray-500">Applies to new chats and to sending in existing ones.</p>
       </Section>
 
+      <Section icon={Mail} title="Email">
+        <ChangeEmail user={user} updateUser={updateUser} />
+      </Section>
+
       <Section icon={KeyRound} title="Password">
-        <ChangePassword />
+        <ChangePassword email={user?.email} />
       </Section>
 
       <div className="card flex items-center justify-between gap-4">

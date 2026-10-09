@@ -63,6 +63,11 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Called when the session can't continue (refresh failed, or the password was
+// changed): the AuthContext signs the user out.
+let sessionEnded = () => {};
+export const setSessionEndedHandler = (fn) => { sessionEnded = fn; };
+
 // ── Auto-refresh on 401 TOKEN_EXPIRED ─────────────────────────────────────────
 let refreshing = false;
 let queue = [];
@@ -98,11 +103,16 @@ api.interceptors.response.use(
       } catch (err) {
         processQueue(err, null);
         await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
-        // Navigation to login is handled by the AuthContext listener
+        sessionEnded();
         return Promise.reject(err);
       } finally {
         refreshing = false;
       }
+    }
+    // The password was changed (here or on another device): sign in again.
+    if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_ENDED') {
+      await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+      sessionEnded();
     }
     return Promise.reject(error);
   }
@@ -116,7 +126,14 @@ export const authAPI = {
   login:    (data) => api.post('/auth/login', data),
   logout:   ()     => api.post('/auth/logout'),
   getMe:    ()     => api.get('/auth/me'),
-  changePassword: (currentPassword, newPassword) => api.put('/auth/password', { currentPassword, newPassword }),
+  // Password: a link is emailed; the new password is set on the page it opens.
+  requestPasswordChange: () => api.post('/auth/password/request'),
+  checkPasswordToken: (token) => api.get('/auth/password/check', { params: { token } }),
+  resetPassword: (token, newPassword) => api.post('/auth/password/reset', { token, newPassword }),
+  // Email: needs the password, then a link sent to the new address confirms it.
+  requestEmailChange: (newEmail, password) => api.post('/auth/email/request', { newEmail, password }),
+  cancelEmailChange: () => api.delete('/auth/email/request'),
+  confirmEmailChange: (token) => api.post('/auth/email/confirm', { token }),
 };
 
 // ── Users ─────────────────────────────────────────────────────────────────────

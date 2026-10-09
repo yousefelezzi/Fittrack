@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, RefreshControl, Alert } from 'react-native';
 import { planAPI, exerciseAPI } from '../api';
 import {
   Card, Button, Spinner, Badge, colors, makeStyles, Sheet, Chip, ChipRow, Label, Hint, ErrorText, LinkText, EmptyState, ExercisePicker, SimilarExercises, confirm,
 } from '../components';
 import { formatPlanWeight } from '../../../client-web/src/utils/planAnalysis';
 import { ArrowLeftRight, X, Sparkles, ClipboardList } from 'lucide-react-native';
+import ReminderControl, { saveReminder } from '../components/ReminderControl';
+import { useAuth } from '../context/AuthContext';
+import { remindersOf, formatTime } from '../../../client-web/src/utils/reminders';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const dayName = (plan, day) => (plan.schedule === 'rotation' ? `Workout ${day.dayOfWeek + 1}` : DAYS[day.dayOfWeek]);
@@ -23,6 +26,11 @@ function PlanCard({ plan, onActivate, onDelete, onStart, onEdit }) {
         {plan.description ? <Text style={styles.desc} numberOfLines={open ? undefined : 2}>{plan.description}</Text> : null}
         <Hint style={{ marginTop: 4 }}>{plan.days.length} day{plan.days.length !== 1 ? 's' : ''} configured</Hint>
       </TouchableOpacity>
+      {plan.isActive ? (
+        <View style={styles.reminder}>
+          <ReminderControl kind="workout" title="Workout reminder" hint="On this plan's workout days; skipped once you've trained." />
+        </View>
+      ) : null}
 
       {open && (
         <View style={styles.openBody}>
@@ -258,9 +266,19 @@ export default function PlansScreen({ navigation, route }) {
     },
   });
 
+  const { user, updateUser } = useAuth();
   const handleActivate = async (id) => {
     const { data } = await planAPI.activate(id);
     setPlans((prev) => prev.map((p) => ({ ...p, isActive: p._id === data._id })));
+    const r = remindersOf(user).workout;
+    if (r.enabled) return;
+    Alert.alert('Turn on workout reminders?', `We'll remind you at ${formatTime(r.time)} on this plan's workout days. You can change the time on the plan.`, [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Turn on', onPress: async () => {
+        const notice = await saveReminder(updateUser, 'workout', { enabled: true }).catch(() => 'Could not turn the reminder on');
+        if (notice) Alert.alert('Reminders', notice);
+      } },
+    ]);
   };
   const handleDelete = async (id) => {
     if (!(await confirm('Delete this plan?', '', 'Delete', true))) return;
@@ -298,6 +316,7 @@ const styles = makeStyles(() => ({
   centered:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   planName:  { flex: 1, fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  reminder:  { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.subtle },
   chev:      { fontSize: 14, color: colors.textMuted },
   desc:      { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
   openBody:  { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },

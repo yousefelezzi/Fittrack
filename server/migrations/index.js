@@ -414,6 +414,15 @@ const migrations = [
       return `${res.modifiedCount} day(s) with supplements kept as logged`;
     },
   },
+  {
+    // Workout reminders now follow the active plan's days instead of days
+    // picked in Settings.
+    name: '2026-10-drop-workout-days',
+    async up(db) {
+      const res = await db.collection('users').updateMany({ workoutDays: { $exists: true } }, { $unset: { workoutDays: '' } });
+      return `${res.modifiedCount} user(s) updated`;
+    },
+  },
 ];
 
 async function runMigrations() {

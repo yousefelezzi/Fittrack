@@ -4,7 +4,10 @@ import ExerciseCombobox from '../components/ExerciseCombobox';
 import { formatPlanWeight } from '../utils/planAnalysis';
 import PlanGenerator from '../components/PlanGenerator';
 import SimilarExercises from '../components/SimilarExercises';
-import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Check, Pencil, Sparkles, Repeat, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Check, Pencil, Sparkles, Repeat, ClipboardList, Bell } from 'lucide-react';
+import ReminderControl, { saveReminder } from '../components/ReminderControl';
+import { useAuth } from '../context/AuthContext';
+import { remindersOf, formatTime } from '../utils/reminders';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -30,6 +33,11 @@ function PlanCard({ plan, onActivate, onDelete, onStart, onEdit }) {
           {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
         </div>
       </div>
+      {plan.isActive && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <ReminderControl kind="workout" title="Workout reminder" hint="On this plan's workout days, on your dashboard and as a phone notification; skipped once you've trained." />
+        </div>
+      )}
 
       {open && (
         <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
@@ -175,7 +183,16 @@ export default function Plans() {
     }
   };
 
-  const handleActivate = async (id) => { const { data } = await planAPI.activate(id); setPlans((prev) => prev.map((p) => ({ ...p, isActive: p._id === data._id }))); };
+  const { user, updateUser } = useAuth();
+  const [askReminder, setAskReminder] = useState(null); // the plan just set active, to offer the workout reminder
+  const handleActivate = async (id) => {
+    const { data } = await planAPI.activate(id);
+    setPlans((prev) => prev.map((p) => ({ ...p, isActive: p._id === data._id })));
+    if (!remindersOf(user).workout.enabled) setAskReminder(data);
+  };
+  const turnOnReminder = async () => {
+    try { await saveReminder(updateUser, 'workout', { enabled: true }); setAskReminder(null); } catch { setError('Could not turn the reminder on'); }
+  };
   const handleDelete  = async (id) => { if (!window.confirm('Delete this plan?')) return; await planAPI.delete(id); setPlans((prev) => prev.filter((p) => p._id !== id)); };
   const handleStart   = async (id) => { try { await planAPI.start(id, new Date().getDay()); alert("Today's workout session created! Head to Log Workout to continue."); } catch (err) { alert(err.response?.data?.message || 'Could not start plan for today'); } };
 
@@ -209,6 +226,19 @@ export default function Plans() {
           </button>
         </div>
       </div>
+
+      {askReminder && (
+        <div className="card flex flex-wrap items-center gap-3 border-l-4 !border-l-brand-500">
+          <Bell size={18} className="text-brand-600 shrink-0" />
+          <p className="flex-1 min-w-[12rem] text-sm text-gray-700 dark:text-gray-200">
+            Turn on workout reminders? You'll be reminded at {formatTime(remindersOf(user).workout.time)} on {askReminder.name}'s workout days. You can change the time on the plan.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => setAskReminder(null)} className="btn-secondary text-sm py-1.5">Not now</button>
+            <button onClick={turnOnReminder} className="btn-primary text-sm py-1.5">Turn on</button>
+          </div>
+        </div>
+      )}
 
       {plans.length === 0 && !creating && (
         <div className="card text-center py-12 text-gray-400 dark:text-gray-500">

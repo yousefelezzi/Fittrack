@@ -4,9 +4,6 @@
  * Pure JS only.
  */
 
-/** Mon…Sun as [weekday (0 = Sunday), short label]. */
-export const WEEK = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
-
 const DEFAULTS = { workout: { enabled: false, time: '08:00' }, supplements: { enabled: false, time: '20:00' } };
 
 /** The user's reminder settings, with defaults filled in. */
@@ -47,13 +44,6 @@ export function formatTime(time) {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-/** "Mon, Wed, Fri" / "Every day" / "No days". */
-export function daysText(days = []) {
-  if (!days.length) return 'No days';
-  if (days.length === 7) return 'Every day';
-  return WEEK.filter(([d]) => days.includes(d)).map(([, l]) => l).join(', ');
-}
-
 /**
  * Today's reminder cards for the dashboard, from GET /reminders/today:
  * [{ kind: 'workout' | 'supplements', text }], once each reminder's time has passed.
@@ -63,7 +53,7 @@ export function dueReminders(status, now = new Date()) {
   const r = remindersOf(status);
   const out = [];
   if (r.workout.enabled && status.workoutDay && !status.workedOut && timePassed(r.workout.time, now)) {
-    out.push({ kind: 'workout', text: "It's a workout day and you haven't trained yet." });
+    out.push({ kind: 'workout', text: `It's a workout day${status.plan ? ` in ${status.plan.name}` : ''} and you haven't trained yet.` });
   }
   const left = status.supplements.total - status.supplements.taken;
   if (r.supplements.enabled && left > 0 && timePassed(r.supplements.time, now)) {

@@ -1,13 +1,40 @@
 /**
- * What the reminders need to know about the user's day: is it a workout day
- * (and have they trained yet), and how many of the day's supplements are
- * ticked off. Used by the web dashboard's reminder cards and by the phone app
- * to skip a notification that's no longer needed.
+ * What the reminders need to know: which of the next 7 days are workout days
+ * in the active plan (and whether they've trained today), and how many of
+ * today's supplements are ticked off. Used by the web dashboard's reminder
+ * cards and by the phone app to plan (and skip) its notifications.
  */
 const User = require('../models/User');
 const NutritionLog = require('../models/NutritionLog');
 const Supplement = require('../models/Supplement');
 const WorkoutSession = require('../models/WorkoutSession');
+const WorkoutPlan = require('../models/WorkoutPlan');
+
+const DAY = 86400000;
+const AHEAD = 7;
+
+/**
+ * Which of the next 7 days (0 = today) the active plan trains on: a weekly
+ * plan's weekdays, a rotation's weekdays, or for "every N days" every N days
+ * from the last workout (today if it's due or overdue).
+ */
+async function workoutOffsets(userId, plan, weekday, dayStart, workedOut) {
+  if (!plan) return [];
+  const offsets = Array.from({ length: AHEAD }, (_, i) => i);
+  const weekdayOf = (i) => (weekday + i) % 7;
+  if (plan.schedule === 'rotation' && plan.rotation?.everyDays) {
+    const n = plan.rotation.everyDays;
+    let last = workedOut ? 0 : null; // days from today of the last workout
+    if (last === null) {
+      const prev = await WorkoutSession.findOne({ user: userId, date: { $lt: dayStart } }).sort({ date: -1 }).select('date').lean();
+      if (prev) last = Math.floor((prev.date - dayStart) / DAY);
+    }
+    const first = last === null ? 0 : Math.max(workedOut ? n : 0, last + n);
+    return offsets.filter((i) => i >= first && (i - first) % n === 0);
+  }
+  const days = plan.schedule === 'rotation' ? (plan.rotation?.weekdays || []) : plan.days.map((d) => d.dayOfWeek);
+  return offsets.filter((i) => days.includes(weekdayOf(i)));
+}
 
 const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
 const endOfDay = (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; };
@@ -30,17 +57,20 @@ exports.today = async (req, res, next) => {
   try {
     const { date, from, to } = req.query;
     const weekday = Number(req.query.weekday);
-    const user = await User.findById(req.user.id).select('workoutDays reminders').lean();
-    const workoutDay = (user.workoutDays || []).includes(weekday);
-    const [workedOut, supplements] = await Promise.all([
+    const [user, plan, worked, supplements] = await Promise.all([
+      User.findById(req.user.id).select('reminders').lean(),
+      WorkoutPlan.findOne({ user: req.user.id, isActive: true }).select('name schedule rotation days.dayOfWeek').lean(),
       WorkoutSession.exists({ user: req.user.id, date: { $gte: new Date(from), $lte: new Date(to) } }),
       supplementCounts(req.user.id, date),
     ]);
+    const workedOut = Boolean(worked);
+    const offsets = await workoutOffsets(req.user.id, plan, weekday, new Date(from), workedOut);
     res.json({
-      workoutDays: user.workoutDays || [],
       reminders: user.reminders,
-      workoutDay,
-      workedOut: Boolean(workedOut),
+      plan: plan ? { name: plan.name } : null,
+      workoutOffsets: offsets,           // days from today that are workout days
+      workoutDay: offsets.includes(0),   // today, if not trained yet
+      workedOut,
       supplements,
     });
   } catch (err) {

@@ -6,7 +6,14 @@ export const authAPI = {
   login:        (data)  => api.post('/auth/login', data),
   logout:       ()      => api.post('/auth/logout'),
   getMe:        ()      => api.get('/auth/me'),
-  changePassword: (currentPassword, newPassword) => api.put('/auth/password', { currentPassword, newPassword }),
+  // Password: a link is emailed; the new password is set on the page it opens.
+  requestPasswordChange: () => api.post('/auth/password/request'),
+  checkPasswordToken: (token) => api.get('/auth/password/check', { params: { token } }),
+  resetPassword: (token, newPassword) => api.post('/auth/password/reset', { token, newPassword }),
+  // Email: needs the password, then a link sent to the new address confirms it.
+  requestEmailChange: (newEmail, password) => api.post('/auth/email/request', { newEmail, password }),
+  cancelEmailChange: () => api.delete('/auth/email/request'),
+  confirmEmailChange: (token) => api.post('/auth/email/confirm', { token }),
 };
 
 // ── Users ───────────────────────────────────────────────────────────────────

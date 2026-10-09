@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI } from '../api';
+import { authAPI, setSessionEndedHandler } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -22,6 +22,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => { loadUser(); }, [loadUser]);
+  // Signed out when the session ends (e.g. the password was changed).
+  useEffect(() => setSessionEndedHandler(() => setUser(null)), []);
 
   const login = async (credentials) => {
     const { data } = await authAPI.login(credentials);

@@ -3,6 +3,7 @@ import { format, subDays, parseISO } from 'date-fns';
 import { Pill, Plus, Trash2, Pencil, X, Search, Sun, Copy, Layers, Check, CheckCheck } from 'lucide-react';
 import { supplementAPI, nutritionAPI } from '../api';
 import DayNav from '../components/DayNav';
+import ReminderControl from '../components/ReminderControl';
 import { microsText, SUPPLEMENT_MICROS } from '../utils/foodLogic';
 
 const key = (d) => format(d, 'yyyy-MM-dd');
@@ -315,6 +316,9 @@ export default function Supplements() {
             })}
           </ul>
         )}
+      </div>
+      <div className="card">
+        <ReminderControl kind="supplements" title="Supplement reminder" hint="Every day, on your dashboard and as a phone notification; skipped once everything's ticked off." />
       </div>
       <p className="text-xs text-center text-gray-400 dark:text-gray-500">Ticked supplements add their vitamins and minerals to that day's micronutrients in the Food Log. Adding, removing or changing servings here only changes this day.</p>
     </div>

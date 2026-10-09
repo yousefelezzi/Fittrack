@@ -21,6 +21,7 @@ import Steps       from './pages/Steps';
 import Feed        from './pages/Feed';
 import Profile     from './pages/Profile';
 import Settings    from './pages/Settings';
+import { AccountPassword, AccountEmail } from './pages/AccountLinks';
 import Calculators    from './pages/Calculators';
 import AboutWNS       from './pages/AboutWNS';
 
@@ -48,6 +49,9 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+            {/* Links from account emails; work signed in or out. */}
+            <Route path="/account/password" element={<AccountPassword />} />
+            <Route path="/account/email"    element={<AccountEmail />} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
             {/* Protected */}

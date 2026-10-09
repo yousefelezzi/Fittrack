@@ -9,7 +9,12 @@ const {
   refreshToken,
   logout,
   getMe,
-  changePassword,
+  requestPasswordChange,
+  checkPasswordToken,
+  resetPassword,
+  requestEmailChange,
+  cancelEmailChange,
+  confirmEmailChange,
 } = require('../controllers/auth.controller');
 
 router.post(
@@ -40,11 +45,13 @@ router.post(
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
-router.put(
-  '/password',
-  protect,
+// Changing the password: a link is emailed, the new password is set on the page it opens.
+router.post('/password/request', protect, requestPasswordChange);
+router.get('/password/check', checkPasswordToken);
+router.post(
+  '/password/reset',
   [
-    body('currentPassword').notEmpty().withMessage('Enter your current password'),
+    body('token').isString().notEmpty().withMessage('The link is missing its code'),
     body('newPassword')
       .isLength({ min: 8 })
       .withMessage('New password must be at least 8 characters')
@@ -52,7 +59,21 @@ router.put(
       .withMessage('New password must include uppercase, lowercase, number, and special character'),
   ],
   validate,
-  changePassword
+  resetPassword
 );
+
+// Changing the email: password, then confirmed from a link sent to the new address.
+router.post(
+  '/email/request',
+  protect,
+  [
+    body('newEmail').isEmail().withMessage('Enter a valid email'),
+    body('password').notEmpty().withMessage('Enter your password'),
+  ],
+  validate,
+  requestEmailChange
+);
+router.delete('/email/request', protect, cancelEmailChange);
+router.post('/email/confirm', [body('token').isString().notEmpty().withMessage('The link is missing its code')], validate, confirmEmailChange);
 
 module.exports = router;

@@ -6,6 +6,7 @@ import { supplementAPI, nutritionAPI } from '../api';
 import { Card, Button, Sheet, colors, makeStyles, Hint, ErrorText, LinkText, confirm } from '../components';
 import DayNav, { useDaySwipe } from '../components/DayNav';
 import { syncReminders } from '../utils/notifications';
+import ReminderControl from '../components/ReminderControl';
 import { microsText, SUPPLEMENT_MICROS } from '../../../client-web/src/utils/foodLogic';
 
 const SUN_NOTE = 'Sun is an estimate: roughly 1,000 IU of vitamin D per 15 minutes of midday summer sun with arms and legs bare, for lighter skin. Much less in winter, early or late in the day, with darker skin or sunscreen.';
@@ -300,6 +301,9 @@ export default function SupplementsScreen() {
             </View>
           );
         })}
+      </Card>
+      <Card>
+        <ReminderControl kind="supplements" title="Supplement reminder" hint="Every day; skipped once everything's ticked off." />
       </Card>
       <Hint style={{ textAlign: 'center' }}>Ticked supplements add their vitamins and minerals to that day's micronutrients in the Food Log. Adding, removing or changing servings here only changes this day. {SUN_NOTE}</Hint>
       <Sheet visible={adding === 'catalog'} title="Add to this day" subtitle="Amounts are typical label doses; change the servings after adding it." onClose={() => setAdding(false)}>

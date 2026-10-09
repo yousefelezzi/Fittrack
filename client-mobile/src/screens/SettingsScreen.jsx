@@ -3,10 +3,8 @@ import { View, Text, TextInput, ScrollView, Switch, TouchableOpacity } from 'rea
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { userAPI, authAPI } from '../api';
-import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented, Sheet, Chip } from '../components';
-import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad, Bell, Clock } from 'lucide-react-native';
-import { WEEK, remindersOf, formatTime, parseTime } from '../../../client-web/src/utils/reminders';
-import { askPermission, syncReminders } from '../utils/notifications';
+import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented } from '../components';
+import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad, Mail } from 'lucide-react-native';
 
 const MESSAGE_OPTIONS = [
   ['connections', 'People I follow or who follow me'],
@@ -35,73 +33,76 @@ function Row({ title, hint, children, last }) {
   );
 }
 
-// Same rule as sign-up (server/routes/auth.routes.js).
-const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&#]+$/;
-
-function ChangePassword() {
-  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+/** Emails a link to choose a new password (the change happens on that page). */
+function ChangePassword({ email }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null); // { ok, text }
-  const set = (k) => (v) => { setForm((f) => ({ ...f, [k]: v })); setMessage(null); };
-
-  const submit = async () => {
-    if (form.next.length < 8 || !PASSWORD_RULE.test(form.next)) {
-      setMessage({ ok: false, text: 'Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol (@$!%*?&).' });
-      return;
-    }
-    if (form.next !== form.confirm) { setMessage({ ok: false, text: "The new passwords don't match." }); return; }
+  const send = async () => {
     setBusy(true);
+    setMessage(null);
     try {
-      await authAPI.changePassword(form.current, form.next);
-      setForm({ current: '', next: '', confirm: '' });
-      setMessage({ ok: true, text: 'Password changed.' });
+      const { data } = await authAPI.requestPasswordChange();
+      setMessage({ ok: true, text: data.message });
     } catch (err) {
-      setMessage({ ok: false, text: err.response?.data?.message || 'Could not change your password' });
+      setMessage({ ok: false, text: err.response?.data?.message || 'Could not send the email' });
     } finally {
       setBusy(false);
     }
   };
-
   return (
     <View style={{ paddingVertical: 10 }}>
-      {[['current', 'Current password', 'current-password'], ['next', 'New password', 'new-password'], ['confirm', 'Confirm new password', 'new-password']].map(([k, label, auto]) => (
-        <View key={k} style={{ marginBottom: 8 }}>
-          <Label>{label}</Label>
-          <TextInput style={styles.input} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={auto}
-            textContentType={k === 'current' ? 'password' : 'newPassword'} value={form[k]} onChangeText={set(k)} />
-        </View>
-      ))}
+      <Hint style={{ marginBottom: 10 }}>We'll email a link to {email}. Open it to choose your new password. You'll then be signed out everywhere.</Hint>
       {message ? <Text style={[styles.message, { color: message.ok ? colors.success : colors.danger }]}>{message.text}</Text> : null}
-      <Button title={busy ? 'Changing…' : 'Change password'} loading={busy} disabled={busy || !form.current || !form.next || !form.confirm} onPress={submit} />
+      <Button title={busy ? 'Sending…' : 'Email me a link'} loading={busy} disabled={busy} onPress={send} />
     </View>
   );
 }
 
-const pad = (n) => String(n).padStart(2, '0');
-
-/** Pick a time of day: the hour, then the minutes in 5-minute steps. */
-function TimeSheet({ visible, value, onPick, onClose, title }) {
-  const [hm, setHm] = useState(parseTime(value));
-  const [openedFor, setOpenedFor] = useState(null);
-  if (visible && openedFor !== value) { setOpenedFor(value); setHm(parseTime(value)); }
-  if (!visible && openedFor !== null) setOpenedFor(null);
-  const time = `${pad(hm.hour)}:${pad(hm.minute)}`;
+/** New email + password; a link sent to the new address confirms it. */
+function ChangeEmail({ user, updateUser }) {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null); // { ok, text }
+  const set = (k) => (v) => { setForm((f) => ({ ...f, [k]: v })); setMessage(null); };
+  const submit = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { data } = await authAPI.requestEmailChange(form.email.trim(), form.password);
+      updateUser({ ...user, pendingEmail: data.pendingEmail });
+      setForm({ email: '', password: '' });
+      setMessage({ ok: true, text: data.message });
+    } catch (err) {
+      setMessage({ ok: false, text: err.response?.data?.errors?.[0]?.message || err.response?.data?.message || 'Could not send the email' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const cancel = async () => {
+    try { await authAPI.cancelEmailChange(); updateUser({ ...user, pendingEmail: null }); setMessage(null); } catch { /* stays pending */ }
+  };
   return (
-    <Sheet visible={visible} title={title} subtitle={formatTime(time)} onClose={onClose}
-      footer={<Button title="Save" onPress={() => onPick(time)} />}>
-      <Label>Hour</Label>
-      <View style={styles.grid}>
-        {Array.from({ length: 24 }, (_, h) => (
-          <Chip key={h} small label={pad(h)} active={hm.hour === h} onPress={() => setHm((t) => ({ ...t, hour: h }))} style={styles.gridChip} />
-        ))}
+    <View style={{ paddingVertical: 10 }}>
+      <Hint style={{ marginBottom: 10 }}>You sign in with {user?.email}.</Hint>
+      {user?.pendingEmail ? (
+        <View style={styles.pending}>
+          <Text style={[styles.pendingText, { flex: 1 }]}>Waiting for you to confirm {user.pendingEmail} from the link we sent there.</Text>
+          <TouchableOpacity onPress={cancel} hitSlop={8}><Text style={[styles.pendingText, { fontWeight: '700', textDecorationLine: 'underline' }]}>Cancel</Text></TouchableOpacity>
+        </View>
+      ) : null}
+      <View style={{ marginBottom: 8 }}>
+        <Label>New email</Label>
+        <TextInput style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email"
+          textContentType="emailAddress" value={form.email} onChangeText={set('email')} />
       </View>
-      <Label style={{ marginTop: 12 }}>Minutes</Label>
-      <View style={styles.grid}>
-        {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
-          <Chip key={m} small label={`:${pad(m)}`} active={hm.minute === m} onPress={() => setHm((t) => ({ ...t, minute: m }))} style={styles.gridChip} />
-        ))}
+      <View style={{ marginBottom: 8 }}>
+        <Label>Your password</Label>
+        <TextInput style={styles.input} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="current-password"
+          textContentType="password" value={form.password} onChangeText={set('password')} />
       </View>
-    </Sheet>
+      {message ? <Text style={[styles.message, { color: message.ok ? colors.success : colors.danger }]}>{message.text}</Text> : null}
+      <Button title={busy ? 'Sending…' : 'Send confirmation link'} loading={busy} disabled={busy || !form.email.trim() || !form.password} onPress={submit} />
+    </View>
   );
 }
 
@@ -113,11 +114,6 @@ export default function SettingsScreen() {
   const [error, setError] = useState('');
 
   const privacy = { privateAccount: false, messages: 'connections', discoverable: true, ...(user?.privacy || {}) };
-  const reminders = remindersOf(user);
-  const workoutDays = user?.workoutDays || [];
-  const [timeFor, setTimeFor] = useState(null); // 'workout' | 'supplements' while picking a time
-  const [notice, setNotice] = useState('');
-
 
   // Saves one setting; the server sends the updated user back.
   const save = async (key, body) => {
@@ -133,19 +129,6 @@ export default function SettingsScreen() {
     }
   };
 
-
-  // Reminder settings, then the phone's notifications are re-planned.
-  const saveReminder = async (key, body) => { await save(key, body); syncReminders(); };
-  const setReminderOn = async (kind, on) => {
-    setNotice('');
-    if (on && !(await askPermission())) {
-      setNotice("FitTrack isn't allowed to send notifications. Turn them on for FitTrack in your phone's Settings, then come back.");
-    }
-    saveReminder(kind, { reminders: { [kind]: { enabled: on } } });
-  };
-  const toggleDay = (d) => saveReminder('workoutDays', {
-    workoutDays: workoutDays.includes(d) ? workoutDays.filter((x) => x !== d) : [...workoutDays, d],
-  });
 
   const toggle = (key, value, body) => (
     <Switch value={value} disabled={busy === key} onValueChange={(v) => save(key, body(v))} trackColor={{ true: colors.brand }} />
@@ -172,42 +155,6 @@ export default function SettingsScreen() {
         </Row>
       </Card>
 
-      <SectionHead icon={Bell}>Reminders</SectionHead>
-      <Card style={{ paddingVertical: 4 }}>
-        <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch' }]}>
-          <Text style={styles.rowTitle}>My workout days</Text>
-          <View style={[styles.grid, { marginTop: 8 }]}>
-            {WEEK.map(([d, label]) => (
-              <Chip key={d} small label={label} active={workoutDays.includes(d)} disabled={busy === 'workoutDays'} onPress={() => toggleDay(d)} style={{ minWidth: 42 }} />
-            ))}
-          </View>
-        </View>
-        <Row title="Remind me on workout days" hint={workoutDays.length ? 'Skipped once you\'ve logged a workout that day.' : 'Pick your workout days above.'}>
-          <Switch value={reminders.workout.enabled} disabled={busy === 'workout'} onValueChange={(v) => setReminderOn('workout', v)} trackColor={{ true: colors.brand }} />
-        </Row>
-        {reminders.workout.enabled ? (
-          <TouchableOpacity onPress={() => setTimeFor('workout')} style={styles.row}>
-            <Clock size={15} color={colors.textMuted} />
-            <Text style={[styles.rowTitle, { flex: 1 }]}>Workout reminder time</Text>
-            <Text style={styles.timeText}>{formatTime(reminders.workout.time)}</Text>
-          </TouchableOpacity>
-        ) : null}
-        <Row title="Remind me to tick off supplements" hint="Skipped once everything's ticked off for the day." last={!reminders.supplements.enabled}>
-          <Switch value={reminders.supplements.enabled} disabled={busy === 'supplements'} onValueChange={(v) => setReminderOn('supplements', v)} trackColor={{ true: colors.brand }} />
-        </Row>
-        {reminders.supplements.enabled ? (
-          <TouchableOpacity onPress={() => setTimeFor('supplements')} style={[styles.row, { borderBottomWidth: 0 }]}>
-            <Clock size={15} color={colors.textMuted} />
-            <Text style={[styles.rowTitle, { flex: 1 }]}>Supplement reminder time</Text>
-            <Text style={styles.timeText}>{formatTime(reminders.supplements.time)}</Text>
-          </TouchableOpacity>
-        ) : null}
-      </Card>
-      {notice ? <Text style={[styles.message, { color: colors.danger, marginTop: -4 }]}>{notice}</Text> : null}
-      <TimeSheet visible={timeFor !== null} value={timeFor ? reminders[timeFor].time : '08:00'}
-        title={timeFor === 'workout' ? 'Workout reminder' : 'Supplement reminder'} onClose={() => setTimeFor(null)}
-        onPick={(time) => { const kind = timeFor; setTimeFor(null); saveReminder(kind, { reminders: { [kind]: { time } } }); }} />
-
       <SectionHead icon={Salad}>Nutrition</SectionHead>
       <Card style={{ paddingVertical: 4 }}>
         <Row title="Adjust my calorie goal from my weight trend" last
@@ -230,9 +177,14 @@ export default function SettingsScreen() {
       </Card>
       <Hint style={{ marginTop: -4, marginBottom: 8 }}>Applies to new chats and to sending in existing ones.</Hint>
 
+      <SectionHead icon={Mail}>Email</SectionHead>
+      <Card>
+        <ChangeEmail user={user} updateUser={updateUser} />
+      </Card>
+
       <SectionHead icon={KeyRound}>Password</SectionHead>
       <Card>
-        <ChangePassword />
+        <ChangePassword email={user?.email} />
       </Card>
 
       <Card style={styles.signOutCard}>
@@ -264,7 +216,6 @@ const styles = makeStyles(() => ({
   message:  { fontSize: 13, marginBottom: 10 },
   signOutCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.brand },
-  grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  gridChip: { minWidth: 46 },
-  timeText: { fontSize: 14, fontWeight: '600', color: colors.brand },
+  pending:  { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, backgroundColor: colors.warningLight, marginBottom: 10 },
+  pendingText: { fontSize: 13, color: colors.warning },
 }));

@@ -54,6 +54,13 @@ api.interceptors.response.use(
         refreshing = false;
       }
     }
+    // The password was changed (here or on another device): sign in again.
+    // The account-link pages handle it themselves.
+    if (error.response?.status === 401 && error.response?.data?.code === 'SESSION_ENDED') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      if (!window.location.pathname.startsWith('/account/')) window.location.href = '/login';
+    }
     return Promise.reject(error);
   }
 );

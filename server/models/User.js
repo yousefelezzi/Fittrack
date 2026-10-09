@@ -6,6 +6,17 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 50 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 8, select: false },
+    // Sessions (tokens) from before this are signed out.
+    passwordChangedAt: { type: Date, default: null, select: false },
+    // Changing the password: a link is emailed; the new password is set on the page it opens.
+    passwordResetHash: { type: String, default: null, select: false },
+    passwordResetExpires: { type: Date, default: null, select: false },
+    passwordResetSentAt: { type: Date, default: null, select: false },
+    // Changing the email: confirmed from a link sent to the new address.
+    pendingEmail: { type: String, lowercase: true, trim: true, default: null },
+    emailChangeHash: { type: String, default: null, select: false },
+    emailChangeExpires: { type: Date, default: null, select: false },
+    emailChangeSentAt: { type: Date, default: null, select: false },
     avatar: { type: String, default: '' },
     bio: { type: String, maxlength: 200, default: '' },
     height: { type: Number, default: null }, // cm
@@ -24,10 +35,10 @@ const userSchema = new mongoose.Schema(
     heightUnit: { type: String, enum: ['cm', 'ft'], default: 'cm' }, // ft = feet and inches
     // Correct the calorie goal from the last two weeks' weight trend and intake (utils/adaptiveCalories.js).
     adaptiveCalories: { type: Boolean, default: true },
-    // Days the user trains (0 = Sunday … 6 = Saturday), for workout-day reminders.
-    workoutDays: [{ type: Number, min: 0, max: 6 }],
     // Reminders (phone notifications, and cards on the web dashboard) at a
-    // time of day ('HH:mm', the user's local time). Off until turned on.
+    // time of day ('HH:mm', the user's local time). Off until turned on. The
+    // workout reminder follows the active plan's days (turned on when a plan
+    // is set active); the supplement one is set on the Supplements page.
     reminders: {
       workout:     { enabled: { type: Boolean, default: false }, time: { type: String, default: '08:00' } },
       supplements: { enabled: { type: Boolean, default: false }, time: { type: String, default: '20:00' } },

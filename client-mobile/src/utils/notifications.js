@@ -1,6 +1,6 @@
 /**
- * Phone notifications for workout days and supplements (settings in
- * Settings → Reminders). Scheduled as one-off notifications for the next week
+ * Phone notifications for workout days (the active plan's days; turned on when
+ * a plan is set active) and supplements (turned on on the Supplements page). Scheduled as one-off notifications for the next week
  * and re-planned whenever the app opens or something relevant changes, so
  * today's are skipped once you've trained or ticked off every supplement.
  */
@@ -67,8 +67,7 @@ async function plan() {
   const { total, taken } = status.supplements;
   const jobs = [];
   for (let i = 0; i < DAYS_AHEAD; i++) {
-    const day = at(i, '00:00');
-    if (r.workout.enabled && status.workoutDays.includes(day.getDay()) && !(i === 0 && status.workedOut)) {
+    if (r.workout.enabled && status.workoutOffsets.includes(i) && !(i === 0 && status.workedOut)) {
       jobs.push(schedule(at(i, r.workout.time), 'Workout day', "Today's a training day. Open FitTrack to start your session.", 'Train'));
     }
     // No supplements on today's list means no stack either, so nothing to remind about.
