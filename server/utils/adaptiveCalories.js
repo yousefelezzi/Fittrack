@@ -25,7 +25,7 @@ const { formulaBmr, DYNAMIC_BASE } = require('./nutritionTargets');
 const WorkoutSession = require('../models/WorkoutSession');
 const { sessionCalories } = require('./workoutCalories');
 const CardioSession = require('../models/CardioSession');
-const { cardioCalories } = require('./cardio');
+const { cardioNetAfterSteps } = require('./cardio');
 
 const DAYS = 14;
 const KCAL_PER_KG = 7700;
@@ -57,15 +57,20 @@ async function adaptiveMaintenance(user, asOf = new Date()) {
       .select('date meals.calories').lean(),
     WeightLog.findOne({ user: user._id, date: { $lt: weightFrom } }).sort({ date: -1 }).lean(),
     WeightLog.find({ user: user._id, date: { $gte: weightFrom, $lte: end } }).sort({ date: 1 }).lean(),
-    StepLog.find({ user: user._id, date: { $gte: start, $lte: new Date(end.getTime() + DAY - 1) } }).select('steps').lean(),
+    StepLog.find({ user: user._id, date: { $gte: start, $lte: new Date(end.getTime() + DAY - 1) } }).select('date steps').lean(),
     WorkoutSession.find({ user: user._id, date: { $gte: start, $lte: new Date(end.getTime() + DAY - 1) } })
       .select('duration exercises.sets.reps exercises.sets.duration exercises.sets.bursts exercises.sets.burstSeconds exercises.sets.burstRest exercises.sets.restTime').lean(),
-    CardioSession.find({ user: user._id, date: { $gte: start, $lte: new Date(end.getTime() + DAY - 1) } }).select('activity intensity minutes').lean(),
+    CardioSession.find({ user: user._id, date: { $gte: start, $lte: new Date(end.getTime() + DAY - 1) } }).select('date activity intensity minutes segments').lean(),
   ]);
 
-  // Workouts and cardio: the calories above resting, per day of the period.
-  const workoutCalories = (sessions.reduce((n, s) => n + sessionCalories(s, user.weight).net, 0)
-    + cardio.reduce((n, c) => n + cardioCalories(c, user.weight).net, 0)) / DAYS;
+  // Workouts and cardio: the calories above resting, per day of the period
+  // (cardio without the steps it overlaps that day, as in the daily goal).
+  const dayKey = (d) => dayStart(d).getTime();
+  const stepsByDay = new Map(steps.map((s) => [dayKey(s.date), s.steps]));
+  const cardioByDay = new Map();
+  for (const c of cardio) cardioByDay.set(dayKey(c.date), [...(cardioByDay.get(dayKey(c.date)) || []), c]);
+  const cardioNet = [...cardioByDay].reduce((n, [k, list]) => n + cardioNetAfterSteps(list, user.weight, stepsByDay.get(k)), 0);
+  const workoutCalories = (sessions.reduce((n, s) => n + sessionCalories(s, user.weight).net, 0) + cardioNet) / DAYS;
   const workoutInfo = { workoutCalories: Math.round(workoutCalories), workouts: sessions.length, cardio: cardio.length };
   // Steps, all of them; days with none logged count as the average logged day.
   const logged = steps.filter((s) => s.steps > 0);

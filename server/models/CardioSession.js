@@ -13,6 +13,15 @@ const cardioSessionSchema = new mongoose.Schema(
     activity: { type: String, enum: Object.keys(ACTIVITIES), required: true },
     intensity: { type: String, enum: INTENSITIES, default: 'moderate' },
     minutes: { type: Number, min: 1, max: 600, required: true },
+    // Exact length, and time per intensity, for sessions timed live.
+    seconds: { type: Number, min: 0, max: 36000, default: null },
+    segments: {
+      type: [{ intensity: { type: String, enum: INTENSITIES }, seconds: { type: Number, min: 0 }, _id: false }],
+      default: undefined,
+    },
+    // One of the user's own activities (activity is then its base).
+    customActivity: { type: mongoose.Schema.Types.ObjectId, ref: 'CardioActivity', default: null },
+    customName: { type: String, trim: true, maxlength: 40, default: '' },
     distanceKm: { type: Number, min: 0, max: 500, default: null },
     notes: { type: String, trim: true, maxlength: 300, default: '' },
   },

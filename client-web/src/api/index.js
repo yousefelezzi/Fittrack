@@ -42,6 +42,7 @@ export const userAPI = {
 
 // ── Exercises ───────────────────────────────────────────────────────────────
 export const exerciseAPI = {
+  rate:        (id, stars)   => api.put(`/exercises/${id}/rating`, { stars }), // 1–5, or 0 to remove; returns { avg, count, mine }
   similar: (id, params) => api.get(`/exercises/${id}/similar`, { params }),
   getAll:   (params) => api.get('/exercises', { params }),
   getById:  (id)     => api.get(`/exercises/${id}`),
@@ -98,6 +99,10 @@ export const cardioAPI = {
   getAll: (params) => api.get('/cardio', { params }),
   create: (data) => api.post('/cardio', data),
   delete: (id) => api.delete(`/cardio/${id}`),
+  // Your own activities: { name, base } (the built-in activity it's most like).
+  activities: () => api.get('/cardio/activities'),
+  addActivity: (data) => api.post('/cardio/activities', data),
+  deleteActivity: (id) => api.delete(`/cardio/activities/${id}`),
 };
 
 // What today's reminders need: workout day / trained yet, supplements ticked.

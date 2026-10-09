@@ -5,13 +5,10 @@ import { Search, Plus, ChevronDown, ChevronUp, X, Pencil, Trash2 } from 'lucide-
 import ExerciseImage from '../components/ExerciseImage';
 import { EXERCISE_TYPES, TYPE_LABEL, typeOf } from '../utils/exerciseTypes';
 import { coveringMuscle, toggleMuscleTag } from '../utils/exerciseFilters';
+import StarRating, { RatingSummary } from '../components/StarRating';
 
 const MUSCLES = ['pecs','clavicular pecs','sternal pecs','costal pecs','lats','trapezius','posterior delt','middle delt','anterior delt','elbow flexors','biceps','brachialis/brachioradialis','triceps','medial/lateral triceps','triceps long head','forearms','abs','erectors','glutes','adductors','hip flexors','quads','vastus quads','rectus femoris','hamstrings','biarticular hamstrings','hamstrings short head','calves','gastrocnemius','soleus'];
 const EQUIPMENT = ['barbell','dumbbell','machine','cable','bodyweight','kettlebell','resistance_band','other'];
-const CATEGORIES = [
-  ['strength', 'Strength'],
-  ['cardio', 'Cardio'],
-];
 
 const EMPTY_FORM = {
   secondaryMuscles: [],
@@ -30,6 +27,12 @@ const UNILATERAL_NAME_PATTERN =
 
 function ExerciseCard({ ex, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(ex.rating || { avg: null, count: 0, mine: null });
+  const [rateError, setRateError] = useState('');
+  const rate = async (stars) => {
+    setRateError('');
+    try { setRating((await exerciseAPI.rate(ex._id, stars)).data); } catch { setRateError('Could not save your rating'); }
+  };
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-3 cursor-pointer" onClick={() => setOpen(!open)}>
@@ -53,6 +56,7 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
               <span className="badge bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">{TYPE_LABEL[typeOf(ex)]}</span>
             )}
           </div>
+          <RatingSummary rating={rating} className="mt-1.5" />
         </div>
         {open
           ? <ChevronUp  size={18} className="text-gray-400 shrink-0 ml-2 mt-1" />
@@ -67,6 +71,13 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
         <ol className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside border-t border-gray-100 dark:border-gray-800 pt-3">
           {ex.instructions.map((step, i) => <li key={i}>{step}</li>)}
         </ol>
+      )}
+      {open && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <span className="text-xs text-gray-500 dark:text-gray-400">{rating.mine ? 'Your rating' : 'Rate this exercise'}</span>
+          <StarRating value={rating.mine || 0} onChange={rate} />
+          {rateError && <span className="text-xs text-red-500">{rateError}</span>}
+        </div>
       )}
       {/* Only your own custom exercises can be changed. */}
       {ex.isCustom && (
@@ -92,14 +103,14 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
   // Until the user picks a type themselves, suggest one from the name.
   const [typeChosen, setTypeChosen] = useState(false);
 
-  // `exercise` with isNew is just starting values for a new one (e.g. its category).
+  // `exercise` with isNew is just starting values for a new one.
   const isEdit = !!exercise && !exercise.isNew;
 
   useEffect(() => {
     if (!open) return;
     setError('');
     setTypeChosen(isEdit);
-    setForm(exercise?.isNew ? { ...EMPTY_FORM, category: exercise.category } : exercise
+    setForm(exercise?.isNew ? { ...EMPTY_FORM } : exercise
       ? {
           name: exercise.name,
           muscleGroups: exercise.muscleGroups || [],
@@ -136,7 +147,7 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
   const handleSubmit = async () => {
     setError('');
     if (!form.name.trim())              return setError('Exercise name is required.');
-    if (form.category !== 'cardio' && form.muscleGroups.length === 0) return setError('Select at least one muscle group.');
+    if (form.muscleGroups.length === 0) return setError('Select at least one muscle group.');
     setSaving(true);
     try {
       const payload = { ...form, name: form.name.trim(), instructions: form.instructions.map(s => s.trim()).filter(Boolean) };
@@ -162,21 +173,8 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-          <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg w-fit">
-            {CATEGORIES.map(([v, label]) => (
-              <button key={v} type="button" onClick={() => setForm(f => ({ ...f, category: v }))}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${form.category === v
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Muscle Groups {form.category === 'cardio' ? <span className="font-normal text-gray-400">· optional</span> : '*'}
+            Muscle Groups *
           </label>
           <div className="flex flex-wrap gap-2">
             {MUSCLES.map(m => {
@@ -253,7 +251,7 @@ function ExerciseModal({ open, exercise, onClose, onSaved }) {
           )}
         </div>
 
-        {form.category !== 'cardio' && (
+        {(
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Exercise type</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -320,7 +318,6 @@ export default function Exercises() {
   const [equipment, setEquipment] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing,   setEditing]   = useState(null); // exercise being edited, or null for "add"
-  const [tab,       setTab]       = useState('strength'); // strength | cardio
 
   const fetchExercises = useCallback(async () => {
     setLoading(true);
@@ -344,9 +341,9 @@ export default function Exercises() {
     : [saved, ...prev]));
 
   // A new exercise starts in the section you're looking at.
-  const openAdd  = () => { setEditing({ ...EMPTY_FORM, category: tab, isNew: true }); setShowModal(true); };
-  const byCategory = (cat) => exercises.filter(e => (e.category || 'strength') === cat);
-  const shown = byCategory(tab);
+  const openAdd  = () => { setEditing({ ...EMPTY_FORM, isNew: true }); setShowModal(true); };
+  // Strength only: cardio has its own page.
+  const shown = exercises.filter(e => (e.category || 'strength') === 'strength');
   const openEdit = (ex) => { setEditing(ex); setShowModal(true); };
 
   const handleDelete = async (ex) => {
@@ -368,24 +365,13 @@ export default function Exercises() {
         </button>
       </div>
 
-      {/* Strength and cardio are separate sections */}
-      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
-        {CATEGORIES.map(([v, label]) => (
-          <button key={v} onClick={() => { setTab(v); if (v === 'cardio') setMuscle(''); }}
-            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === v
-              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
-            {label} <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">{byCategory(v).length}</span>
-          </button>
-        ))}
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input className="input pl-9" placeholder="Search exercises…" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
-        {tab === 'strength' && (
+        {(
           <select className="input sm:w-44" value={muscle} onChange={e => setMuscle(e.target.value)}>
             <option value="">All muscles</option>
             {MUSCLES.map(m => <option key={m} value={m} className="capitalize">{m.replace('_', ' ')}</option>)}
@@ -400,7 +386,7 @@ export default function Exercises() {
       {loading
         ? <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
         : shown.length === 0
-          ? <p className="text-center text-gray-400 dark:text-gray-500 py-16">No {tab} exercises found.</p>
+          ? <p className="text-center text-gray-400 dark:text-gray-500 py-16">No exercises found.</p>
           : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {shown.map(ex => <ExerciseCard key={ex._id} ex={ex} onEdit={openEdit} onDelete={handleDelete} />)}
             </div>

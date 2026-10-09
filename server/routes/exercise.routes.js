@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const validate = require('../middleware/validate');
 const protect = require('../middleware/auth');
 const {
@@ -10,6 +10,7 @@ const {
   updateExercise,
   deleteExercise, saveSharedExercise,
   getSimilarExercises,
+  rateExercise,
 } = require('../controllers/exercise.controller');
 
 // GET /api/exercises?muscle=pecs&equipment=barbell&search=bench
@@ -21,6 +22,10 @@ router.post('/from-shared', protect, [
   body('messageId').optional().isMongoId().withMessage('Invalid message'),
 ], validate, saveSharedExercise);
 router.get('/:id/similar', protect, getSimilarExercises);
+router.put('/:id/rating', protect, [
+  param('id').isMongoId().withMessage('Invalid exercise'),
+  body('stars').isInt({ min: 0, max: 5 }).withMessage('Rate it 1 to 5 stars (0 takes your rating back)'),
+], validate, rateExercise);
 router.get('/:id', protect, getExerciseById);
 
 router.post(
@@ -28,9 +33,8 @@ router.post(
   protect,
   [
     body('name').trim().notEmpty().withMessage('Exercise name is required'),
-    body('category').optional().isIn(['strength', 'cardio']).withMessage('Category must be strength or cardio'),
     body('muscleGroups').isArray().withMessage('Muscle groups must be a list')
-      .custom((v, { req }) => req.body.category === 'cardio' || v.length > 0)
+      .custom((v) => v.length > 0)
       .withMessage('At least one muscle group is required'),
     body('equipment').optional().isString(),
     body('secondaryMuscles').optional().isArray().withMessage('Secondary muscles must be a list'),
@@ -46,9 +50,8 @@ router.put(
   protect,
   [
     body('name').optional().trim().notEmpty().withMessage('Exercise name is required'),
-    body('category').optional().isIn(['strength', 'cardio']).withMessage('Category must be strength or cardio'),
     body('muscleGroups').optional().isArray().withMessage('Muscle groups must be a list')
-      .custom((v, { req }) => req.body.category === 'cardio' || v.length > 0)
+      .custom((v) => v.length > 0)
       .withMessage('At least one muscle group is required'),
     body('equipment').optional().isString(),
     body('secondaryMuscles').optional().isArray().withMessage('Secondary muscles must be a list'),

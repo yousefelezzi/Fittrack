@@ -501,6 +501,28 @@ const migrations = [
       return `${recipes} recipe(s) and ${meals} logged meal(s) updated`;
     },
   },
+  {
+    // Cardio left the exercise library (it has its own Log Cardio page): the
+    // built-in cardio exercises go if nothing uses them, and any left (used in
+    // a workout or plan, or someone's own) become strength exercises.
+    name: '2026-10-cardio-out-of-library',
+    async up(db) {
+      const ex = db.collection('exercises');
+      const cardio = await ex.find({ category: 'cardio' }, { projection: { _id: 1, isCustom: 1 } }).toArray();
+      let removed = 0;
+      for (const e of cardio) {
+        const used = !e.isCustom && ((await db.collection('workoutsessions').countDocuments({ 'exercises.exercise': e._id }))
+          || (await db.collection('workoutplans').countDocuments({ 'days.exercises.exercise': e._id })));
+        if (!e.isCustom && !used) {
+          await ex.deleteOne({ _id: e._id });
+          await db.collection('exerciseratings').deleteMany({ exercise: e._id });
+          removed++;
+        }
+      }
+      const kept = await ex.updateMany({ category: 'cardio' }, { $set: { category: 'strength' } });
+      return `${removed} cardio exercise(s) removed, ${kept.modifiedCount} kept as strength`;
+    },
+  },
 ];
 
 async function runMigrations() {

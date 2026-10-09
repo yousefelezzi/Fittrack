@@ -7,10 +7,10 @@ import {
 import { X } from 'lucide-react-native';
 import { EXERCISE_TYPES, TYPE_LABEL, typeOf } from '../../../client-web/src/utils/exerciseTypes';
 import { coveringMuscle, toggleMuscleTag } from '../../../client-web/src/utils/exerciseFilters';
+import StarRating, { RatingSummary } from '../components/StarRating';
 
 const MUSCLES = ['pecs','clavicular pecs','sternal pecs','costal pecs','lats','trapezius','posterior delt','middle delt','anterior delt','elbow flexors','biceps','brachialis/brachioradialis','triceps','medial/lateral triceps','triceps long head','forearms','abs','erectors','glutes','adductors','hip flexors','quads','vastus quads','rectus femoris','hamstrings','biarticular hamstrings','hamstrings short head','calves','gastrocnemius','soleus'];
 const EQUIPMENT = ['barbell','dumbbell','machine','cable','bodyweight','kettlebell','resistance_band','other'];
-const CATEGORIES = [['strength', 'Strength'], ['cardio', 'Cardio']];
 const EMPTY_FORM = { name: '', muscleGroups: [], secondaryMuscles: [], equipment: 'bodyweight', category: 'strength', laterality: 'bilateral', type: 'dynamic', instructions: [''] };
 // Names that mean one arm/leg at a time (same as server/utils/laterality.js).
 const UNILATERAL_NAME_PATTERN = /\b(single|one)[\s-]*(arm|leg|hand)\b|\bunilateral\b|\bcable lateral raise\b|\bdumbbell preacher curl\b/i;
@@ -18,6 +18,10 @@ const pretty = (s) => s.replace('_', ' ');
 
 function ExerciseCard({ ex, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(ex.rating || { avg: null, count: 0, mine: null });
+  const rate = async (stars) => {
+    try { setRating((await exerciseAPI.rate(ex._id, stars)).data); } catch { /* stays as it was */ }
+  };
   return (
     <Card style={{ marginBottom: 10 }}>
       <TouchableOpacity onPress={() => setOpen(!open)} activeOpacity={0.7} style={styles.cardHead}>
@@ -32,6 +36,7 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
             {ex.laterality === 'unilateral' && <Text style={[styles.badge, styles.badgePurple]}>Unilateral</Text>}
             {typeOf(ex) !== 'dynamic' && <Text style={[styles.badge, styles.badgeAmber]}>{TYPE_LABEL[typeOf(ex)]}</Text>}
           </View>
+          <RatingSummary rating={rating} style={{ marginTop: 6 }} />
         </View>
         <Text style={styles.chev}>{open ? '▴' : '▾'}</Text>
       </TouchableOpacity>
@@ -42,6 +47,12 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
         </View>
       )}
       {open && ex.secondaryMuscles?.length > 0 && <Hint style={{ marginTop: 6 }}>Lighter tags are secondary muscles: they count up to half a set (less the more trained you are).</Hint>}
+      {open ? (
+        <View style={styles.rateRow}>
+          <Text style={styles.rateLabel}>{rating.mine ? 'Your rating' : 'Rate this exercise'}</Text>
+          <StarRating value={rating.mine || 0} onChange={rate} />
+        </View>
+      ) : null}
       {ex.isCustom && (
         <View style={styles.customRow}>
           <Text style={[styles.badge, { marginRight: 'auto' }]}>Custom</Text>
@@ -74,7 +85,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       laterality: exercise.laterality || 'bilateral',
       type: typeOf(exercise),
       instructions: exercise.instructions?.length ? exercise.instructions : [''],
-    } : { ...EMPTY_FORM, category: exercise?.category || 'strength' });
+    } : { ...EMPTY_FORM });
   }, [visible, exercise]);
 
   // Until the user picks a type themselves, suggest one from the name.
@@ -89,7 +100,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
   const submit = async () => {
     setError('');
     if (!form.name.trim()) return setError('Exercise name is required.');
-    if (form.category !== 'cardio' && form.muscleGroups.length === 0) return setError('Select at least one muscle group.');
+    if (form.muscleGroups.length === 0) return setError('Select at least one muscle group.');
     setSaving(true);
     try {
       const payload = { ...form, name: form.name.trim(), instructions: form.instructions.map((s) => s.trim()).filter(Boolean) };
@@ -110,10 +121,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       <Label style={{ marginTop: 0 }}>Name *</Label>
       <TextInput style={styles.field} placeholder="e.g. Reverse Nordic Curl" placeholderTextColor={colors.textMuted} value={form.name} onChangeText={setName} />
 
-      <Label>Category</Label>
-      <Segmented value={form.category} options={CATEGORIES} onChange={(v) => setForm((f) => ({ ...f, category: v }))} />
-
-      <Label>Muscle groups {form.category === 'cardio' ? '· optional' : '*'}</Label>
+      <Label>Muscle groups *</Label>
       <ChipRow style={{ gap: 6 }}>
         {MUSCLES.map((m) => <Chip key={m} small label={m} active={form.muscleGroups.includes(m)} disabled={!!coveringMuscle(m, form.muscleGroups)} onPress={() => toggleMuscle(m)} />)}
       </ChipRow>
@@ -150,7 +158,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
         <Hint style={{ marginTop: 4 }}>Sets you already logged per side stay as left and right.</Hint>
       )}
 
-      {form.category !== 'cardio' && (
+      {(
         <>
           <Label>Exercise type</Label>
           <View style={{ gap: 6 }}>
@@ -192,7 +200,6 @@ export default function ExercisesScreen() {
   const [search, setSearch] = useState('');
   const [muscle, setMuscle] = useState('');
   const [equipment, setEquipment] = useState('');
-  const [tab, setTab] = useState('strength');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editing, setEditing] = useState(null); // exercise, or { category } for a new one
 
@@ -213,8 +220,8 @@ export default function ExercisesScreen() {
     return () => clearTimeout(t);
   }, [fetchExercises]);
 
-  const byCategory = (cat) => exercises.filter((e) => (e.category || 'strength') === cat);
-  const shown = byCategory(tab);
+  // Strength only: cardio has its own page.
+  const shown = exercises.filter((e) => (e.category || 'strength') === 'strength');
 
   const handleSaved = (saved, wasEdit) => setExercises((prev) => (wasEdit ? prev.map((e) => (e._id === saved._id ? saved : e)) : [saved, ...prev]));
   const handleDelete = async (ex) => {
@@ -232,13 +239,11 @@ export default function ExercisesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.top}>
-        <Segmented value={tab} onChange={(v) => { setTab(v); if (v === 'cardio') setMuscle(''); }}
-          options={CATEGORIES.map(([v, l]) => [v, `${l} ${byCategory(v).length}`])} />
-        <View style={[styles.cardHead, { marginTop: 10 }]}>
+        <View style={styles.cardHead}>
           <TextInput style={[styles.field, { flex: 1 }]} placeholder="Search exercises…" placeholderTextColor={colors.textMuted}
             value={search} onChangeText={setSearch} autoCorrect={false} />
           <Button title={filterCount ? `Filters (${filterCount})` : 'Filters'} variant="secondary" onPress={() => setFiltersOpen(true)} style={{ minHeight: 42, paddingHorizontal: 12 }} />
-          <Button title="+" onPress={() => setEditing({ category: tab })} style={{ minHeight: 42, width: 46, paddingHorizontal: 0 }} />
+          <Button title="+" onPress={() => setEditing({})} style={{ minHeight: 42, width: 46, paddingHorizontal: 0 }} />
         </View>
       </View>
 
@@ -248,7 +253,7 @@ export default function ExercisesScreen() {
           keyExtractor={(e) => e._id}
           contentContainerStyle={{ padding: 16, paddingTop: 4 }}
           renderItem={({ item }) => <ExerciseCard ex={item} onEdit={setEditing} onDelete={handleDelete} />}
-          ListEmptyComponent={<Text style={styles.empty}>No {tab} exercises found.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>No exercises found.</Text>}
         />
       )}
 
@@ -257,7 +262,7 @@ export default function ExercisesScreen() {
           <Button title="Clear" variant="secondary" onPress={() => { setMuscle(''); setEquipment(''); }} style={{ flex: 1 }} />
           <Button title="Done" onPress={() => setFiltersOpen(false)} style={{ flex: 1 }} />
         </View>}>
-        {tab === 'strength' && (
+        {(
           <>
             <Label style={{ marginTop: 0 }}>Muscle</Label>
             <ChipRow style={{ gap: 6 }}>
@@ -301,4 +306,6 @@ const styles = makeStyles(() => ({
   weightBox:  { backgroundColor: colors.inset, borderRadius: 12, padding: 10, marginTop: 10, gap: 6 },
   weightRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stepRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  rateRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.subtle },
+  rateLabel: { fontSize: 13, color: colors.textSecondary },
 }));

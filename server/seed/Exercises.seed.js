@@ -766,44 +766,6 @@ const exercises = [
       'Extend and flex your wrists through the full range of motion.',
     ],
   },
-  {
-    name: 'Farmers Walk',
-    muscleGroups: ['forearms', 'trapezius'],
-    equipment: 'dumbbell',
-    instructions: [
-      'Pick up heavy dumbbells or kettlebells and walk for a set distance.',
-      'Keep your torso upright and grip tight throughout.',
-    ],
-  },
-
-  // ── CARDIO / CONDITIONING ──────────────────────────────────────────────────
-  {
-    name: 'Jump Rope',
-    muscleGroups: [],
-    equipment: 'other',
-    instructions: [
-      'Hold handles at hip height. Jump with both feet as the rope passes under.',
-      'Keep jumps low and land softly on the balls of your feet.',
-    ],
-  },
-  {
-    name: 'Battle Ropes',
-    muscleGroups: [],
-    equipment: 'other',
-    instructions: [
-      'Hold one end of each rope. Alternate or simultaneously slam the ropes in waves.',
-      'Keep knees slightly bent and core engaged.',
-    ],
-  },
-  {
-    name: 'Sled Push',
-    muscleGroups: ['quads', 'glutes'],
-    equipment: 'other',
-    instructions: [
-      'Load a sled and place hands on the uprights at shoulder height.',
-      'Drive forward with powerful leg strides, keeping a forward lean.',
-    ],
-  },
 ];
 
 // Exercises done one arm or leg at a time — logged per side.
@@ -828,9 +790,8 @@ for (const ex of exercises) {
   ex.type = YIELDING_ISOMETRIC.has(ex.name) ? 'yielding' : 'dynamic';
 }
 
-// Conditioning work lives in its own Cardio section rather than under a muscle.
-const CARDIO = new Set(['Jump Rope', 'Battle Ropes', 'Sled Push', 'Farmers Walk']);
-for (const ex of exercises) ex.category = CARDIO.has(ex.name) ? 'cardio' : 'strength';
+// The library is strength work; cardio is logged on its own page (Log Cardio).
+for (const ex of exercises) ex.category = 'strength';
 
 // Start/end position photos for each built-in exercise, served by the web app
 // from client-web/public/exercise-images. Source: Free Exercise DB
@@ -910,10 +871,6 @@ const IMAGES = {
   "Donkey Calf Raise": ["/exercise-images/donkey-calf-raise-0.jpg", "/exercise-images/donkey-calf-raise-1.jpg"],
   "Barbell Wrist Curl": ["/exercise-images/barbell-wrist-curl-0.jpg", "/exercise-images/barbell-wrist-curl-1.jpg"],
   "Reverse Wrist Curl": ["/exercise-images/reverse-wrist-curl-0.jpg", "/exercise-images/reverse-wrist-curl-1.jpg"],
-  "Farmers Walk": ["/exercise-images/farmers-walk-0.jpg", "/exercise-images/farmers-walk-1.jpg"],
-  "Jump Rope": ["/exercise-images/jump-rope-0.jpg", "/exercise-images/jump-rope-1.jpg"],
-  "Battle Ropes": ["/exercise-images/battle-ropes-0.jpg", "/exercise-images/battle-ropes-1.jpg"],
-  "Sled Push": ["/exercise-images/sled-push-0.jpg", "/exercise-images/sled-push-1.jpg"],
 };
 for (const ex of exercises) ex.images = IMAGES[ex.name] || [];
 
