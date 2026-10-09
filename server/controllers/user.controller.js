@@ -1,6 +1,10 @@
 const User = require('../models/User');
 const { STAT_KEYS } = require('./stats.controller');
 const { canViewContent, canMessage } = require('../utils/privacy');
+const { levelFromFfmi } = require('../utils/trainingLevel');
+
+// Only the owner sees these.
+const PRIVATE_FIELDS = ['fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories', 'savedFoods', 'workoutDays', 'reminders'];
 
 const MESSAGE_SETTINGS = ['connections', 'following', 'nobody'];
 
@@ -32,13 +36,15 @@ exports.searchUsers = async (req, res, next) => {
 exports.getUserById = async (req, res, next) => {
   try {
     const isOwner = req.params.id === String(req.user.id);
+    const full = await User.findById(req.params.id).select('-password').lean();
+    if (!full) return res.status(404).json({ message: 'User not found' });
+    // Beginner / intermediate / advanced from the sex-adjusted FFMI (null
+    // without height, weight and body fat). Worked out, never set by the user.
+    const trainingLevel = levelFromFfmi(full);
+    const counts = { followersCount: (full.followers || []).length, followingCount: (full.following || []).length, trainingLevel };
+    if (isOwner) return res.json({ ...full, ...counts, canView: true });
     // Body fat feeds the private FFMI stat, so only the owner gets the raw value.
-    const user = await User.findById(req.params.id)
-      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType -bodyWeightUnit -heightUnit -adaptiveCalories -savedFoods -workoutDays -reminders')
-      .lean();
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    const counts = { followersCount: (user.followers || []).length, followingCount: (user.following || []).length };
-    if (isOwner) return res.json({ ...user, ...counts, canView: true });
+    const user = Object.fromEntries(Object.entries(full).filter(([k]) => !PRIVATE_FIELDS.includes(k)));
 
     // Others see whether they can view the profile and message, and whether
     // they've asked to follow; a private profile's lists stay hidden.

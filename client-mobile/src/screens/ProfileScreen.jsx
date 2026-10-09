@@ -13,6 +13,7 @@ import { PostCard } from '../components/social';
 import { usePostActions } from '../components/usePostActions';
 import { ACTIVITY_LEVELS } from '../../../client-web/src/utils/calculators';
 import { Footprints, Calculator, History, Settings, Lock, FileText, Pencil, Camera } from 'lucide-react-native';
+import { LEVEL_TAGS, LEVEL_HINT, NO_LEVEL_HINT } from '../../../client-web/src/utils/levelTag';
 import { cmToFtIn, ftInToCm, kgTo, toKgFrom, formatHeight, formatBodyWeight } from '../../../client-web/src/utils/bodyUnits';
 
 const GOAL_LABELS = {
@@ -318,7 +319,18 @@ export default function ProfileScreen({ route, navigation }) {
           </View>
 
           <Text style={styles.profileName}>{profile.name}</Text>
-          {profile.fitnessGoal && <View style={[styles.goalBadge, { marginBottom: 4 }]}><Text style={styles.goalBadgeText}>{GOAL_LABELS[profile.fitnessGoal]}</Text></View>}
+          <View style={styles.badgeRow}>
+            {LEVEL_TAGS[profile.trainingLevel] ? (
+              <TouchableOpacity onPress={() => Alert.alert(LEVEL_TAGS[profile.trainingLevel].label, LEVEL_HINT)}
+                style={[styles.goalBadge, { backgroundColor: LEVEL_TAGS[profile.trainingLevel].bg }]}>
+                <Text style={[styles.goalBadgeText, { color: LEVEL_TAGS[profile.trainingLevel].color }]}>{LEVEL_TAGS[profile.trainingLevel].label}</Text>
+              </TouchableOpacity>
+            ) : isOwn ? (
+              <TouchableOpacity onPress={() => Alert.alert('No level yet', NO_LEVEL_HINT)} style={[styles.goalBadge, { backgroundColor: colors.subtle }]}>
+                <Text style={[styles.goalBadgeText, { color: colors.textMuted }]}>No level yet</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           <View style={styles.metaRow}>
             {age !== null && <Text style={styles.meta}>{age} yrs</Text>}
@@ -410,6 +422,7 @@ const styles = makeStyles(() => ({
   statNum:      { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   statLabel:    { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
   profileName:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  badgeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
   goalBadge:    { alignSelf: 'flex-start', backgroundColor: colors.brandLight, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   goalBadgeText:{ fontSize: 12, color: colors.brand, fontWeight: '600' },
   bio:          { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 6 },

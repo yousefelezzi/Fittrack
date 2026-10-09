@@ -9,6 +9,7 @@ import { usePostActions } from '../components/social/usePostActions';
 import { ACTIVITY_LEVELS } from '../utils/calculators';
 import { Camera, Edit2, Check, X, UserPlus, UserMinus, MessageSquare, Settings as SettingsIcon, Lock, Clock } from 'lucide-react';
 import { format, differenceInYears } from 'date-fns';
+import { LEVEL_TAGS, LEVEL_HINT, NO_LEVEL_HINT } from '../utils/levelTag';
 import { cmToFtIn, ftInToCm, kgTo, toKgFrom, formatHeight, formatBodyWeight } from '../utils/bodyUnits';
 
 const GOAL_LABELS = {
@@ -388,8 +389,13 @@ export default function Profile() {
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{profile.name}</h1>
-                  {profile.fitnessGoal && (
-                    <span className="badge bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400">{GOAL_LABELS[profile.fitnessGoal]}</span>
+                  {LEVEL_TAGS[profile.trainingLevel] ? (
+                    <span className="badge font-semibold cursor-help" title={LEVEL_HINT}
+                      style={{ color: LEVEL_TAGS[profile.trainingLevel].color, backgroundColor: LEVEL_TAGS[profile.trainingLevel].bg }}>
+                      {LEVEL_TAGS[profile.trainingLevel].label}
+                    </span>
+                  ) : isOwn && (
+                    <span className="badge bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-help" title={NO_LEVEL_HINT}>No level yet</span>
                   )}
                 </div>
                 {profile.bio && <p className="text-sm text-gray-500 mt-1">{profile.bio}</p>}
