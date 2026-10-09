@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { STAT_KEYS } = require('./stats.controller');
 const { canViewContent, canMessage } = require('../utils/privacy');
 const { levelFromFfmi } = require('../utils/trainingLevel');
+const { normalize: normalizeUsername, usernameProblem, usernameTaken } = require('../utils/username');
 
 // Only the owner sees these.
 const PRIVATE_FIELDS = ['onboardedAt', 'twoFactorEnabled', 'pendingEmail', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories', 'savedFoods', 'reminders'];
@@ -14,16 +15,18 @@ exports.searchUsers = async (req, res, next) => {
     const q = String(req.query.q || '').trim().slice(0, 50);
     if (!q) return res.json([]);
     const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // search text, not a regex
+    const handle = normalizeUsername(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     const users = await User.find({
       $or: [
         { name: { $regex: safe, $options: 'i' } },
+        ...(handle ? [{ username: { $regex: `^${handle}` } }] : []), // @username, from the start
         { email: { $regex: `^${safe}$`, $options: 'i' } }, // exact email only
       ],
       _id: { $ne: req.user.id },
       'privacy.discoverable': { $ne: false }, // "show me in search" turned off
     })
-      .select('name avatar bio privacy.privateAccount')
+      .select('name username avatar bio privacy.privateAccount')
       .limit(20);
 
     res.json(users);
@@ -82,6 +85,14 @@ exports.updateMe = async (req, res, next) => {
       });
     }
 
+    if (req.body.username !== undefined) {
+      const username = normalizeUsername(req.body.username);
+      const problem = usernameProblem(username);
+      if (problem) return res.status(422).json({ message: problem, errors: [{ field: 'username', message: problem }] });
+      if (await usernameTaken(username, req.user.id)) return res.status(409).json({ message: 'That username is taken' });
+      updates.username = username;
+    }
+
     // Get Started finished or skipped.
     if (req.body.onboarded === true) updates.onboardedAt = new Date();
 
@@ -134,6 +145,7 @@ exports.updateMe = async (req, res, next) => {
     const user = await User.findById(req.user.id);
     res.json(user);
   } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.username) return res.status(409).json({ message: 'That username is taken' });
     next(err);
   }
 };
@@ -231,7 +243,7 @@ exports.getSuggestions = async (req, res, next) => {
       ids.push(...newest.map((u) => String(u._id)));
     }
 
-    const users = await User.find({ _id: { $in: ids }, 'privacy.discoverable': { $ne: false } }).select('name avatar bio privacy.privateAccount').lean();
+    const users = await User.find({ _id: { $in: ids }, 'privacy.discoverable': { $ne: false } }).select('name username avatar bio privacy.privateAccount').lean();
     const order = new Map(ids.map((id, i) => [id, i]));
     res.json(users
       .map((u) => ({ ...u, mutual: counts.get(String(u._id)) || 0 }))
@@ -244,7 +256,7 @@ exports.getSuggestions = async (req, res, next) => {
 // GET /api/users/:id/followers
 exports.getFollowers = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select('privacy followers following').populate('followers', 'name avatar bio');
+    const user = await User.findById(req.params.id).select('privacy followers following').populate('followers', 'name username avatar bio');
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (!canViewContent(user, req.user.id)) return res.status(403).json({ message: 'This account is private.' });
     res.json(user.followers);
@@ -256,7 +268,7 @@ exports.getFollowers = async (req, res, next) => {
 // GET /api/users/:id/following
 exports.getFollowing = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select('privacy followers following').populate('following', 'name avatar bio');
+    const user = await User.findById(req.params.id).select('privacy followers following').populate('following', 'name username avatar bio');
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (!canViewContent(user, req.user.id)) return res.status(403).json({ message: 'This account is private.' });
     res.json(user.following);
@@ -268,7 +280,7 @@ exports.getFollowing = async (req, res, next) => {
 // GET /api/users/me/follow-requests — people waiting to follow your private account
 exports.getFollowRequests = async (req, res, next) => {
   try {
-    const me = await User.findById(req.user.id).select('followRequests').populate('followRequests', 'name avatar bio').lean();
+    const me = await User.findById(req.user.id).select('followRequests').populate('followRequests', 'name username avatar bio').lean();
     res.json(me?.followRequests || []);
   } catch (err) {
     next(err);

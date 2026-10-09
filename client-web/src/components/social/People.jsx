@@ -11,7 +11,7 @@ function PersonRow({ person, isFollowing, isRequested, followsMe, onFollow, onUn
       <Link to={`/profile/${person._id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80">
         <Avatar user={person} size="md" />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{person.name}</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{person.name} {person.username && <span className="font-normal text-gray-400">@{person.username}</span>}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{note || person.bio || (followsMe ? 'Follows you' : '')}</p>
         </div>
       </Link>
@@ -54,7 +54,7 @@ function FollowRequests({ requests, onAnswer }) {
               <Link to={`/profile/${u._id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80">
                 <Avatar user={u} size="md" />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{u.name}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{u.name} {u.username && <span className="font-normal text-gray-400">@{u.username}</span>}</p>
                   {u.bio && <p className="text-xs text-gray-400 truncate">{u.bio}</p>}
                 </div>
               </Link>

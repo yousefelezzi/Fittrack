@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { sendMail } = require('../utils/mailer');
+const { normalize: normalizeUsername, usernameProblem, usernameTaken } = require('../utils/username');
 
 const APP_URL = () => (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
 const HOUR = 3600000;
@@ -81,14 +82,37 @@ const signTokens = (userId) => {
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
+    const username = normalizeUsername(req.body.username);
+    const problem = usernameProblem(username);
+    if (problem) return res.status(422).json({ message: problem, errors: [{ field: 'username', message: problem }] });
 
     const existing = await User.findOne({ email });
     if (existing) return res.status(409).json({ message: 'Email already in use' });
+    if (await usernameTaken(username)) return res.status(409).json({ message: 'That username is taken' });
 
-    const user = await User.create({ name, email, password });
+    const user = await User.create({ name, email, username, password });
     const { accessToken, refreshToken } = signTokens(user._id);
 
     res.status(201).json({ accessToken, refreshToken, user });
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ message: err.keyPattern?.username ? 'That username is taken' : 'Email already in use' });
+    next(err);
+  }
+};
+
+// GET /api/auth/username-available?username=…  — for sign-up and changing it (signed-in users keep their own)
+exports.usernameAvailable = async (req, res, next) => {
+  try {
+    const username = normalizeUsername(req.query.username);
+    const problem = usernameProblem(username);
+    if (problem) return res.json({ username, available: false, message: problem });
+    let me = null;
+    const auth = req.headers.authorization;
+    if (auth?.startsWith('Bearer ')) {
+      try { me = jwt.verify(auth.slice(7), process.env.JWT_SECRET).id; } catch { /* not signed in */ }
+    }
+    const taken = await usernameTaken(username, me);
+    res.json({ username, available: !taken, message: taken ? 'That username is taken' : 'Available' });
   } catch (err) {
     next(err);
   }
@@ -97,11 +121,15 @@ exports.register = async (req, res, next) => {
 // POST /api/auth/login
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    // Email or username.
+    const login = String(req.body.email || req.body.login || '').trim().toLowerCase();
+    // An email has an @ in the middle; "@name" or "name" is a username.
+    const query = login.indexOf('@') > 0 ? { email: login } : { username: normalizeUsername(login) };
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = login ? await User.findOne(query).select('+password') : null;
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Wrong email/username or password' });
     }
 
     // Two-step sign-in: email a code; the app sends it back with the challenge.
@@ -395,8 +423,8 @@ exports.logout = async (req, res) => {
 exports.getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id)
-      .populate('followers', 'name avatar')
-      .populate('following', 'name avatar');
+      .populate('followers', 'name username avatar')
+      .populate('following', 'name username avatar');
     res.json(user);
   } catch (err) {
     next(err);

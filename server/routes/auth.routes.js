@@ -16,6 +16,7 @@ const {
   cancelEmailChange,
   confirmEmailChange,
   verifyLogin,
+  usernameAvailable,
   resendLoginCode,
   requestTwoFactor,
   confirmTwoFactor,
@@ -26,6 +27,7 @@ router.post(
   '/register',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
+    body('username').isString().trim().notEmpty().withMessage('Pick a username'),
     body('email').isEmail().withMessage('Valid email is required'),
     body('password')
       .isLength({ min: 8 })
@@ -40,7 +42,7 @@ router.post(
 router.post(
   '/login',
   [
-    body('email').isEmail().withMessage('Valid email is required'),
+    body('email').isString().trim().notEmpty().withMessage('Enter your email or username'),
     body('password').notEmpty().withMessage('Password is required'),
   ],
   validate,
@@ -55,6 +57,7 @@ router.post('/2fa/enable/request', protect, [body('password').notEmpty().withMes
 router.post('/2fa/enable/confirm', protect, [codeRule], validate, confirmTwoFactor);
 router.post('/2fa/disable', protect, [body('password').notEmpty().withMessage('Enter your password')], validate, disableTwoFactor);
 
+router.get('/username-available', usernameAvailable);
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);

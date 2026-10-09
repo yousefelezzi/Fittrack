@@ -17,7 +17,7 @@ async function visiblePost(postId, viewerId, res) {
 // Workout posts show the workout itself, so its exercises are populated too.
 const populatePost = (query) =>
   query
-    .populate('user', 'name avatar')
+    .populate('user', 'name username avatar')
     .populate({
       path: 'workoutSession',
       select: 'name exercises duration date',
@@ -30,7 +30,7 @@ const populatePost = (query) =>
     })
     .populate('exercise', 'name muscleGroups secondaryMuscles equipment laterality type category images instructions isCustom createdBy')
     .populate('food', 'name brand per100g servings ingredients numServings category source createdBy')
-    .populate('comments.user', 'name avatar');
+    .populate('comments.user', 'name username avatar');
 
 // GET /api/posts/feed?scope=following|discover&page=1&limit=10
 // following: you and the people you follow. discover: everyone's posts, to find people.
@@ -208,7 +208,7 @@ exports.addComment = async (req, res, next) => {
     }
     post.comments.push({ user: req.user.id, text: req.body.text, parent });
     await post.save();
-    await post.populate('comments.user', 'name avatar');
+    await post.populate('comments.user', 'name username avatar');
     res.status(201).json(post.comments);
   } catch (err) {
     next(err);
@@ -226,7 +226,7 @@ exports.editComment = async (req, res, next) => {
     comment.text = req.body.text;
     comment.editedAt = new Date();
     await post.save();
-    await post.populate('comments.user', 'name avatar');
+    await post.populate('comments.user', 'name username avatar');
     res.json(post.comments);
   } catch (err) {
     next(err);

@@ -545,7 +545,7 @@ function PersonRow({ person, isFollowing, isRequested, followsMe, onFollow, onUn
       <TouchableOpacity style={[styles.row, { flex: 1 }]} onPress={() => onOpenProfile(person._id)}>
         <Avatar user={person} size={40} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.bold} numberOfLines={1}>{person.name}</Text>
+          <Text style={styles.bold} numberOfLines={1}>{person.name}{person.username ? <Text style={styles.muted}>  @{person.username}</Text> : null}</Text>
           <Text style={styles.muted} numberOfLines={1}>{note || person.bio || (followsMe ? 'Follows you' : '')}</Text>
         </View>
       </TouchableOpacity>
@@ -580,7 +580,7 @@ function FollowRequests({ requests, onAnswer, onOpenProfile }) {
           <TouchableOpacity style={[styles.row, { flex: 1 }]} onPress={() => onOpenProfile(u._id)}>
             <Avatar user={u} size={40} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.bold} numberOfLines={1}>{u.name}</Text>
+              <Text style={styles.bold} numberOfLines={1}>{u.name}{u.username ? <Text style={styles.muted}>  @{u.username}</Text> : null}</Text>
               {u.bio ? <Text style={styles.muted} numberOfLines={1}>{u.bio}</Text> : null}
             </View>
           </TouchableOpacity>

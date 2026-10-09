@@ -91,7 +91,7 @@ exports.getConversations = async (req, res, next) => {
     const conversations = await Conversation.find({ participants: me, 'lastMessage.sentAt': { $ne: null } })
       .sort({ updatedAt: -1 })
       .limit(50)
-      .populate('participants', 'name avatar')
+      .populate('participants', 'name username avatar')
       .populate('lastMessage.sender', 'name')
       .lean();
     const unread = await Message.aggregate([
@@ -139,7 +139,7 @@ exports.openConversation = async (req, res, next) => {
       if (!canMessage(theirs, me)) return res.status(403).json({ message: NOT_ACCEPTING });
       convo = await Conversation.create({ participants: [me, userId] });
     }
-    await convo.populate('participants', 'name avatar');
+    await convo.populate('participants', 'name username avatar');
     res.json(summary(convo, me));
   } catch (err) {
     next(err);
@@ -162,7 +162,7 @@ exports.createGroup = async (req, res, next) => {
 
     const convo = await Conversation.create({ participants: [me, ...check.ids], isGroup: true, name, createdBy: me });
     await postSystemMessage(convo, me, `${await nameOf(me)} created "${name}"`);
-    await convo.populate('participants', 'name avatar');
+    await convo.populate('participants', 'name username avatar');
     res.status(201).json(summary(convo, me));
   } catch (err) {
     next(err);
@@ -181,7 +181,7 @@ exports.renameGroup = async (req, res, next) => {
       convo.name = name;
       await postSystemMessage(convo, me, `${await nameOf(me)} renamed the group to "${name}"`);
     }
-    await convo.populate('participants', 'name avatar');
+    await convo.populate('participants', 'name username avatar');
     res.json(summary(convo, me));
   } catch (err) {
     next(err);
@@ -202,7 +202,7 @@ exports.addMembers = async (req, res, next) => {
     }
     convo.participants.push(...check.ids);
     await postSystemMessage(convo, me, `${await nameOf(me)} added ${check.users.map((u) => u.name).join(', ')}`);
-    await convo.populate('participants', 'name avatar');
+    await convo.populate('participants', 'name username avatar');
     res.json(summary(convo, me));
   } catch (err) {
     next(err);
@@ -243,7 +243,7 @@ exports.getMessages = async (req, res, next) => {
     const messages = page.slice(0, limit).reverse();
 
     const senderIds = [...new Set(messages.map((m) => String(m.sender)))];
-    const senders = await User.find({ _id: { $in: senderIds } }).select('name avatar').lean();
+    const senders = await User.find({ _id: { $in: senderIds } }).select('name username avatar').lean();
     const people = Object.fromEntries(senders.map((u) => [String(u._id), u]));
     const unread = await Message.countDocuments({ conversation: convo._id, ...unreadFilter(me) });
     res.json({ messages, hasMore: page.length > limit, people, unread });

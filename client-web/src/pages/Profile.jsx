@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { userAPI, postAPI } from '../api';
+import { userAPI, postAPI, authAPI } from '../api';
 import ProfileStats from '../components/ProfileStats';
 import AvatarCropper from '../components/AvatarCropper';
 import PostCard from '../components/social/PostCard';
@@ -9,6 +9,7 @@ import { usePostActions } from '../components/social/usePostActions';
 import { ACTIVITY_LEVELS } from '../utils/calculators';
 import { Camera, Edit2, Check, X, UserPlus, UserMinus, MessageSquare, Settings as SettingsIcon, Lock, Clock } from 'lucide-react';
 import { format, differenceInYears } from 'date-fns';
+import { USERNAME_HINT, cleanUsername, useUsernameCheck } from '../utils/username';
 import { LEVEL_TAGS, LEVEL_HINT, NO_LEVEL_HINT } from '../utils/levelTag';
 import { cmToFtIn, ftInToCm, kgTo, toKgFrom, formatHeight, formatBodyWeight } from '../utils/bodyUnits';
 
@@ -19,6 +20,12 @@ const GOAL_LABELS = {
   stay_active:       'Stay Active',
   other:             'Other',
 };
+
+function UsernameStatus({ check }) {
+  if (check.status === 'idle') return <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{USERNAME_HINT}</p>;
+  const color = check.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : check.status === 'bad' ? 'text-red-500' : 'text-gray-400';
+  return <p className={`text-xs mt-1 ${color}`}>{check.message}</p>;
+}
 
 function Avatar({ user, size = 'lg' }) {
   const dim = size === 'lg' ? 'w-24 h-24 text-2xl' : 'w-8 h-8 text-xs';
@@ -83,7 +90,7 @@ function FollowListModal({ title, users, onClose }) {
                     : <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm">{u.name?.[0]}</div>
                   }
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{u.name}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{u.name} {u.username && <span className="font-normal text-gray-400">@{u.username}</span>}</p>
                     {u.bio && <p className="text-xs text-gray-400 truncate max-w-[200px]">{u.bio}</p>}
                   </div>
                 </Link>
@@ -109,6 +116,7 @@ export default function Profile() {
   const [editing, setEditing]   = useState(false);
   const [saving, setSaving]     = useState(false);
   const [form, setForm]         = useState({});
+  const usernameCheck = useUsernameCheck(form.username || '', authAPI.usernameAvailable, profile?.username || '');
   const [formErr, setFormErr]   = useState('');
   const [modal, setModal]       = useState(null); // 'followers' | 'following'
   const [modalUsers, setModalUsers] = useState([]);
@@ -138,6 +146,7 @@ export default function Profile() {
   const startEdit = () => {
     setForm({
       name:        profile.name ?? '',
+      username:    profile.username ?? '',
       bio:         profile.bio ?? '',
       // Height and weight are typed in the user's units (cm or ft + in, kg or lb).
       heightUnit:  me?.heightUnit === 'ft' ? 'ft' : 'cm',
@@ -162,6 +171,8 @@ export default function Profile() {
 
   const saveEdit = async () => {
     if (!form.name?.trim()) { setFormErr('Name is required'); return; }
+    if (usernameCheck.status === 'bad') { setFormErr(usernameCheck.message); return; }
+    if ((form.username || '').length < 3) { setFormErr('Usernames are 3 to 20 characters'); return; }
     const stepGoal = Number(form.stepGoal);
     if (!(stepGoal >= 1000 && stepGoal <= 50000)) { setFormErr('Step goal must be between 1,000 and 50,000'); return; }
     const heightCm = form.heightUnit === 'ft'
@@ -174,6 +185,7 @@ export default function Profile() {
     try {
       const payload = {
         name:        form.name.trim(),
+        ...(form.username !== profile.username ? { username: form.username } : {}),
         bio:         form.bio.trim(),
         fitnessGoal: form.fitnessGoal,
         ...(heightCm ? { height: heightCm } : {}),
@@ -304,6 +316,14 @@ export default function Profile() {
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Your name"
                 />
+                <div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+                    <input className="input pl-7 text-sm" value={form.username} autoCapitalize="none" placeholder="username" aria-label="Username"
+                      onChange={(e) => setForm({ ...form, username: cleanUsername(e.target.value) })} />
+                  </div>
+                  <UsernameStatus check={usernameCheck} />
+                </div>
                 <textarea
                   className="input resize-none text-sm"
                   rows={2}
@@ -389,6 +409,7 @@ export default function Profile() {
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{profile.name}</h1>
+                  {profile.username && <span className="text-sm text-gray-400 dark:text-gray-500">@{profile.username}</span>}
                   {LEVEL_TAGS[profile.trainingLevel] ? (
                     <span className="badge font-semibold cursor-help" title={LEVEL_HINT}
                       style={{ color: LEVEL_TAGS[profile.trainingLevel].color, backgroundColor: LEVEL_TAGS[profile.trainingLevel].bg }}>

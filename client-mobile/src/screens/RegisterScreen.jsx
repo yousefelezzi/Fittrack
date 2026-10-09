@@ -3,19 +3,28 @@ import {
   View, Text, TouchableOpacity, KeyboardAvoidingView,
   Platform, ScrollView, } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { errorMessage } from '../api';
+import { errorMessage, authAPI } from '../api';
 import { Button, Input, colors, makeStyles, cardSurface } from '../components';
 import { Dumbbell } from 'lucide-react-native';
+import { USERNAME_HINT, cleanUsername, useUsernameCheck } from '../../../client-web/src/utils/username';
+
+function UsernameStatus({ check }) {
+  const color = check.status === 'ok' ? colors.success : check.status === 'bad' ? colors.danger : colors.textMuted;
+  return <Text style={{ fontSize: 12, color, marginTop: -6, marginBottom: 10 }}>{check.status === 'idle' ? USERNAME_HINT : check.message}</Text>;
+}
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
-  const [form, setForm]       = useState({ name: '', email: '', password: '', confirm: '' });
+  const [form, setForm]       = useState({ name: '', username: '', email: '', password: '', confirm: '' });
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
+  const check = useUsernameCheck(form.username, authAPI.usernameAvailable);
 
   const handleRegister = async () => {
     setError('');
-    if (!form.name || !form.email || !form.password) { setError('Please fill in all fields'); return; }
+    if (!form.name || !form.username || !form.email || !form.password) { setError('Please fill in all fields'); return; }
+    if (form.username.length < 3) { setError('Usernames are 3 to 20 characters'); return; }
+    if (check.status === 'bad') { setError(check.message); return; }
     if (form.password !== form.confirm) { setError('Passwords do not match'); return; }
     if (form.password.length < 8) { setError('Password must be at least 8 characters'); return; }
     const pwRe = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/;
@@ -25,7 +34,7 @@ export default function RegisterScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      await register({ name: form.name, email: form.email, password: form.password });
+      await register({ name: form.name, username: form.username, email: form.email, password: form.password });
     } catch (err) {
       setError(errorMessage(err, 'Registration failed'));
     } finally {
@@ -46,6 +55,9 @@ export default function RegisterScreen({ navigation }) {
           ) : null}
 
           <Input label="Name" placeholder="Your name" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} autoComplete="name" />
+          <Input label="Username" placeholder="yourname" value={form.username} onChangeText={(v) => setForm({ ...form, username: cleanUsername(v) })}
+            autoCapitalize="none" autoCorrect={false} autoComplete="username-new" textContentType="username" />
+          <UsernameStatus check={check} />
           <Input label="Email" placeholder="you@example.com" value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
           <Input label="Password" placeholder="Min 8 chars, Aa1@…" value={form.password} onChangeText={(v) => setForm({ ...form, password: v })} secureTextEntry />
           <Input label="Confirm password" placeholder="••••••••" value={form.confirm} onChangeText={(v) => setForm({ ...form, confirm: v })} secureTextEntry />

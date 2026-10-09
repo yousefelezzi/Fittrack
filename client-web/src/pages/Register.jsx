@@ -2,17 +2,27 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Dumbbell } from 'lucide-react';
+import { authAPI } from '../api';
+import { USERNAME_HINT, cleanUsername, useUsernameCheck } from '../utils/username';
+
+function UsernameStatus({ check }) {
+  if (check.status === 'idle') return <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{USERNAME_HINT}</p>;
+  const color = check.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : check.status === 'bad' ? 'text-red-500' : 'text-gray-400';
+  return <p className={`text-xs mt-1 ${color}`}>{check.message}</p>;
+}
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const check = useUsernameCheck(form.username, authAPI.usernameAvailable);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (check.status === 'bad') { setError(check.message); return; }
     setLoading(true);
     try {
       await register(form);
@@ -39,6 +49,15 @@ export default function Register() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full name</label>
               <input className="input" placeholder="John Doe" value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">@</span>
+                <input className="input pl-7" placeholder="yourname" autoComplete="username" autoCapitalize="none" value={form.username}
+                  onChange={(e) => setForm({ ...form, username: cleanUsername(e.target.value) })} required minLength={3} />
+              </div>
+              <UsernameStatus check={check} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>

@@ -83,13 +83,14 @@ export default function LoginScreen({ navigation }) {
           ) : (
           <>
           <Input
-            label="Email"
-            placeholder="you@example.com"
+            label="Email or username"
+            placeholder="you@example.com or yourname"
             value={form.email}
             onChangeText={(v) => setForm({ ...form, email: v })}
             autoCapitalize="none"
+            autoCorrect={false}
             keyboardType="email-address"
-            autoComplete="email"
+            autoComplete="username"
           />
           <Input
             label="Password"

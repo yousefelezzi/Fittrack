@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 50 },
+    // Unique handle (@username), stored lowercase; see utils/username.js.
+    username: { type: String, lowercase: true, trim: true, unique: true, sparse: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 8, select: false },
     // Sessions (tokens) from before this are signed out.

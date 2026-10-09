@@ -126,6 +126,7 @@ export const authAPI = {
   login:    (data) => api.post('/auth/login', data),
   logout:   ()     => api.post('/auth/logout'),
   getMe:    ()     => api.get('/auth/me'),
+  usernameAvailable: (username) => api.get('/auth/username-available', { params: { username } }),
   // Two-step sign-in: login may answer { twoFactorRequired, challenge, email }; then send the emailed code.
   verifyLogin: (challenge, code) => api.post('/auth/login/verify', { challenge, code }),
   resendLoginCode: (challenge) => api.post('/auth/login/resend', { challenge }),

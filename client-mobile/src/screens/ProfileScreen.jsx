@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
-import { userAPI, postAPI, uploadUrl } from '../api';
+import { userAPI, postAPI, authAPI, uploadUrl } from '../api';
 import { Card, Avatar, Button, Spinner, colors, makeStyles, Segmented, Label, Hint, ErrorText, ListRow } from '../components';
 import ProfileStats from '../components/ProfileStats';
 import AvatarCropper from '../components/AvatarCropper';
@@ -13,6 +13,7 @@ import { PostCard } from '../components/social';
 import { usePostActions } from '../components/usePostActions';
 import { ACTIVITY_LEVELS } from '../../../client-web/src/utils/calculators';
 import { Footprints, Calculator, History, Settings, Lock, FileText, Pencil, Camera } from 'lucide-react-native';
+import { USERNAME_HINT, cleanUsername, useUsernameCheck } from '../../../client-web/src/utils/username';
 import { LEVEL_TAGS, LEVEL_HINT, NO_LEVEL_HINT } from '../../../client-web/src/utils/levelTag';
 import { cmToFtIn, ftInToCm, kgTo, toKgFrom, formatHeight, formatBodyWeight } from '../../../client-web/src/utils/bodyUnits';
 
@@ -23,6 +24,11 @@ const idOf = (x) => String(x?._id ?? x);
 // Today as YYYY-MM-DD in the phone's time zone.
 const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime());
+
+function UsernameStatus({ check }) {
+  const color = check.status === 'ok' ? colors.success : check.status === 'bad' ? colors.danger : colors.textMuted;
+  return <Text style={{ fontSize: 12, color, marginTop: -6, marginBottom: 10 }}>{check.status === 'idle' ? USERNAME_HINT : check.message}</Text>;
+}
 
 function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children }) {
   const { user: me } = useAuth();
@@ -35,6 +41,7 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
     setErr('');
     setForm({
       name: profile?.name ?? '',
+      username: profile?.username ?? '',
       bio: profile?.bio ?? '',
       // Height and weight are typed in the user's units (cm or ft + in, kg or lb).
       heightUnit: me?.heightUnit === 'ft' ? 'ft' : 'cm',
@@ -53,10 +60,13 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
     });
   }, [visible, profile]);
 
+  const usernameCheck = useUsernameCheck(form.username || '', authAPI.usernameAvailable, profile?.username || '');
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
     if (!form.name.trim()) { setErr('Name is required'); return; }
+    if ((form.username || '').length < 3) { setErr('Usernames are 3 to 20 characters'); return; }
+    if (usernameCheck.status === 'bad') { setErr(usernameCheck.message); return; }
     if (form.dateOfBirth && !isDate(form.dateOfBirth)) { setErr('Date of birth must be YYYY-MM-DD'); return; }
     if (form.bodyFat !== '' && !(Number(form.bodyFat) >= 3 && Number(form.bodyFat) <= 70)) { setErr('Body fat must be between 3 and 70%'); return; }
     const stepGoal = Number(form.stepGoal);
@@ -68,6 +78,7 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
         : (form.height ? Number(form.height) : null);
       await onSave({
         name: form.name.trim(),
+        ...(form.username !== profile?.username ? { username: form.username } : {}),
         bio: form.bio.trim(),
         fitnessGoal: form.fitnessGoal,
         ...(heightCm ? { height: heightCm } : {}),
@@ -115,6 +126,12 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
             </View>
           </TouchableOpacity>
           {field('Name', 'name')}
+          <View>
+            <Label>Username</Label>
+            <TextInput style={styles.field} value={form.username} autoCapitalize="none" autoCorrect={false} placeholder="username" placeholderTextColor={colors.textMuted}
+              onChangeText={(v) => setForm((f) => ({ ...f, username: cleanUsername(v) }))} />
+          </View>
+          <UsernameStatus check={usernameCheck} />
           {field('Bio', 'bio', { multiline: true, maxLength: 200, placeholder: 'Short bio…', style: [styles.field, { height: 70, textAlignVertical: 'top', paddingTop: 8 }] })}
           <Label>Height</Label>
           <Segmented value={form.heightUnit} onChange={(u) => setForm((f) => ({ ...f, heightUnit: u }))} options={[['cm', 'cm'], ['ft', 'ft-in']]} style={{ width: 140, marginBottom: 6 }} />
@@ -184,7 +201,7 @@ function FollowModal({ visible, title, users, onClose, onOpen }) {
               <TouchableOpacity style={styles.followRow} onPress={() => onOpen(u._id)}>
                 <Avatar user={u} size={38} />
                 <View style={{ marginLeft: 10 }}>
-                  <Text style={styles.followName}>{u.name}</Text>
+                  <Text style={styles.followName}>{u.name}{u.username ? <Text style={styles.followBio}>  @{u.username}</Text> : null}</Text>
                   {u.bio ? <Text style={styles.followBio} numberOfLines={1}>{u.bio}</Text> : null}
                 </View>
               </TouchableOpacity>
@@ -319,6 +336,7 @@ export default function ProfileScreen({ route, navigation }) {
           </View>
 
           <Text style={styles.profileName}>{profile.name}</Text>
+          {profile.username ? <Text style={styles.handle}>@{profile.username}</Text> : null}
           <View style={styles.badgeRow}>
             {LEVEL_TAGS[profile.trainingLevel] ? (
               <TouchableOpacity onPress={() => Alert.alert(LEVEL_TAGS[profile.trainingLevel].label, LEVEL_HINT)}
@@ -421,7 +439,8 @@ const styles = makeStyles(() => ({
   statPill:     { alignItems: 'center' },
   statNum:      { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   statLabel:    { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
-  profileName:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  profileName:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  handle:       { fontSize: 14, color: colors.textMuted, marginBottom: 6 },
   badgeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
   goalBadge:    { alignSelf: 'flex-start', backgroundColor: colors.brandLight, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   goalBadgeText:{ fontSize: 12, color: colors.brand, fontWeight: '600' },

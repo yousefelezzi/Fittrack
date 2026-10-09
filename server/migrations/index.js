@@ -433,6 +433,17 @@ const migrations = [
       return `${users.length} existing user(s) marked as started`;
     },
   },
+  {
+    // Everyone now has a unique username; accounts from before get one made
+    // from their name (they can change it in their profile).
+    name: '2026-10-usernames',
+    async up(db) {
+      const { makeUsername } = require('../utils/username');
+      const users = await db.collection('users').find({ $or: [{ username: { $exists: false } }, { username: null }] }, { projection: { name: 1, email: 1 } }).toArray();
+      for (const u of users) await db.collection('users').updateOne({ _id: u._id }, { $set: { username: await makeUsername(u.name, u.email) } });
+      return `${users.length} username(s) created`;
+    },
+  },
 ];
 
 async function runMigrations() {
