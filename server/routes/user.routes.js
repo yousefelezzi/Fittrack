@@ -52,6 +52,8 @@ router.put(
     body('statsVisibility').optional().isObject().withMessage('Invalid visibility settings'),
     body('privacy').optional().isObject().withMessage('Invalid privacy settings'),
     body('reminders').optional().isObject().withMessage('Invalid reminder settings'),
+    body('onboarded').optional().isBoolean().withMessage('Must be true or false'),
+    body('dateOfBirth').optional({ nullable: true }).isISO8601().withMessage('Enter a valid date of birth'),
     ...['workout', 'supplements'].flatMap((kind) => [
       body(`reminders.${kind}.time`).optional().matches(/^([01]\d|2[0-3]):[0-5]\d$/).withMessage('Time must be HH:mm'),
       body(`reminders.${kind}.enabled`).optional().isBoolean().withMessage('Must be true or false'),

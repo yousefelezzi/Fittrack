@@ -423,6 +423,16 @@ const migrations = [
       return `${res.modifiedCount} user(s) updated`;
     },
   },
+  {
+    // New users now start on a Get Started page; everyone who signed up before
+    // counts as done.
+    name: '2026-10-onboarded-existing-users',
+    async up(db) {
+      const users = await db.collection('users').find({ onboardedAt: { $in: [null, undefined] } }, { projection: { createdAt: 1 } }).toArray();
+      for (const u of users) await db.collection('users').updateOne({ _id: u._id }, { $set: { onboardedAt: u.createdAt || new Date() } });
+      return `${users.length} existing user(s) marked as started`;
+    },
+  },
 ];
 
 async function runMigrations() {

@@ -16,7 +16,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(form);
-      navigate('/');
+      navigate('/get-started');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {

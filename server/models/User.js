@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema(
     passwordResetHash: { type: String, default: null, select: false },
     passwordResetExpires: { type: Date, default: null, select: false },
     passwordResetSentAt: { type: Date, default: null, select: false },
+    // When the new user finished (or skipped) the Get Started page; until then
+    // the apps send them there.
+    onboardedAt: { type: Date, default: null },
     // Two-step sign-in: after the password, a code emailed to the user.
     twoFactorEnabled: { type: Boolean, default: false },
     // The latest emailed code (signing in, or turning two-step on): hashed,

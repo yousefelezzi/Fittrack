@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Layout from './components/Layout';
@@ -21,18 +21,23 @@ import Steps       from './pages/Steps';
 import Feed        from './pages/Feed';
 import Profile     from './pages/Profile';
 import Settings    from './pages/Settings';
+import GetStarted from './pages/GetStarted';
 import { AccountPassword, AccountEmail } from './pages/AccountLinks';
 import Calculators    from './pages/Calculators';
 import AboutWNS       from './pages/AboutWNS';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const { pathname } = useLocation();
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
-  return user ? children : <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  // New accounts fill in Get Started first.
+  if (!user.onboardedAt && pathname !== '/get-started') return <Navigate to="/get-started" replace />;
+  return children;
 };
 
 const PublicRoute = ({ children }) => {
@@ -50,6 +55,7 @@ export default function App() {
             {/* Public */}
             <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
             {/* Links from account emails; work signed in or out. */}
+            <Route path="/get-started" element={<ProtectedRoute><GetStarted /></ProtectedRoute>} />
             <Route path="/account/password" element={<AccountPassword />} />
             <Route path="/account/email"    element={<AccountEmail />} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />

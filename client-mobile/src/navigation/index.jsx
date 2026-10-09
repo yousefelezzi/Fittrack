@@ -37,6 +37,7 @@ import StepsScreen         from '../screens/StepsScreen';
 import CalculatorsScreen   from '../screens/CalculatorsScreen';
 import AboutWNSScreen      from '../screens/AboutWNSScreen';
 import SettingsScreen      from '../screens/SettingsScreen';
+import GetStartedScreen    from '../screens/GetStartedScreen';
 import { House, Dumbbell, Salad, Users, User } from 'lucide-react-native';
 
 // ── Stack / Tab navigators ────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme} initialState={user ? savedNavState : undefined}
       onStateChange={(state) => { savedNavState = state; }}>
-      {user ? <AppStack /> : <AuthStackNav />}
+      {!user ? <AuthStackNav /> : user.onboardedAt ? <AppStack /> : <GetStartedScreen />}
     </NavigationContainer>
   );
 }

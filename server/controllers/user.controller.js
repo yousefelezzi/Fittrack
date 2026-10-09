@@ -4,7 +4,7 @@ const { canViewContent, canMessage } = require('../utils/privacy');
 const { levelFromFfmi } = require('../utils/trainingLevel');
 
 // Only the owner sees these.
-const PRIVATE_FIELDS = ['twoFactorEnabled', 'pendingEmail', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories', 'savedFoods', 'reminders'];
+const PRIVATE_FIELDS = ['onboardedAt', 'twoFactorEnabled', 'pendingEmail', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories', 'savedFoods', 'reminders'];
 
 const MESSAGE_SETTINGS = ['connections', 'following', 'nobody'];
 
@@ -81,6 +81,9 @@ exports.updateMe = async (req, res, next) => {
         if (typeof vis[key] === 'boolean') updates[`statsVisibility.${key}`] = vis[key];
       });
     }
+
+    // Get Started finished or skipped.
+    if (req.body.onboarded === true) updates.onboardedAt = new Date();
 
     // Reminders, one setting at a time like the stat toggles.
     const reminders = req.body.reminders;
