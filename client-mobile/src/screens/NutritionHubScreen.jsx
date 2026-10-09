@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
 import { Utensils, GlassWater, Pill, ChartLine, History, Scale } from 'lucide-react-native';
+import { syncReminders } from '../utils/notifications';
 import { nutritionAPI } from '../api';
 import { Card, ListRow, colors, makeStyles, Title } from '../components';
 import { formatMl } from '../../../client-web/src/utils/nutritionProgress';
@@ -38,7 +39,10 @@ export default function NutritionHubScreen({ navigation }) {
   // Tick off all of today's supplements in one tap.
   const tickAll = async () => {
     setBusy(true);
-    try { setSupDay((await nutritionAPI.takeSupplements(today(), { supplementIds: unticked })).data.supplementsTaken || []); } catch { /* shown on next load */ } finally { setBusy(false); }
+    try {
+      setSupDay((await nutritionAPI.takeSupplements(today(), { supplementIds: unticked })).data.supplementsTaken || []);
+      syncReminders();
+    } catch { /* shown on next load */ } finally { setBusy(false); }
   };
   const bar = (value, goal, color) => (
     <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, goal ? (value / goal) * 100 : 0)}%`, backgroundColor: color }]} /></View>

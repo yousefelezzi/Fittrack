@@ -1,13 +1,16 @@
 import React, { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../context/AuthContext';
 import { colors, isDark } from '../components';
 import { syncIfStale } from '../utils/stepSync';
+import { syncReminders, onReminderTap } from '../utils/notifications';
+
+const navigationRef = createNavigationContainerRef();
 
 // ── Auth screens ──────────────────────────────────────────────────────────────
 import LoginScreen    from '../screens/LoginScreen';
@@ -98,12 +101,24 @@ const STACK_SCREENS = [
 ];
 
 function AppStack() {
-  // Pull steps from the phone / health app when the app opens or comes back to the front.
+  // Pull steps from the phone / health app, and re-plan reminders, when the app
+  // opens or comes back to the front.
   useEffect(() => {
     syncIfStale();
-    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') syncIfStale(); });
+    syncReminders();
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') { syncIfStale(); syncReminders(); } });
     return () => sub.remove();
   }, []);
+
+  // A tapped reminder opens its screen.
+  useEffect(() => onReminderTap((screen) => {
+    const go = () => {
+      if (!navigationRef.isReady()) { setTimeout(go, 200); return; }
+      if (screen === 'Supplements') navigationRef.navigate('Supplements');
+      else navigationRef.navigate('Tabs', { screen: 'Train' });
+    };
+    go();
+  }), []);
 
   return (
     <RootStack.Navigator screenOptions={{ headerTintColor: colors.brand, headerTitleStyle: { color: colors.textPrimary }, headerBackTitle: 'Back' }}>
@@ -150,7 +165,7 @@ export default function AppNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navTheme} initialState={user ? savedNavState : undefined}
+    <NavigationContainer ref={navigationRef} theme={navTheme} initialState={user ? savedNavState : undefined}
       onStateChange={(state) => { savedNavState = state; }}>
       {user ? <AppStack /> : <AuthStackNav />}
     </NavigationContainer>

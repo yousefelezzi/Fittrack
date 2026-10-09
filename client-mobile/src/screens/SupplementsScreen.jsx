@@ -5,6 +5,7 @@ import { Pill, Trash2, Pencil, Plus, Minus, Sun, Copy, Layers, X, Check, CheckCh
 import { supplementAPI, nutritionAPI } from '../api';
 import { Card, Button, Sheet, colors, makeStyles, Hint, ErrorText, LinkText, confirm } from '../components';
 import DayNav, { useDaySwipe } from '../components/DayNav';
+import { syncReminders } from '../utils/notifications';
 import { microsText, SUPPLEMENT_MICROS } from '../../../client-web/src/utils/foodLogic';
 
 const SUN_NOTE = 'Sun is an estimate: roughly 1,000 IU of vitamin D per 15 minutes of midday summer sun with arms and legs bare, for lighter skin. Much less in winter, early or late in the day, with darker skin or sunscreen.';
@@ -218,6 +219,8 @@ export default function SupplementsScreen() {
   const loadDay = useCallback(() => { setDay(null); nutritionAPI.supplementDay(date).then(({ data }) => fromLog(data)).catch(() => setDay([])); }, [date]);
   useEffect(() => { loadList(); }, [loadList]);
   useEffect(() => { loadDay(); }, [loadDay]);
+  // Ticking everything off today cancels tonight's reminder (and unticking brings it back).
+  useEffect(() => { if (day && date === key(new Date())) syncReminders(); }, [day, date]);
 
   const run = async (fn, fallback) => {
     setError('');

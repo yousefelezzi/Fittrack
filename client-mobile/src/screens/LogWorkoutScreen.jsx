@@ -16,6 +16,7 @@ import {
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../../../client-web/src/utils/logSets';
+import { syncReminders } from '../utils/notifications';
 import { X, Flame, SkipForward, PartyPopper, ArrowLeftRight, Clock, ChevronUp, ChevronDown, ClipboardList, Plus, Play, Check, ListOrdered, Square } from 'lucide-react-native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -753,6 +754,7 @@ export default function LogWorkoutScreen({ navigation, route }) {
           })),
         })),
       });
+      syncReminders(); // no workout reminder later today
       setExercises([]);
       setNotes('');
       setName(`Workout ${new Date().toLocaleDateString()}`);

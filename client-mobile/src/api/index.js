@@ -189,6 +189,11 @@ export const weightAPI = {
   delete: (id)           => api.delete(`/weight/${id}`),
 };
 
+// What today's reminders need: workout day / trained yet, supplements ticked.
+export const reminderAPI = {
+  today: (params) => api.get('/reminders/today', { params }),
+};
+
 export const supplementAPI = {
   getAll: ()         => api.get('/supplements'),
   catalog: ()        => api.get('/supplements/catalog'), // built-in list with micros per serving

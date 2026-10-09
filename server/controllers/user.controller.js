@@ -34,7 +34,7 @@ exports.getUserById = async (req, res, next) => {
     const isOwner = req.params.id === String(req.user.id);
     // Body fat feeds the private FFMI stat, so only the owner gets the raw value.
     const user = await User.findById(req.params.id)
-      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType -bodyWeightUnit -heightUnit -adaptiveCalories -savedFoods')
+      .select(isOwner ? '-password' : '-password -bodyFat -sex -activityLevel -stepGoal -weightUnit -waterGoal -waterType -bodyWeightUnit -heightUnit -adaptiveCalories -savedFoods -workoutDays -reminders')
       .lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
     const counts = { followersCount: (user.followers || []).length, followingCount: (user.following || []).length };
@@ -73,6 +73,20 @@ exports.updateMe = async (req, res, next) => {
     if (vis && typeof vis === 'object') {
       STAT_KEYS.forEach((key) => {
         if (typeof vis[key] === 'boolean') updates[`statsVisibility.${key}`] = vis[key];
+      });
+    }
+
+    if (Array.isArray(req.body.workoutDays)) {
+      updates.workoutDays = [...new Set(req.body.workoutDays.map(Number))].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort();
+    }
+    // Reminders, one setting at a time like the stat toggles.
+    const reminders = req.body.reminders;
+    if (reminders && typeof reminders === 'object') {
+      ['workout', 'supplements'].forEach((kind) => {
+        const r = reminders[kind];
+        if (!r || typeof r !== 'object') return;
+        if (typeof r.enabled === 'boolean') updates[`reminders.${kind}.enabled`] = r.enabled;
+        if (typeof r.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.time)) updates[`reminders.${kind}.time`] = r.time;
       });
     }
 

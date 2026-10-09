@@ -51,6 +51,13 @@ router.put(
     body('stepGoal').optional().isInt({ min: 1000, max: 50000 }).withMessage('Step goal must be between 1,000 and 50,000'),
     body('statsVisibility').optional().isObject().withMessage('Invalid visibility settings'),
     body('privacy').optional().isObject().withMessage('Invalid privacy settings'),
+    body('workoutDays').optional().isArray({ max: 7 }).withMessage('Workout days must be a list'),
+    body('workoutDays.*').optional().isInt({ min: 0, max: 6 }).withMessage('Invalid day'),
+    body('reminders').optional().isObject().withMessage('Invalid reminder settings'),
+    ...['workout', 'supplements'].flatMap((kind) => [
+      body(`reminders.${kind}.time`).optional().matches(/^([01]\d|2[0-3]):[0-5]\d$/).withMessage('Time must be HH:mm'),
+      body(`reminders.${kind}.enabled`).optional().isBoolean().withMessage('Must be true or false'),
+    ]),
     body('privacy.messages').optional().isIn(['connections', 'following', 'nobody']).withMessage('Invalid message setting'),
     body('fitnessGoal')
       .optional()

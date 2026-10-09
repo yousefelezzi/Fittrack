@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { workoutAPI, nutritionAPI, stepsAPI } from '../api';
+import { workoutAPI, nutritionAPI, stepsAPI, reminderAPI } from '../api';
+import { todayParams, dueReminders } from '../utils/reminders';
 import { format, subDays } from 'date-fns';
 import { stepStreak } from '../utils/stepStreak';
-import { Dumbbell, Flame, Calendar, Footprints } from 'lucide-react';
+import { Dumbbell, Flame, Calendar, Footprints, Pill, Bell } from 'lucide-react';
 import VolumeCheck from '../components/VolumeCheck';
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
@@ -26,6 +27,14 @@ export default function Dashboard() {
   const [todayNutrition, setTodayNutrition] = useState(null);
   const [steps, setSteps] = useState(null); // { goal, days: [today?] }
   const [loading, setLoading] = useState(true);
+  const [reminderStatus, setReminderStatus] = useState(null);
+  const [, setTick] = useState(0); // re-checks whether a reminder's time has come
+
+  useEffect(() => {
+    reminderAPI.today(todayParams()).then(({ data }) => setReminderStatus(data)).catch(() => {});
+    const id = setInterval(() => setTick((n) => n + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -62,6 +71,18 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Good {getGreeting()}, {user?.name?.split(' ')[0]}</h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{format(new Date(), 'EEEE, MMMM d')}</p>
       </div>
+
+      {dueReminders(reminderStatus).map(({ kind, text }) => (
+        <div key={kind} className="card !py-3 flex items-center gap-3 border-l-4 !border-l-brand-500">
+          <div className="w-9 h-9 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
+            {kind === 'workout' ? <Dumbbell size={18} className="text-brand-600" /> : <Pill size={18} className="text-brand-600" />}
+          </div>
+          <p className="flex-1 text-sm text-gray-700 dark:text-gray-200 flex items-center gap-1.5"><Bell size={13} className="text-gray-400 shrink-0" /> {text}</p>
+          <Link to={kind === 'workout' ? '/log' : '/nutrition/supplements'} className="btn-primary text-sm py-1.5 shrink-0">
+            {kind === 'workout' ? 'Start workout' : 'Tick them off'}
+          </Link>
+        </div>
+      ))}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Dumbbell}   label="Total Workouts" value={stats?.totalWorkouts ?? 0} color="bg-brand-600" />

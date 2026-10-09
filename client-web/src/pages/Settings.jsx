@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple } from 'lucide-react';
+import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple, Bell } from 'lucide-react';
+import { WEEK, remindersOf } from '../utils/reminders';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, authAPI } from '../api';
 
@@ -92,6 +93,9 @@ export default function Settings() {
   const [error, setError] = useState('');
 
   const privacy = { privateAccount: false, messages: 'connections', discoverable: true, ...(user?.privacy || {}) };
+  const reminders = remindersOf(user);
+  const workoutDays = user?.workoutDays || [];
+  const toggleDay = (d) => save('workoutDays', { workoutDays: workoutDays.includes(d) ? workoutDays.filter((x) => x !== d) : [...workoutDays, d] });
 
 
   // Saves one setting; the server sends the updated user back.
@@ -124,6 +128,34 @@ export default function Settings() {
         <Row title="Show me in search and suggestions" hint="When off, people can only find you through someone who follows you.">
           <Toggle checked={privacy.discoverable} disabled={busy === 'discoverable'} onChange={(v) => save('discoverable', { privacy: { discoverable: v } })} />
         </Row>
+      </Section>
+
+      <Section icon={Bell} title="Reminders">
+        <div className="py-3 border-b border-gray-100 dark:border-gray-800">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">My workout days</p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {WEEK.map(([d, label]) => (
+              <button key={d} onClick={() => toggleDay(d)} disabled={busy === 'workoutDays'} aria-pressed={workoutDays.includes(d)}
+                className={`min-w-[3rem] px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-60 ${workoutDays.includes(d)
+                  ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {[['workout', 'Remind me on workout days', workoutDays.length ? "Skipped once you've logged a workout that day." : 'Pick your workout days above.'],
+          ['supplements', 'Remind me to tick off supplements', "Skipped once everything's ticked off for the day."]].map(([kind, title, hint]) => (
+          <Row key={kind} title={title} hint={hint}>
+            <div className="flex items-center gap-3 shrink-0">
+              {reminders[kind].enabled && (
+                <input type="time" className="input w-auto py-1.5 text-sm" value={reminders[kind].time} aria-label={`${title}: time`}
+                  onChange={(e) => e.target.value && save(kind, { reminders: { [kind]: { time: e.target.value } } })} />
+              )}
+              <Toggle checked={reminders[kind].enabled} disabled={busy === kind} onChange={(v) => save(kind, { reminders: { [kind]: { enabled: v } } })} />
+            </div>
+          </Row>
+        ))}
+        <p className="text-xs text-gray-400 dark:text-gray-500 pt-2">On your phone, the FitTrack app sends these as notifications. Here they show on your dashboard once it's time.</p>
       </Section>
 
       <Section icon={Apple} title="Nutrition">

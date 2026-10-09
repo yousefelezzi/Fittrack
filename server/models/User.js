@@ -24,6 +24,14 @@ const userSchema = new mongoose.Schema(
     heightUnit: { type: String, enum: ['cm', 'ft'], default: 'cm' }, // ft = feet and inches
     // Correct the calorie goal from the last two weeks' weight trend and intake (utils/adaptiveCalories.js).
     adaptiveCalories: { type: Boolean, default: true },
+    // Days the user trains (0 = Sunday … 6 = Saturday), for workout-day reminders.
+    workoutDays: [{ type: Number, min: 0, max: 6 }],
+    // Reminders (phone notifications, and cards on the web dashboard) at a
+    // time of day ('HH:mm', the user's local time). Off until turned on.
+    reminders: {
+      workout:     { enabled: { type: Boolean, default: false }, time: { type: String, default: '08:00' } },
+      supplements: { enabled: { type: Boolean, default: false }, time: { type: String, default: '20:00' } },
+    },
     // Custom foods and recipes saved from posts and messages (shown with your own in food search).
     savedFoods: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Food' }],
     // Which profile stats other users can see. Everything is private by default.

@@ -3,8 +3,10 @@ import { View, Text, TextInput, ScrollView, Switch, TouchableOpacity } from 'rea
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { userAPI, authAPI } from '../api';
-import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented } from '../components';
-import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad } from 'lucide-react-native';
+import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented, Sheet, Chip } from '../components';
+import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad, Bell, Clock } from 'lucide-react-native';
+import { WEEK, remindersOf, formatTime, parseTime } from '../../../client-web/src/utils/reminders';
+import { askPermission, syncReminders } from '../utils/notifications';
 
 const MESSAGE_OPTIONS = [
   ['connections', 'People I follow or who follow me'],
@@ -75,6 +77,34 @@ function ChangePassword() {
   );
 }
 
+const pad = (n) => String(n).padStart(2, '0');
+
+/** Pick a time of day: the hour, then the minutes in 5-minute steps. */
+function TimeSheet({ visible, value, onPick, onClose, title }) {
+  const [hm, setHm] = useState(parseTime(value));
+  const [openedFor, setOpenedFor] = useState(null);
+  if (visible && openedFor !== value) { setOpenedFor(value); setHm(parseTime(value)); }
+  if (!visible && openedFor !== null) setOpenedFor(null);
+  const time = `${pad(hm.hour)}:${pad(hm.minute)}`;
+  return (
+    <Sheet visible={visible} title={title} subtitle={formatTime(time)} onClose={onClose}
+      footer={<Button title="Save" onPress={() => onPick(time)} />}>
+      <Label>Hour</Label>
+      <View style={styles.grid}>
+        {Array.from({ length: 24 }, (_, h) => (
+          <Chip key={h} small label={pad(h)} active={hm.hour === h} onPress={() => setHm((t) => ({ ...t, hour: h }))} style={styles.gridChip} />
+        ))}
+      </View>
+      <Label style={{ marginTop: 12 }}>Minutes</Label>
+      <View style={styles.grid}>
+        {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
+          <Chip key={m} small label={`:${pad(m)}`} active={hm.minute === m} onPress={() => setHm((t) => ({ ...t, minute: m }))} style={styles.gridChip} />
+        ))}
+      </View>
+    </Sheet>
+  );
+}
+
 /** Settings: appearance; privacy (private account, who can message you, search); password; sign out. */
 export default function SettingsScreen() {
   const { user, updateUser, logout } = useAuth();
@@ -83,6 +113,10 @@ export default function SettingsScreen() {
   const [error, setError] = useState('');
 
   const privacy = { privateAccount: false, messages: 'connections', discoverable: true, ...(user?.privacy || {}) };
+  const reminders = remindersOf(user);
+  const workoutDays = user?.workoutDays || [];
+  const [timeFor, setTimeFor] = useState(null); // 'workout' | 'supplements' while picking a time
+  const [notice, setNotice] = useState('');
 
 
   // Saves one setting; the server sends the updated user back.
@@ -99,6 +133,19 @@ export default function SettingsScreen() {
     }
   };
 
+
+  // Reminder settings, then the phone's notifications are re-planned.
+  const saveReminder = async (key, body) => { await save(key, body); syncReminders(); };
+  const setReminderOn = async (kind, on) => {
+    setNotice('');
+    if (on && !(await askPermission())) {
+      setNotice("FitTrack isn't allowed to send notifications. Turn them on for FitTrack in your phone's Settings, then come back.");
+    }
+    saveReminder(kind, { reminders: { [kind]: { enabled: on } } });
+  };
+  const toggleDay = (d) => saveReminder('workoutDays', {
+    workoutDays: workoutDays.includes(d) ? workoutDays.filter((x) => x !== d) : [...workoutDays, d],
+  });
 
   const toggle = (key, value, body) => (
     <Switch value={value} disabled={busy === key} onValueChange={(v) => save(key, body(v))} trackColor={{ true: colors.brand }} />
@@ -124,6 +171,42 @@ export default function SettingsScreen() {
           {toggle('discoverable', privacy.discoverable, (v) => ({ privacy: { discoverable: v } }))}
         </Row>
       </Card>
+
+      <SectionHead icon={Bell}>Reminders</SectionHead>
+      <Card style={{ paddingVertical: 4 }}>
+        <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch' }]}>
+          <Text style={styles.rowTitle}>My workout days</Text>
+          <View style={[styles.grid, { marginTop: 8 }]}>
+            {WEEK.map(([d, label]) => (
+              <Chip key={d} small label={label} active={workoutDays.includes(d)} disabled={busy === 'workoutDays'} onPress={() => toggleDay(d)} style={{ minWidth: 42 }} />
+            ))}
+          </View>
+        </View>
+        <Row title="Remind me on workout days" hint={workoutDays.length ? 'Skipped once you\'ve logged a workout that day.' : 'Pick your workout days above.'}>
+          <Switch value={reminders.workout.enabled} disabled={busy === 'workout'} onValueChange={(v) => setReminderOn('workout', v)} trackColor={{ true: colors.brand }} />
+        </Row>
+        {reminders.workout.enabled ? (
+          <TouchableOpacity onPress={() => setTimeFor('workout')} style={styles.row}>
+            <Clock size={15} color={colors.textMuted} />
+            <Text style={[styles.rowTitle, { flex: 1 }]}>Workout reminder time</Text>
+            <Text style={styles.timeText}>{formatTime(reminders.workout.time)}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <Row title="Remind me to tick off supplements" hint="Skipped once everything's ticked off for the day." last={!reminders.supplements.enabled}>
+          <Switch value={reminders.supplements.enabled} disabled={busy === 'supplements'} onValueChange={(v) => setReminderOn('supplements', v)} trackColor={{ true: colors.brand }} />
+        </Row>
+        {reminders.supplements.enabled ? (
+          <TouchableOpacity onPress={() => setTimeFor('supplements')} style={[styles.row, { borderBottomWidth: 0 }]}>
+            <Clock size={15} color={colors.textMuted} />
+            <Text style={[styles.rowTitle, { flex: 1 }]}>Supplement reminder time</Text>
+            <Text style={styles.timeText}>{formatTime(reminders.supplements.time)}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </Card>
+      {notice ? <Text style={[styles.message, { color: colors.danger, marginTop: -4 }]}>{notice}</Text> : null}
+      <TimeSheet visible={timeFor !== null} value={timeFor ? reminders[timeFor].time : '08:00'}
+        title={timeFor === 'workout' ? 'Workout reminder' : 'Supplement reminder'} onClose={() => setTimeFor(null)}
+        onPick={(time) => { const kind = timeFor; setTimeFor(null); saveReminder(kind, { reminders: { [kind]: { time } } }); }} />
 
       <SectionHead icon={Salad}>Nutrition</SectionHead>
       <Card style={{ paddingVertical: 4 }}>
@@ -181,4 +264,7 @@ const styles = makeStyles(() => ({
   message:  { fontSize: 13, marginBottom: 10 },
   signOutCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.brand },
+  grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  gridChip: { minWidth: 46 },
+  timeText: { fontSize: 14, fontWeight: '600', color: colors.brand },
 }));
