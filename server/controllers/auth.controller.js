@@ -10,6 +10,63 @@ const newToken = () => crypto.randomBytes(32).toString('hex');
 const hashToken = (token) => crypto.createHash('sha256').update(String(token || '')).digest('hex');
 const tooSoon = (sentAt) => sentAt && Date.now() - sentAt.getTime() < RESEND_AFTER;
 
+// ── Emailed codes (two-step sign-in) ─────────────────────────────────────────
+const CODE_TTL = 10 * 60000;
+const CODE_TRIES = 5;
+const CODE_FIELDS = '+emailCodeHash +emailCodePurpose +emailCodeExpires +emailCodeAttempts +emailCodeSentAt +loginChallengeHash';
+const codeHash = (user, code) => hashToken(`${user._id}:${String(code).replace(/\D/g, '')}`);
+const maskEmail = (email) => email.replace(/^(.)(.*)(.@)/, (_, a, mid, b) => `${a}${'•'.repeat(Math.min(mid.length, 6))}${b}`);
+
+/** Puts a fresh 6-digit code on the user (save it afterwards) and returns it. */
+function issueCode(user, purpose) {
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  user.emailCodeHash = codeHash(user, code);
+  user.emailCodePurpose = purpose;
+  user.emailCodeExpires = new Date(Date.now() + CODE_TTL);
+  user.emailCodeAttempts = 0;
+  user.emailCodeSentAt = new Date();
+  return code;
+}
+
+/** 'ok' | 'expired' | 'locked' | 'wrong' for a typed code (counts the try). */
+function checkCode(user, purpose, code) {
+  if (user.emailCodePurpose !== purpose || !user.emailCodeHash || !user.emailCodeExpires || user.emailCodeExpires < new Date()) return 'expired';
+  if (user.emailCodeAttempts >= CODE_TRIES) return 'locked';
+  const a = Buffer.from(codeHash(user, code));
+  const b = Buffer.from(user.emailCodeHash);
+  if (a.length === b.length && crypto.timingSafeEqual(a, b)) return 'ok';
+  user.emailCodeAttempts += 1;
+  return user.emailCodeAttempts >= CODE_TRIES ? 'locked' : 'wrong';
+}
+
+const clearCode = (user) => {
+  user.emailCodeHash = null;
+  user.emailCodePurpose = null;
+  user.emailCodeExpires = null;
+  user.emailCodeAttempts = 0;
+  user.loginChallengeHash = null;
+};
+
+const codeProblem = (result, user) => ({
+  expired: [400, 'This code has expired. Ask for a new one.'],
+  locked: [429, 'Too many wrong codes. Ask for a new one.'],
+  wrong: [400, `That code isn't right. ${CODE_TRIES - user.emailCodeAttempts} ${CODE_TRIES - user.emailCodeAttempts === 1 ? 'try' : 'tries'} left.`],
+}[result]);
+
+const sendCode = (user, code, purpose) => sendMail({
+  to: user.email,
+  subject: purpose === 'login' ? `${code} is your FitTrack sign-in code` : `${code} is your FitTrack code`,
+  heading: purpose === 'login' ? 'Your sign-in code' : 'Turn on two-step sign-in',
+  paragraphs: [
+    purpose === 'login' ? `Hi ${user.name}, enter this code to finish signing in to FitTrack:` : `Hi ${user.name}, enter this code in FitTrack to turn on two-step sign-in:`,
+    code,
+    'It works for 10 minutes.',
+  ],
+  footer: purpose === 'login'
+    ? "If you didn't just try to sign in, someone may know your password. Change it in Settings."
+    : "If you didn't ask for this, you can ignore this email.",
+});
+
 const signTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
@@ -47,10 +104,123 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    // Two-step sign-in: email a code; the app sends it back with the challenge.
+    if (user.twoFactorEnabled) {
+      const challenge = newToken();
+      const code = issueCode(user, 'login');
+      user.loginChallengeHash = hashToken(challenge);
+      await user.save();
+      try {
+        await sendCode(user, code, 'login');
+      } catch (err) {
+        console.error('Sign-in code email failed:', err.message);
+        return res.status(503).json({ message: "We couldn't email your sign-in code. Try again in a moment." });
+      }
+      return res.json({ twoFactorRequired: true, challenge, email: maskEmail(user.email) });
+    }
+
     const { accessToken, refreshToken } = signTokens(user._id);
     user.password = undefined;
 
     res.json({ accessToken, refreshToken, user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── Two-step sign-in ─────────────────────────────────────────────────────────
+
+const userForChallenge = (challenge) => User.findOne({ loginChallengeHash: hashToken(challenge) }).select(CODE_FIELDS);
+
+// POST /api/auth/login/verify { challenge, code }  — finishes a two-step sign-in
+exports.verifyLogin = async (req, res, next) => {
+  try {
+    const user = await userForChallenge(req.body.challenge);
+    if (!user) return res.status(400).json({ message: 'This sign-in has expired. Sign in again.' });
+    const result = checkCode(user, 'login', req.body.code);
+    if (result !== 'ok') {
+      await user.save();
+      const [status, message] = codeProblem(result, user);
+      return res.status(status).json({ message });
+    }
+    clearCode(user);
+    await user.save();
+    const { accessToken, refreshToken } = signTokens(user._id);
+    const fresh = await User.findById(user._id);
+    res.json({ accessToken, refreshToken, user: fresh });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/login/resend { challenge }  — a new sign-in code
+exports.resendLoginCode = async (req, res, next) => {
+  try {
+    const user = await userForChallenge(req.body.challenge);
+    if (!user || user.emailCodePurpose !== 'login') return res.status(400).json({ message: 'This sign-in has expired. Sign in again.' });
+    if (tooSoon(user.emailCodeSentAt)) return res.status(429).json({ message: 'We just sent a code. Wait a minute before asking for another.' });
+    const code = issueCode(user, 'login');
+    await user.save();
+    await sendCode(user, code, 'login');
+    res.json({ message: `We sent a new code to ${maskEmail(user.email)}.` });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/2fa/enable/request { password }  — emails a code to turn two-step sign-in on
+exports.requestTwoFactor = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select(`+password ${CODE_FIELDS}`);
+    if (!(await user.comparePassword(req.body.password))) return res.status(400).json({ message: 'Your password is wrong' });
+    if (user.twoFactorEnabled) return res.status(400).json({ message: 'Two-step sign-in is already on' });
+    if (user.emailCodePurpose === 'enable2fa' && tooSoon(user.emailCodeSentAt)) {
+      return res.status(429).json({ message: 'We just sent a code. Wait a minute before asking for another.' });
+    }
+    const code = issueCode(user, 'enable2fa');
+    await user.save();
+    await sendCode(user, code, 'enable2fa');
+    res.json({ message: `We sent a code to ${user.email}. Enter it to turn two-step sign-in on.` });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/2fa/enable/confirm { code }  — turns two-step sign-in on (the code proves emails arrive)
+exports.confirmTwoFactor = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select(CODE_FIELDS);
+    const result = checkCode(user, 'enable2fa', req.body.code);
+    if (result !== 'ok') {
+      await user.save();
+      const [status, message] = codeProblem(result, user);
+      return res.status(status).json({ message });
+    }
+    clearCode(user);
+    user.twoFactorEnabled = true;
+    await user.save();
+    res.json({ message: "Two-step sign-in is on. Next time you sign in, we'll email you a code.", twoFactorEnabled: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/2fa/disable { password }  — turns two-step sign-in off
+exports.disableTwoFactor = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select(`+password ${CODE_FIELDS}`);
+    if (!(await user.comparePassword(req.body.password))) return res.status(400).json({ message: 'Your password is wrong' });
+    user.twoFactorEnabled = false;
+    clearCode(user);
+    await user.save();
+    sendMail({
+      to: user.email,
+      subject: 'Two-step sign-in was turned off',
+      heading: 'Two-step sign-in is off',
+      paragraphs: [`Hi ${user.name}, two-step sign-in was just turned off for your FitTrack account. Signing in now only needs your password.`],
+      footer: "If this wasn't you, change your password in Settings right away.",
+    }).catch((err) => console.error('2FA-off email failed:', err.message));
+    res.json({ message: 'Two-step sign-in is off.', twoFactorEnabled: false });
   } catch (err) {
     next(err);
   }

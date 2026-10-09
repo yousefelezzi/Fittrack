@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { userAPI, authAPI } from '../api';
 import { Card, Button, Label, colors, makeStyles, Hint, ErrorText, confirm, Segmented } from '../components';
-import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad, Mail } from 'lucide-react-native';
+import { Lock, MessageCircle, KeyRound, LogOut, Moon, Salad, Mail, ShieldCheck } from 'lucide-react-native';
 
 const MESSAGE_OPTIONS = [
   ['connections', 'People I follow or who follow me'],
@@ -106,6 +106,83 @@ function ChangeEmail({ user, updateUser }) {
   );
 }
 
+/**
+ * Two-step sign-in: a code emailed at each sign-in. Turning it on needs the
+ * password and a code (so we know the emails arrive); turning it off, the password.
+ */
+function TwoStep({ user, updateUser }) {
+  const on = !!user?.twoFactorEnabled;
+  const [step, setStep] = useState(null); // null | 'password' | 'code'
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null); // { ok, text }
+  const fail = (err, fallback) => setMessage({ ok: false, text: err.response?.data?.errors?.[0]?.message || err.response?.data?.message || fallback });
+  const reset = () => { setStep(null); setPassword(''); setCode(''); };
+
+  const submitPassword = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (on) {
+        const { data } = await authAPI.disableTwoFactor(password);
+        updateUser({ ...user, twoFactorEnabled: false });
+        reset();
+        setMessage({ ok: true, text: data.message });
+      } else {
+        const { data } = await authAPI.requestTwoFactor(password);
+        setPassword('');
+        setStep('code');
+        setMessage({ ok: true, text: data.message });
+      }
+    } catch (err) { fail(err, 'Could not do that'); } finally { setBusy(false); }
+  };
+  const submitCode = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { data } = await authAPI.confirmTwoFactor(code);
+      updateUser({ ...user, twoFactorEnabled: true });
+      reset();
+      setMessage({ ok: true, text: data.message });
+    } catch (err) { fail(err, 'Could not check the code'); } finally { setBusy(false); }
+  };
+
+  return (
+    <View style={{ paddingVertical: 10 }}>
+      <Text style={styles.rowTitle}>{on ? 'Two-step sign-in is on' : 'Two-step sign-in is off'}</Text>
+      <Hint style={{ marginTop: 2, marginBottom: 10 }}>
+        {on ? `When you sign in, we email a code to ${user?.email} to type in after your password.` : "Add a code emailed to you at each sign-in, so your password alone isn't enough."}
+      </Hint>
+      {step === 'password' ? (
+        <View style={{ marginBottom: 8 }}>
+          <Label>Your password</Label>
+          <TextInput style={styles.input} secureTextEntry autoFocus autoCapitalize="none" autoCorrect={false} textContentType="password" value={password} onChangeText={setPassword} />
+        </View>
+      ) : null}
+      {step === 'code' ? (
+        <View style={{ marginBottom: 8 }}>
+          <Label>Code from the email</Label>
+          <TextInput style={[styles.input, { textAlign: 'center', fontSize: 20, letterSpacing: 6, fontWeight: '700' }]} autoFocus keyboardType="number-pad"
+            textContentType="oneTimeCode" maxLength={6} value={code} onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))} />
+        </View>
+      ) : null}
+      {message ? <Text style={[styles.message, { color: message.ok ? colors.success : colors.danger }]}>{message.text}</Text> : null}
+      {!step ? (
+        <Button title={on ? 'Turn off' : 'Turn on'} variant={on ? 'secondary' : 'primary'} onPress={() => { setStep('password'); setMessage(null); }} />
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Button style={{ flex: 1 }} variant={on && step === 'password' ? 'danger' : 'primary'} loading={busy}
+            disabled={busy || (step === 'password' ? !password : code.length !== 6)}
+            title={step === 'code' ? 'Turn on' : on ? 'Turn off' : 'Email me a code'}
+            onPress={step === 'code' ? submitCode : submitPassword} />
+          <Button style={{ flex: 1 }} variant="secondary" title="Cancel" onPress={reset} />
+        </View>
+      )}
+    </View>
+  );
+}
+
 /** Settings: appearance; privacy (private account, who can message you, search); password; sign out. */
 export default function SettingsScreen() {
   const { user, updateUser, logout } = useAuth();
@@ -185,6 +262,11 @@ export default function SettingsScreen() {
       <SectionHead icon={KeyRound}>Password</SectionHead>
       <Card>
         <ChangePassword email={user?.email} />
+      </Card>
+
+      <SectionHead icon={ShieldCheck}>Two-step sign-in</SectionHead>
+      <Card>
+        <TwoStep user={user} updateUser={updateUser} />
       </Card>
 
       <Card style={styles.signOutCard}>

@@ -126,6 +126,12 @@ export const authAPI = {
   login:    (data) => api.post('/auth/login', data),
   logout:   ()     => api.post('/auth/logout'),
   getMe:    ()     => api.get('/auth/me'),
+  // Two-step sign-in: login may answer { twoFactorRequired, challenge, email }; then send the emailed code.
+  verifyLogin: (challenge, code) => api.post('/auth/login/verify', { challenge, code }),
+  resendLoginCode: (challenge) => api.post('/auth/login/resend', { challenge }),
+  requestTwoFactor: (password) => api.post('/auth/2fa/enable/request', { password }),
+  confirmTwoFactor: (code) => api.post('/auth/2fa/enable/confirm', { code }),
+  disableTwoFactor: (password) => api.post('/auth/2fa/disable', { password }),
   // Password: a link is emailed; the new password is set on the page it opens.
   requestPasswordChange: () => api.post('/auth/password/request'),
   checkPasswordToken: (token) => api.get('/auth/password/check', { params: { token } }),

@@ -12,6 +12,16 @@ const userSchema = new mongoose.Schema(
     passwordResetHash: { type: String, default: null, select: false },
     passwordResetExpires: { type: Date, default: null, select: false },
     passwordResetSentAt: { type: Date, default: null, select: false },
+    // Two-step sign-in: after the password, a code emailed to the user.
+    twoFactorEnabled: { type: Boolean, default: false },
+    // The latest emailed code (signing in, or turning two-step on): hashed,
+    // short-lived, a few tries. A sign-in also has a challenge the app sends back.
+    emailCodeHash: { type: String, default: null, select: false },
+    emailCodePurpose: { type: String, enum: ['login', 'enable2fa', null], default: null, select: false },
+    emailCodeExpires: { type: Date, default: null, select: false },
+    emailCodeAttempts: { type: Number, default: 0, select: false },
+    emailCodeSentAt: { type: Date, default: null, select: false },
+    loginChallengeHash: { type: String, default: null, select: false },
     // Changing the email: confirmed from a link sent to the new address.
     pendingEmail: { type: String, lowercase: true, trim: true, default: null },
     emailChangeHash: { type: String, default: null, select: false },

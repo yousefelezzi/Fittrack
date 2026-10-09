@@ -4,7 +4,7 @@ const { canViewContent, canMessage } = require('../utils/privacy');
 const { levelFromFfmi } = require('../utils/trainingLevel');
 
 // Only the owner sees these.
-const PRIVATE_FIELDS = ['pendingEmail', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories', 'savedFoods', 'reminders'];
+const PRIVATE_FIELDS = ['twoFactorEnabled', 'pendingEmail', 'fitnessGoal', 'bodyFat', 'sex', 'activityLevel', 'stepGoal', 'weightUnit', 'waterGoal', 'waterType', 'bodyWeightUnit', 'heightUnit', 'adaptiveCalories', 'savedFoods', 'reminders'];
 
 const MESSAGE_SETTINGS = ['connections', 'following', 'nobody'];
 

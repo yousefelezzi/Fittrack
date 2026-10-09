@@ -15,6 +15,11 @@ const {
   requestEmailChange,
   cancelEmailChange,
   confirmEmailChange,
+  verifyLogin,
+  resendLoginCode,
+  requestTwoFactor,
+  confirmTwoFactor,
+  disableTwoFactor,
 } = require('../controllers/auth.controller');
 
 router.post(
@@ -41,6 +46,14 @@ router.post(
   validate,
   login
 );
+
+// Two-step sign-in: the emailed code, sent back with the challenge from /login.
+const codeRule = body('code').matches(/^\s*\d{6}\s*$/).withMessage('Enter the 6-digit code');
+router.post('/login/verify', [body('challenge').isString().notEmpty().withMessage('Sign in again'), codeRule], validate, verifyLogin);
+router.post('/login/resend', [body('challenge').isString().notEmpty().withMessage('Sign in again')], validate, resendLoginCode);
+router.post('/2fa/enable/request', protect, [body('password').notEmpty().withMessage('Enter your password')], validate, requestTwoFactor);
+router.post('/2fa/enable/confirm', protect, [codeRule], validate, confirmTwoFactor);
+router.post('/2fa/disable', protect, [body('password').notEmpty().withMessage('Enter your password')], validate, disableTwoFactor);
 
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);

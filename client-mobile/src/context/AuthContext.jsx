@@ -25,8 +25,7 @@ export const AuthProvider = ({ children }) => {
   // Signed out when the session ends (e.g. the password was changed).
   useEffect(() => setSessionEndedHandler(() => setUser(null)), []);
 
-  const login = async (credentials) => {
-    const { data } = await authAPI.login(credentials);
+  const signedIn = async (data) => {
     await AsyncStorage.multiSet([
       ['accessToken',  data.accessToken],
       ['refreshToken', data.refreshToken],
@@ -34,6 +33,16 @@ export const AuthProvider = ({ children }) => {
     setUser(data.user);
     return data.user;
   };
+
+  // With two-step sign-in on, this returns { twoFactor: { challenge, email } }
+  // instead of signing in; finish with verifyLogin and the emailed code.
+  const login = async (credentials) => {
+    const { data } = await authAPI.login(credentials);
+    if (data.twoFactorRequired) return { twoFactor: { challenge: data.challenge, email: data.email } };
+    return signedIn(data);
+  };
+
+  const verifyLogin = async (challenge, code) => signedIn((await authAPI.verifyLogin(challenge, code)).data);
 
   const register = async (formData) => {
     const { data } = await authAPI.register(formData);
@@ -54,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = (updates) => setUser((prev) => ({ ...prev, ...updates }));
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, verifyLogin, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

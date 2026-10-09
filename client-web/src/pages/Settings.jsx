@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple, Mail } from 'lucide-react';
+import { ArrowLeft, Lock, MessageSquare, Search, KeyRound, LogOut, Apple, Mail, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, authAPI } from '../api';
 
@@ -112,6 +112,82 @@ function ChangeEmail({ user, updateUser }) {
   );
 }
 
+/**
+ * Two-step sign-in: a code emailed at each sign-in. Turning it on needs the
+ * password and a code (so we know the emails arrive); turning it off, the password.
+ */
+function TwoStep({ user, updateUser }) {
+  const on = !!user?.twoFactorEnabled;
+  const [step, setStep] = useState(null); // null | 'password' | 'code'
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null); // { ok, text }
+  const fail = (err, fallback) => setMessage({ ok: false, text: err.response?.data?.errors?.[0]?.message || err.response?.data?.message || fallback });
+  const reset = () => { setStep(null); setPassword(''); setCode(''); };
+
+  const submitPassword = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (on) {
+        const { data } = await authAPI.disableTwoFactor(password);
+        updateUser({ ...user, twoFactorEnabled: false });
+        reset();
+        setMessage({ ok: true, text: data.message });
+      } else {
+        const { data } = await authAPI.requestTwoFactor(password);
+        setPassword('');
+        setStep('code');
+        setMessage({ ok: true, text: data.message });
+      }
+    } catch (err) { fail(err, 'Could not do that'); } finally { setBusy(false); }
+  };
+  const submitCode = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { data } = await authAPI.confirmTwoFactor(code);
+      updateUser({ ...user, twoFactorEnabled: true });
+      reset();
+      setMessage({ ok: true, text: data.message });
+    } catch (err) { fail(err, 'Could not check the code'); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-3 pt-2">
+      <Row title={on ? 'Two-step sign-in is on' : 'Two-step sign-in is off'}
+        hint={on ? `When you sign in, we email a code to ${user?.email} to type in after your password.` : 'Add a code emailed to you at each sign-in, so your password alone isn\'t enough.'}>
+        {!step && <button onClick={() => { setStep('password'); setMessage(null); }} className={on ? 'btn-secondary text-sm shrink-0' : 'btn-primary text-sm shrink-0'}>{on ? 'Turn off' : 'Turn on'}</button>}
+      </Row>
+      {step === 'password' && (
+        <form onSubmit={submitPassword} className="space-y-2">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">Your password</label>
+          <input type="password" className="input" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy || !password} className={on ? 'btn-danger text-sm' : 'btn-primary text-sm'}>{busy ? 'Checking…' : on ? 'Turn off' : 'Email me a code'}</button>
+            <button type="button" onClick={reset} className="btn-secondary text-sm">Cancel</button>
+          </div>
+        </form>
+      )}
+      {step === 'code' && (
+        <form onSubmit={submitCode} className="space-y-2">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">Code from the email</label>
+          <input className="input w-40 text-center text-lg tracking-[0.3em] font-semibold" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
+            value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy || code.length !== 6} className="btn-primary text-sm">{busy ? 'Checking…' : 'Turn on'}</button>
+            <button type="button" onClick={reset} className="btn-secondary text-sm">Cancel</button>
+          </div>
+        </form>
+      )}
+      {message && <p className={`text-sm ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{message.text}</p>}
+    </div>
+  );
+}
+
 /** Privacy settings: private account, who can message you, search, password; sign out. */
 export default function Settings() {
   const { user, updateUser, logout } = useAuth();
@@ -180,6 +256,10 @@ export default function Settings() {
 
       <Section icon={KeyRound} title="Password">
         <ChangePassword email={user?.email} />
+      </Section>
+
+      <Section icon={ShieldCheck} title="Two-step sign-in">
+        <TwoStep user={user} updateUser={updateUser} />
       </Section>
 
       <div className="card flex items-center justify-between gap-4">
