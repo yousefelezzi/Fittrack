@@ -25,6 +25,7 @@ const stepsRoutes     = require('./routes/steps.routes');
 const supplementRoutes = require('./routes/supplement.routes');
 const weightRoutes = require('./routes/weight.routes');
 const reminderRoutes = require('./routes/reminder.routes');
+const cardioRoutes = require('./routes/cardio.routes');
 
 const app = express();
 
@@ -95,6 +96,7 @@ app.use('/api/steps',     stepsRoutes);
 app.use('/api/supplements', supplementRoutes);
 app.use('/api/weight', weightRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/cardio', cardioRoutes);
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use(errorHandler);

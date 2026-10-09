@@ -1,20 +1,20 @@
 const StepLog = require('../models/StepLog');
 const User = require('../models/User');
 const NutritionLog = require('../models/NutritionLog');
-const { stepCalories, stepBurn, baselineSteps, DEFAULT_STEP_GOAL } = require('../utils/steps');
+const { stepCalories, stepBurn, DEFAULT_STEP_GOAL } = require('../utils/steps');
 const { syncGoals } = require('./nutrition.controller');
 
 const startOfDay = (date) => { const d = new Date(date); d.setHours(0,0,0,0); return d; };
 const endOfDay   = (date) => { const d = new Date(date); d.setHours(23,59,59,999); return d; };
 const sameDay    = (date) => ({ $gte: startOfDay(date), $lte: endOfDay(date) });
 
-const USER_FIELDS = 'weight activityLevel stepGoal';
+const USER_FIELDS = 'weight activityLevel stepGoal adaptiveCalories';
 
-// What the client needs to explain the numbers: the goal, and from how many
-// steps a day starts adding to the calorie target.
+// What the client needs to explain the numbers: the goal, and whether steps
+// count toward the calorie goal (only with the dynamic goal on).
 const settingsFor = (user) => ({
   goal: user?.stepGoal || DEFAULT_STEP_GOAL,
-  baseline: baselineSteps(user?.activityLevel),
+  dynamic: user?.adaptiveCalories !== false,
   canAdjustCalories: !!user?.weight,
 });
 
@@ -22,7 +22,7 @@ const entryFor = (log, user) => ({
   _id: log._id,
   date: log.date,
   steps: log.steps,
-  calories: stepCalories(user, log.steps), // added to the day's calorie target
+  calories: stepCalories(user, log.steps), // added to the day's calorie goal (dynamic goal only)
   burned: stepBurn(user, log.steps),        // all calories burned walking them
 });
 

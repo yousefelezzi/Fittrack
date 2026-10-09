@@ -234,8 +234,8 @@ export default function SettingsScreen() {
 
       <SectionHead icon={Salad}>Nutrition</SectionHead>
       <Card style={{ paddingVertical: 4 }}>
-        <Row title="Adjust my calorie goal from my weight trend" last
-          hint="Compares what you ate with how your weight moved over the last 2 weeks and corrects your maintenance. Needs food logged on 10 of 14 days and a couple of weigh-ins each week.">
+        <Row title="Dynamic calorie goal" last
+          hint="On: each day's steps are added, and your last 2 weeks of workouts, food and weight trend tune your maintenance (needs food on 10 of 14 days and a couple of weigh-ins a week). Off: a plain calculator from your profile and activity level, with no steps or workouts.">
           {toggle('adaptiveCalories', user?.adaptiveCalories !== false, (v) => ({ adaptiveCalories: v }))}
         </Row>
       </Card>

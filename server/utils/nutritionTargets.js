@@ -4,10 +4,18 @@
  * Calories: Mifflin-St Jeor BMR × activity multiplier = maintenance (TDEE),
  * then adjusted for the user's fitness goal. Same BMR/TDEE math as the
  * BMR & TDEE calculator page (client-web/src/utils/calculators.js).
- * On days with more steps than the activity level assumes, the calories they
- * burn are added on top (see utils/steps.js); the extra goes to carbs and fat.
- * With `adaptive` (utils/adaptiveCalories.js), maintenance is corrected by how
- * the user's weight actually moved over the last two weeks.
+ * That's all with the dynamic goal off: a plain calculator from the profile
+ * and the chosen activity level, with no steps, cardio or workouts.
+ *
+ * With the dynamic goal on (the default), the activity level isn't used:
+ *   maintenance = what the user's weight change says they burn (food eaten
+ *                 minus the surplus or deficit, utils/adaptiveCalories.js),
+ *                 minus the daily average of the steps, workouts and cardio
+ *                 they did in those two weeks
+ *   until there's enough data for that: BMR × 1.1 (resting and digesting)
+ * and then each day gets back what it actually has: that day's steps (from
+ * the first step) and that day's workouts and cardio (the extra goes to carbs
+ * and fat). Training or walking less lowers that day's goal.
  */
 const { stepCalories } = require('./steps');
 
@@ -36,21 +44,31 @@ function ageFrom(dob) {
   return age;
 }
 
+const SEDENTARY = 1.2; // BMR × 1.2: resting plus everyday movement, no exercise
+const DYNAMIC_BASE = 1.1; // BMR × 1.1: resting and digesting; the dynamic goal adds each day's steps and workouts
+
+/** Mifflin-St Jeor BMR (kcal), or null if the profile is missing something. */
+function formulaBmr(user) {
+  if (!user?.weight || !user?.height || !user?.dateOfBirth || !user?.sex) return null;
+  return 10 * user.weight + 6.25 * user.height - 5 * ageFrom(user.dateOfBirth) + (user.sex === 'female' ? -161 : 5);
+}
+
 /** BMR × activity (kcal), or null if the profile is missing something. */
 function formulaMaintenance(user) {
-  if (!user?.weight || !user?.height || !user?.dateOfBirth || !user?.sex) return null;
+  const bmr = formulaBmr(user);
+  if (bmr == null) return null;
   const activity = ACTIVITY_LEVELS.includes(user.activityLevel) ? user.activityLevel : DEFAULT_ACTIVITY;
-  const bmr = 10 * user.weight + 6.25 * user.height - 5 * ageFrom(user.dateOfBirth) + (user.sex === 'female' ? -161 : 5);
   return bmr * activity;
 }
 
 /**
  * @param opts.steps     steps walked that day, if logged
+ * @param opts.workouts  kcal (above resting) from that day's workouts and cardio
  * @param opts.adaptive  result of adaptiveMaintenance(): its `offset` (kcal) is
  *                       added to maintenance before the goal is applied
  * @returns {{ targets: {calories, protein, carbs, fat} | null, missing: string[], basis?: object }}
  */
-function nutritionTargets(user, { steps, adaptive } = {}) {
+function nutritionTargets(user, { steps, workouts, adaptive } = {}) {
   const missing = [];
   if (!user?.weight) missing.push('weight');
   if (!user?.height) missing.push('height');
@@ -64,15 +82,21 @@ function nutritionTargets(user, { steps, adaptive } = {}) {
 
   const bmr = 10 * user.weight + 6.25 * user.height - 5 * age + (user.sex === 'female' ? -161 : 5);
   const formula = bmr * activity;
-  // Corrected by the user's real weight trend when there's enough data.
-  const offset = adaptive?.offset || 0;
-  const maintenance = formula + offset;
+  // Dynamic: no activity-level guess. From the weight change (without the
+  // period's steps and workouts) when there's enough data, else BMR × 1.1;
+  // the day's own steps and workouts are added below.
+  const dynamic = user.adaptiveCalories !== false;
+  const measured = dynamic && adaptive && adaptive.offset != null && !adaptive.reason;
+  const offset = measured ? adaptive.offset : 0;
+  const maintenance = !dynamic ? formula : bmr * DYNAMIC_BASE + offset;
 
   let calories = maintenance * (1 + rule.calorieAdjust);
   const floored = calories < MIN_CALORIES[user.sex];
   if (floored) calories = MIN_CALORIES[user.sex];
-  const fromSteps = stepCalories(user, steps);
-  calories = Math.round((calories + fromSteps) / 10) * 10;
+  // Steps only count with the dynamic adjustment on.
+  const fromSteps = dynamic ? stepCalories(user, steps) : 0;
+  const fromWorkouts = dynamic ? Math.max(0, Math.round(workouts || 0)) : 0;
+  calories = Math.round((calories + fromSteps + fromWorkouts) / 10) * 10;
 
   const protein = Math.round(user.weight * rule.proteinPerKg);
   const fat = Math.round((calories * rule.fatPct) / 9);
@@ -86,14 +110,16 @@ function nutritionTargets(user, { steps, adaptive } = {}) {
       adjustment: rule.label,
       maintenance: Math.round(maintenance / 10) * 10,
       formulaMaintenance: Math.round(formula / 10) * 10,
-      adaptive: adaptive || null,
+      dynamic,
+      adaptive: dynamic ? adaptive || null : null,
       activityLevel: activity,
       activityAssumed: !ACTIVITY_LEVELS.includes(user.activityLevel),
       floored,
       steps: steps ?? null,
       stepCalories: fromSteps,
+      workoutCalories: fromWorkouts,
     },
   };
 }
 
-module.exports = { nutritionTargets, formulaMaintenance, ACTIVITY_LEVELS };
+module.exports = { nutritionTargets, formulaMaintenance, formulaBmr, SEDENTARY, DYNAMIC_BASE, ACTIVITY_LEVELS };

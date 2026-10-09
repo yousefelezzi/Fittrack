@@ -5,6 +5,9 @@ import { workoutAPI, nutritionAPI } from '../api';
 import { MEAL_TYPES } from '../constants/nutrition';
 import { setLabel, workingSetCount } from '../utils/workoutSummary';
 import { Trash2, ChevronDown, ChevronUp, AlertTriangle, X, Dumbbell, Apple, Share2, Salad } from 'lucide-react';
+import { loggedWorkoutTotals } from '../utils/sessionReport';
+import { formatRest } from '../utils/workoutCalories';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 10;
 const fmtRest = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
@@ -110,6 +113,8 @@ function HistoryHeader({ countLabel, onClearAll, canClear }) {
 function WorkoutRow({ workout, onDelete, deleting }) {
   const [open, setOpen] = useState(false);
   const totalSets = workingSetCount(workout);
+  const { user } = useAuth();
+  const burn = loggedWorkoutTotals(workout, user?.weight); // estimated calories and recorded rest
 
   return (
     <li className="card !p-4">
@@ -117,7 +122,7 @@ function WorkoutRow({ workout, onDelete, deleting }) {
         <button onClick={() => setOpen(!open)} className="flex-1 text-left min-w-0">
           <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{workout.name}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {format(new Date(workout.date), 'EEE, MMM d, yyyy')} · {workout.exercises.length} exercise{workout.exercises.length !== 1 ? 's' : ''} · {totalSets} set{totalSets !== 1 ? 's' : ''} · {workout.duration}min
+            {format(new Date(workout.date), 'EEE, MMM d, yyyy')} · {workout.exercises.length} exercise{workout.exercises.length !== 1 ? 's' : ''} · {totalSets} set{totalSets !== 1 ? 's' : ''} · {workout.duration}min{burn.restSeconds ? ` · ${formatRest(burn.restSeconds)} rest` : ''} · ~{burn.calories.toLocaleString()} kcal
           </p>
         </button>
         {open ? <ChevronUp size={16} className="text-gray-400 shrink-0" /> : <ChevronDown size={16} className="text-gray-400 shrink-0" />}

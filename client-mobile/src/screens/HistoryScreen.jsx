@@ -6,6 +6,9 @@ import { MEAL_TYPES } from '../../../client-web/src/constants/nutrition';
 import { setLabel, workingSetCount } from '../../../client-web/src/utils/workoutSummary';
 import { Card, Button, Spinner, colors, makeStyles, Segmented, Sheet, ErrorText, EmptyState, confirm } from '../components';
 import { Share2, Trash2, X, Dumbbell, Salad } from 'lucide-react-native';
+import { loggedWorkoutTotals } from '../../../client-web/src/utils/sessionReport';
+import { formatRest } from '../../../client-web/src/utils/workoutCalories';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 10;
 const fmtRest = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
@@ -99,13 +102,15 @@ function HistoryList({ h, renderItem, countLabel, onClearAll, empty }) {
 function WorkoutRow({ workout, onDelete, onShare }) {
   const [open, setOpen] = useState(false);
   const totalSets = workingSetCount(workout);
+  const { user } = useAuth();
+  const burn = loggedWorkoutTotals(workout, user?.weight); // estimated calories and recorded rest
   return (
     <Card style={{ marginBottom: 10 }}>
       <View style={styles.row}>
         <TouchableOpacity style={{ flex: 1 }} onPress={() => setOpen(!open)}>
           <Text style={styles.title} numberOfLines={1}>{workout.name}</Text>
           <Text style={styles.meta}>
-            {format(new Date(workout.date), 'EEE, MMM d, yyyy')} · {workout.exercises.length} exercise{workout.exercises.length !== 1 ? 's' : ''} · {totalSets} set{totalSets !== 1 ? 's' : ''} · {workout.duration}min
+            {format(new Date(workout.date), 'EEE, MMM d, yyyy')} · {workout.exercises.length} exercise{workout.exercises.length !== 1 ? 's' : ''} · {totalSets} set{totalSets !== 1 ? 's' : ''} · {workout.duration}min{burn.restSeconds ? ` · ${formatRest(burn.restSeconds)} rest` : ''} · ~{burn.calories.toLocaleString()} kcal
           </Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onShare(workout)} hitSlop={6} style={styles.icon}><Share2 size={17} color={colors.textMuted} /></TouchableOpacity>

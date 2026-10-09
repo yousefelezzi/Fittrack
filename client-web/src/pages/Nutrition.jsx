@@ -1336,16 +1336,23 @@ function GoalInfo({ info }) {
       {basis.stepCalories > 0 && (
         <p className="text-xs">Includes +{basis.stepCalories} kcal for today's {basis.steps.toLocaleString()} <Link to="/steps" className="text-brand-600">steps</Link>.</p>
       )}
+      {basis.workoutCalories > 0 && (
+        <p className="text-xs">Includes +{basis.workoutCalories} kcal for today's workouts and cardio.</p>
+      )}
       {adaptiveText(basis.adaptive, user?.bodyWeightUnit) && (
         <p className={`text-xs ${basis.adaptive?.reason ? '' : 'text-sky-700 dark:text-sky-300'}`}>
           {adaptiveText(basis.adaptive, user?.bodyWeightUnit)} <Link to="/nutrition/weight" className="text-brand-600">Weight log</Link>
         </p>
       )}
       {basis.floored && <p className="text-xs">Raised to the minimum recommended intake rather than going lower.</p>}
-      {basis.activityAssumed && (
+      {basis.activityAssumed && !basis.dynamic && (
         <p className="text-xs">Assuming you're moderately active. <Link to="/profile" className="text-brand-600">Set your activity level</Link> for a more accurate goal.</p>
       )}
-      <p className="text-xs">Change your goal, weight or activity level in your <Link to="/profile" className="text-brand-600">profile</Link> and today's goals update automatically.</p>
+      <p className="text-xs">
+        {basis.dynamic
+          ? <>Dynamic goal on: worked out from your weight change, steps and workouts. Turn it off in <Link to="/settings" className="text-brand-600">Settings</Link> to use your activity level instead.</>
+          : <>Worked out from your profile and activity level. Change them in your <Link to="/profile" className="text-brand-600">profile</Link> and today's goals update automatically.</>}
+      </p>
     </div>
   );
 }

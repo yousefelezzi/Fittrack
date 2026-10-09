@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, Text } from 'react-native';
 import { planAPI } from '../api';
 import { Card, Button, ListRow, colors, makeStyles, Title, Hint } from '../components';
-import { CirclePlus, ClipboardList, Dumbbell, ChartColumn, History, Calculator } from 'lucide-react-native';
+import { CirclePlus, ClipboardList, Dumbbell, ChartColumn, History, Calculator, HeartPulse } from 'lucide-react-native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -30,6 +30,7 @@ export default function TrainScreen({ navigation }) {
       )}
       <Card style={{ paddingVertical: 4 }}>
         <ListRow icon={CirclePlus} title="Log Workout" subtitle="Live session with rest timer, or one you've already done" onPress={() => navigation.navigate('LogWorkout')} />
+        <ListRow icon={HeartPulse} title="Log Cardio" subtitle="Runs, rides, swims and more, with calories burned" onPress={() => navigation.navigate('LogCardio')} />
         <ListRow icon={ClipboardList} title="Plans" subtitle="Your plans, the plan generator and the plan builder" onPress={() => navigation.navigate('Plans')} />
         <ListRow icon={Dumbbell} title="Exercises" subtitle="Library and your custom exercises" onPress={() => navigation.navigate('Exercises')} />
         <ListRow icon={ChartColumn} title="Progress" subtitle="Volume check, muscles trained, lift progress" onPress={() => navigation.navigate('Progress')} />

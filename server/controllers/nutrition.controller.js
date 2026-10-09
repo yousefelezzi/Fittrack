@@ -1,5 +1,9 @@
 const NutritionLog = require('../models/NutritionLog');
 const User = require('../models/User');
+const WorkoutSession = require('../models/WorkoutSession');
+const { sessionCalories } = require('../utils/workoutCalories');
+const CardioSession = require('../models/CardioSession');
+const { cardioCalories } = require('../utils/cardio');
 const StepLog = require('../models/StepLog');
 const { nutritionTargets } = require('../utils/nutritionTargets');
 const { generateMealPlan, catalogFoodNames } = require('../utils/mealPlan');
@@ -23,10 +27,10 @@ const TARGET_PROFILE_FIELDS = 'weight height dateOfBirth sex activityLevel fitne
  * The user's targets for a day: the profile formula, corrected by their real
  * weight trend over the last two weeks unless they've turned that off.
  */
-async function targetsFor(user, steps) {
+async function targetsFor(user, steps, workouts) {
   const { adaptiveMaintenance } = require('../utils/adaptiveCalories');
   const adaptive = user && user.adaptiveCalories !== false ? await adaptiveMaintenance(user) : null;
-  return nutritionTargets(user, { steps, adaptive });
+  return nutritionTargets(user, { steps, workouts, adaptive });
 }
 
 /** The user's log for `date`, created (with `fields`) if there isn't one yet. */
@@ -41,6 +45,18 @@ async function stepsOn(userId, date) {
   return entry?.steps;
 }
 
+const SESSION_CALORIE_FIELDS = 'date duration exercises.sets.reps exercises.sets.duration exercises.sets.bursts exercises.sets.burstSeconds exercises.sets.burstRest exercises.sets.restTime';
+
+/** Calories (above resting) from the workouts and cardio logged on `date`, for a body weight of `kg`. */
+async function workoutsOn(userId, date, kg) {
+  const [sessions, cardio] = await Promise.all([
+    WorkoutSession.find({ user: userId, date: sameDay(date) }).select(SESSION_CALORIE_FIELDS).lean(),
+    CardioSession.find({ user: userId, date: sameDay(date) }).select('activity intensity minutes').lean(),
+  ]);
+  return Math.round(sessions.reduce((n, s) => n + sessionCalories(s, kg).net, 0)
+    + cardio.reduce((n, c) => n + cardioCalories(c, kg).net, 0));
+}
+
 /**
  * Keep today's (and future) logs in line with the user's current profile-based
  * targets and that day's steps, so changing your goal or weight, or logging
@@ -53,7 +69,8 @@ async function syncGoals(log, userId) {
     User.findById(userId).select(TARGET_PROFILE_FIELDS).lean(),
     stepsOn(userId, log.date),
   ]);
-  const { targets } = await targetsFor(user, steps);
+  const workouts = await workoutsOn(userId, log.date, user?.weight);
+  const { targets } = await targetsFor(user, steps, workouts);
   if (!targets) return log;
   const g = log.dailyGoals || {};
   if (MACRO_KEYS.every((k) => g[k] === targets[k])) return log;
@@ -118,11 +135,12 @@ exports.syncGoals = syncGoals;
 // (with that day's steps, today by default) and how they were worked out
 exports.getTargets = async (req, res, next) => {
   try {
+    const day = req.query.date ? new Date(req.query.date) : new Date();
     const [user, steps] = await Promise.all([
       User.findById(req.user.id).select(TARGET_PROFILE_FIELDS).lean(),
-      stepsOn(req.user.id, req.query.date ? new Date(req.query.date) : new Date()),
+      stepsOn(req.user.id, day),
     ]);
-    res.json(await targetsFor(user, steps));
+    res.json(await targetsFor(user, steps, await workoutsOn(req.user.id, day, user?.weight)));
   } catch (err) {
     next(err);
   }
@@ -621,11 +639,18 @@ exports.getSummary = async (req, res, next) => {
     // defaults. For those, work out the target from the profile and that day's steps.
     const DEFAULT_GOALS = Object.fromEntries(MACRO_KEYS.map((k) => [k, NutritionLog.schema.path(`dailyGoals.${k}`).defaultValue]));
     const stepsByDay = new Map(stepLogs.map((s) => [s.date.toISOString().slice(0, 10), s.steps]));
+    const sessions = await WorkoutSession.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } }).select(SESSION_CALORIE_FIELDS).lean();
+    const cardio = await CardioSession.find({ user: req.user.id, date: { $gte: startOfDay(from), $lte: endOfDay(to) } }).select('date activity intensity minutes').lean();
+    const workoutsByDay = new Map();
+    const addDay = (date, kcal) => { const k = startOfDay(date).toISOString().slice(0, 10); workoutsByDay.set(k, (workoutsByDay.get(k) || 0) + kcal); };
+    for (const w of sessions) addDay(w.date, sessionCalories(w, user?.weight).net);
+    for (const c of cardio) addDay(c.date, cardioCalories(c, user?.weight).net);
     const goalsFor = (l) => {
       const g = l.dailyGoals;
       const untouched = !g || MACRO_KEYS.every((k) => g[k] === DEFAULT_GOALS[k]);
       if (!untouched) return g;
-      const { targets } = nutritionTargets(user, { steps: stepsByDay.get(l.date.toISOString().slice(0, 10)) });
+      const key = l.date.toISOString().slice(0, 10);
+      const { targets } = nutritionTargets(user, { steps: stepsByDay.get(key), workouts: Math.round(workoutsByDay.get(key) || 0) });
       return targets || g || null;
     };
     const sum = (list, f) => Math.round(list.reduce((n, x) => n + (Number(f(x)) || 0), 0));

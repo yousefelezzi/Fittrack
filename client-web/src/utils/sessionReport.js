@@ -12,6 +12,21 @@
  */
 import { toKg, fromKg } from './weightUnits';
 import { typeOf, amountKey, savedAmount, amountUnit } from './exerciseTypes';
+import { sessionCalories, workSeconds } from './workoutCalories';
+
+// Rest recorded and seconds of work in Log Workout's sets (warm-ups included: rest is rest).
+function restAndWork(exercises) {
+  let rest = 0;
+  let work = 0;
+  for (const ex of exercises) {
+    const type = typeOf(ex.exercise);
+    for (const s of ex.sets) {
+      rest += Number(s.restTime) || 0;
+      for (const side of s.left ? [s.left, s.right] : [s]) work += workSeconds(type, side);
+    }
+  }
+  return { rest, work };
+}
 
 // Log Workout's sets → performed sets, each a list of entries in kg ({ amount, kg, side }).
 const entriesOf = (ex) => ex.sets
@@ -45,10 +60,20 @@ const totalsOf = (setGroups, dynamic = true) => ({
 });
 const addUp = (list) => list.reduce((t, x) => ({ sets: t.sets + x.sets, reps: t.reps + x.reps, volume: t.volume + x.volume }), { sets: 0, reps: 0, volume: 0 });
 
-/** Totals of a saved workout: { sets, reps, volume (kg), minutes }. */
-export function loggedWorkoutTotals(workout) {
+/** Estimated calories for a workout being logged (Log Workout's exercises), `seconds` long, at body weight `kg`. */
+export function loggingCalories(exercises, seconds, kg) {
+  const { rest, work } = restAndWork(exercises);
+  return sessionCalories({ seconds, restSeconds: rest, work, kg }).calories;
+}
+
+/** Totals of a saved workout: { sets, reps, volume (kg), minutes, restSeconds, calories } (calories for body weight `kg`). */
+export function loggedWorkoutTotals(workout, kg) {
   const t = addUp((workout?.exercises || []).map((e) => totalsOf(loggedEntriesOf(e.sets, e.exercise), typeOf(e.exercise) === 'dynamic')));
-  return { ...t, minutes: workout?.duration || 0 };
+  const sets = (workout?.exercises || []).flatMap((e) => (e.sets || []).map((s) => [typeOf(e.exercise), s]));
+  const restSeconds = sets.reduce((n, [, s]) => n + (Number(s.restTime) || 0), 0);
+  const work = sets.reduce((n, [type, s]) => n + workSeconds(type, s), 0);
+  const { calories } = sessionCalories({ seconds: (workout?.duration || 0) * 60, restSeconds, work, kg });
+  return { ...t, minutes: workout?.duration || 0, restSeconds, calories };
 }
 
 /**
@@ -65,17 +90,20 @@ export function pickPreviousWorkout(workouts = [], name, exerciseIds = []) {
 /**
  * @param exercises  Log Workout's exercises ({ exercise, unit, sets })
  * @param seconds    session time
+ * @param kg         body weight, for the calories (a typical weight without one)
  * @param previous   the workout to compare with (from pickPreviousWorkout), or null
  * @param lastSets   { [exerciseId]: sets from GET /workouts/last/:id } — the last
  *                   time each exercise was done
  * @returns {{ totals, change, exercises: [{ name, type, amountUnit, unit, sets, amount, topWeight, isFirst, setRows }] }}
+ *   totals has sets, reps, volume, minutes, restSeconds (rest recorded between
+ *   sets) and calories (estimated, see workoutCalories.js).
  *   Volume is in kg; weights are in the exercise's unit. Each exercise's
  *   setRows compare set n with set n last time (side with side for unilateral
  *   exercises): [{ number, entries: [{ side, amount, weight, change: { amount, weight } | null }] }].
  *   amountUnit says what the amount is: 'reps', 's' (seconds held) or 'bursts'.
  *   A change is null when there's nothing to compare with.
  */
-export function buildSessionReport({ exercises, seconds, previous, lastSets = {} }) {
+export function buildSessionReport({ exercises, seconds, previous, lastSets = {}, kg }) {
   // An exercise split by "do it later" appears twice; report it once.
   const merged = [];
   for (const ex of exercises) {
@@ -87,13 +115,20 @@ export function buildSessionReport({ exercises, seconds, previous, lastSets = {}
   const done = merged.filter((m) => m.groups.length);
 
   const all = addUp(done.map((m) => totalsOf(m.groups, typeOf(m.exercise) === 'dynamic')));
-  const totals = { sets: all.sets, reps: all.reps, volume: all.volume, minutes: Math.max(1, Math.round(seconds / 60)) };
-  const prev = previous ? loggedWorkoutTotals(previous) : null;
+  const { rest, work } = restAndWork(exercises);
+  const { calories, estimatedWeight } = sessionCalories({ seconds, restSeconds: rest, work, kg });
+  const totals = {
+    sets: all.sets, reps: all.reps, volume: all.volume, minutes: Math.max(1, Math.round(seconds / 60)),
+    restSeconds: rest, calories, estimatedWeight,
+  };
+  const prev = previous ? loggedWorkoutTotals(previous, kg) : null;
   const change = prev && {
     sets: totals.sets - prev.sets,
     reps: totals.reps - prev.reps,
     volume: totals.volume - prev.volume,
     minutes: prev.minutes ? totals.minutes - prev.minutes : null,
+    restMinutes: prev.restSeconds ? Math.round(rest / 60) - Math.round(prev.restSeconds / 60) : null,
+    calories: prev.calories ? calories - prev.calories : null,
   };
 
   return {

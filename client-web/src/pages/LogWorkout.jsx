@@ -10,8 +10,9 @@ import { setsFromLastWorkout } from '../utils/lastSets';
 import { UNITS, fromKg } from '../utils/weightUnits';
 import { typeOf, fieldsOf, amountKey, OPTIONAL_FIELDS, toSavedFields, TYPE_LABEL } from '../utils/exerciseTypes';
 import {
-  buildSessionReport, pickPreviousWorkout, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
+  buildSessionReport, pickPreviousWorkout, loggingCalories, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
 } from '../utils/sessionReport';
+import { formatRest } from '../utils/workoutCalories';
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../utils/logSets';
@@ -207,6 +208,7 @@ function Change({ value, suffix = '' }) {
 
 function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
   const [report, setReport] = useState(null);
+  const { user } = useAuth(); // body weight, for the calories
 
   useEffect(() => {
     let alive = true;
@@ -217,7 +219,7 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
     ]).then(([workouts, ...last]) => {
       if (!alive) return;
       const previous = pickPreviousWorkout(workouts, name, ids);
-      setReport(buildSessionReport({ exercises, seconds, previous, lastSets: Object.fromEntries(last) }));
+      setReport(buildSessionReport({ exercises, seconds, previous, lastSets: Object.fromEntries(last), kg: user?.weight }));
     });
     return () => { alive = false; };
     // The report is of the session as it ended.
@@ -231,6 +233,8 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
     ['Reps', t.reps, c?.reps],
     [`Volume (${volumeUnit})`, vol(t.volume), c && Math.round(fromKg(c.volume, volumeUnit))],
     ['Time (min)', t.minutes, c?.minutes],
+    ['Rest', t.restSeconds ? formatRest(t.restSeconds) : '–', c?.restMinutes, ' min'],
+    [`Calories${t.estimatedWeight ? '*' : ''}`, `~${t.calories.toLocaleString()}`, c?.calories, ' kcal'],
   ];
 
   return (
@@ -248,16 +252,19 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
 
         {report && (<>
           <div className="grid grid-cols-2 gap-2">
-            {stats.map(([label, value, change]) => (
+            {stats.map(([label, value, change, suffix]) => (
               <div key={label} className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
                 <p className="text-[11px] text-gray-400 dark:text-gray-500">{label}</p>
                 <p className="flex items-baseline gap-2">
                   <span className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{value}</span>
-                  <Change value={change} />
+                  <Change value={change} suffix={suffix} />
                 </p>
               </div>
             ))}
           </div>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 -mt-2">
+            Calories are an estimate from your session time, rest and body weight.{t.estimatedWeight ? ' * Using a typical weight: add yours to your profile.' : ''}
+          </p>
 
           {report.exercises.length > 0 && (
             <div>
@@ -951,7 +958,8 @@ export default function LogWorkout() {
           })),
         })),
       });
-      navigate('/');
+      // A workout logged afterwards gets its calorie estimate here (a live one saw it in the report).
+      navigate('/', mode === 'past' ? { state: { saved: `Workout saved. About ${loggingCalories(exercises, (Number(duration) || 0) * 60, user?.weight).toLocaleString()} kcal burned (estimate).` } } : undefined);
     } catch (err) {
       // Show which field the server rejected instead of a bare "Validation failed".
       const data = err.response?.data;

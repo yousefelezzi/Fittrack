@@ -6,7 +6,7 @@ import {
   Apple, Users, LogOut, Menu, X, Moon, Sun,
   Calculator, History, Dumbbell as WorkoutsIcon, ChevronDown, PlusCircle, Footprints,
   Utensils, GlassWater, Pill, TrendingUp,
-  Scale,
+  Scale, HeartPulse,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { messageAPI } from '../api';
@@ -16,6 +16,7 @@ import Avatar from './Avatar';
 // Everything about training lives under one collapsible "Workouts" group.
 const workoutNav = [
   { to: '/log',       label: 'Log Workout', icon: PlusCircle },
+  { to: '/cardio',    label: 'Log Cardio',  icon: HeartPulse },
   { to: '/plans',     label: 'Plans',       icon: ClipboardList },
   { to: '/exercises', label: 'Exercises',   icon: Dumbbell },
   { to: '/progress',  label: 'Progress',    icon: BarChart2 },

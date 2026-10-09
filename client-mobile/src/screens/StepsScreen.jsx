@@ -65,7 +65,7 @@ export default function StepsScreen({ navigation }) {
   if (loading) return <View style={styles.centered}><Spinner /></View>;
   if (!data) return <View style={styles.centered}><Text style={styles.muted}>Could not load your steps.</Text></View>;
 
-  const { goal, baseline, canAdjustCalories } = data;
+  const { goal, dynamic, canAdjustCalories } = data;
   const todayKey = dateKey(new Date());
   const today = byDate.get(todayKey);
   const savedToday = today?.steps ?? 0;
@@ -104,10 +104,12 @@ export default function StepsScreen({ navigation }) {
         <Text style={styles.small}>{pct >= 100 ? 'Goal reached' : `${fmt(goal - todaySteps)} to go (${pct}%)`}</Text>
         <Text style={[styles.small, { marginTop: 8 }]}>
           {!canAdjustCalories
-            ? 'Add your weight to your profile so extra steps can raise your calorie target.'
-            : `${today?.burned > 0 ? `About ${fmt(today.burned)} kcal burned walking today. ` : ''}${today?.calories > 0
-              ? `+${today.calories} kcal of that is added to today's calorie target; the first ${fmt(baseline)} are everyday movement that's already in your maintenance.`
-              : `Steps beyond ${fmt(baseline)} (everyday movement, already in your maintenance) raise your calorie target for the day.`}`}
+            ? 'Add your weight to your profile so your steps can count toward your calorie goal.'
+            : !dynamic
+              ? `${today?.burned > 0 ? `About ${fmt(today.burned)} kcal burned walking today. ` : ''}Steps don't change your calorie goal while the dynamic goal is off (your activity level covers them). Turn it on in Settings.`
+              : today?.burned > 0
+                ? `About ${fmt(today.burned)} kcal burned walking today, all added to today's calorie goal.`
+                : 'Every step you walk adds to the day\'s calorie goal.'}
         </Text>
       </Card>
 

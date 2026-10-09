@@ -93,6 +93,13 @@ export const weightAPI = {
   delete: (id)           => api.delete(`/weight/${id}`),
 };
 
+// Cardio sessions (their own page); calories are estimated on the server.
+export const cardioAPI = {
+  getAll: (params) => api.get('/cardio', { params }),
+  create: (data) => api.post('/cardio', data),
+  delete: (id) => api.delete(`/cardio/${id}`),
+};
+
 // What today's reminders need: workout day / trained yet, supplements ticked.
 export const reminderAPI = {
   today: (params) => api.get('/reminders/today', { params }),

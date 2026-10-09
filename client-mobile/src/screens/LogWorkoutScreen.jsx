@@ -11,8 +11,9 @@ import { setsFromLastWorkout } from '../../../client-web/src/utils/lastSets';
 import { UNITS, fromKg } from '../../../client-web/src/utils/weightUnits';
 import { typeOf, fieldsOf, amountKey, toSavedFields, TYPE_LABEL } from '../../../client-web/src/utils/exerciseTypes';
 import {
-  buildSessionReport, pickPreviousWorkout, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
+  buildSessionReport, pickPreviousWorkout, loggingCalories, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
 } from '../../../client-web/src/utils/sessionReport';
+import { formatRest } from '../../../client-web/src/utils/workoutCalories';
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../../../client-web/src/utils/logSets';
@@ -157,6 +158,7 @@ function Change({ value, suffix = '' }) {
 
 function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
   const [report, setReport] = useState(null);
+  const { user } = useAuth(); // body weight, for the calories
 
   // The report is of the session as it ended, so it's built once.
   useEffect(() => {
@@ -168,7 +170,7 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
     ]).then(([workouts, ...last]) => {
       if (!alive) return;
       const previous = pickPreviousWorkout(workouts, name, ids);
-      setReport(buildSessionReport({ exercises, seconds, previous, lastSets: Object.fromEntries(last) }));
+      setReport(buildSessionReport({ exercises, seconds, previous, lastSets: Object.fromEntries(last), kg: user?.weight }));
     });
     return () => { alive = false; };
   }, []);
@@ -180,6 +182,8 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
     ['Reps', t.reps, c?.reps],
     [`Volume (${volumeUnit})`, Math.round(fromKg(t.volume, volumeUnit)).toLocaleString(), c && Math.round(fromKg(c.volume, volumeUnit))],
     ['Time (min)', t.minutes, c?.minutes],
+    ['Rest', t.restSeconds ? formatRest(t.restSeconds) : '–', c?.restMinutes, ' min'],
+    [`Calories${t.estimatedWeight ? '*' : ''}`, `~${t.calories.toLocaleString()}`, c?.calories, ' kcal'],
   ];
 
   return (
@@ -196,13 +200,16 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
       {!report ? <Spinner /> : (
         <>
           <View style={styles.statGrid}>
-            {stats.map(([label, value, change]) => (
+            {stats.map(([label, value, change, suffix]) => (
               <View key={label} style={styles.statBox}>
                 <Text style={styles.statLabel}>{label}</Text>
-                <Text style={styles.statValue}>{value}<Change value={change} /></Text>
+                <Text style={styles.statValue}>{value}<Change value={change} suffix={suffix} /></Text>
               </View>
             ))}
           </View>
+          <Text style={[styles.small, { marginTop: 6 }]}>
+            Calories are an estimate from your session time, rest and body weight.{t.estimatedWeight ? ' * Using a typical weight: add yours to your profile.' : ''}
+          </Text>
           {report.exercises.length > 0 && (
             <View style={{ marginTop: 16 }}>
               <Text style={styles.reportHead}>By set <Text style={styles.small}>· each set vs the same set last time</Text></Text>
@@ -758,7 +765,9 @@ export default function LogWorkoutScreen({ navigation, route }) {
       setExercises([]);
       setNotes('');
       setName(`Workout ${new Date().toLocaleDateString()}`);
-      Alert.alert('Workout saved!', '', [{ text: 'OK', onPress: () => navigation.popTo('Tabs', { screen: 'Dashboard' }) }]);
+      // A workout logged afterwards gets its calorie estimate here (a live one saw it in the report).
+      const burned = mode === 'past' ? `About ${loggingCalories(exercises, (Number(duration) || 0) * 60, user?.weight).toLocaleString()} kcal burned (estimate).` : '';
+      Alert.alert('Workout saved!', burned, [{ text: 'OK', onPress: () => navigation.popTo('Tabs', { screen: 'Dashboard' }) }]);
     } catch (err) {
       const data = err.response?.data;
       const details = data?.errors?.map((e) => e.message).filter(Boolean);

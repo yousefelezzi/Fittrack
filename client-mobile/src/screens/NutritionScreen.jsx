@@ -94,14 +94,19 @@ function GoalInfo({ info, onProfile, onSteps, onWeight }) {
         {basis.adjustment === 'maintenance' ? `maintenance, about ${basis.maintenance.toLocaleString()} kcal.` : `${basis.adjustment} from about ${basis.maintenance.toLocaleString()} kcal maintenance.`}
       </Text>
       {basis.stepCalories > 0 && <Hint>Includes +{basis.stepCalories} kcal for today's {basis.steps.toLocaleString()} <Text style={styles.link} onPress={onSteps}>steps</Text>.</Hint>}
+      {basis.workoutCalories > 0 && <Hint>Includes +{basis.workoutCalories} kcal for today's workouts and cardio.</Hint>}
       {adaptiveText(basis.adaptive, user?.bodyWeightUnit) ? (
         <Hint style={basis.adaptive?.reason ? null : { color: '#0ea5e9' }}>
           {adaptiveText(basis.adaptive, user?.bodyWeightUnit)} <Text style={styles.link} onPress={onWeight}>Weight log</Text>
         </Hint>
       ) : null}
       {basis.floored && <Hint>Raised to the minimum recommended intake rather than going lower.</Hint>}
-      {basis.activityAssumed && <Hint>Assuming you're moderately active. <Text style={styles.link} onPress={onProfile}>Set your activity level</Text> for a more accurate goal.</Hint>}
-      <Hint>Change your goal, weight or activity level in your <Text style={styles.link} onPress={onProfile}>profile</Text> and today's goals update automatically.</Hint>
+      {basis.activityAssumed && !basis.dynamic && <Hint>Assuming you're moderately active. <Text style={styles.link} onPress={onProfile}>Set your activity level</Text> for a more accurate goal.</Hint>}
+      <Hint>
+        {basis.dynamic
+          ? 'Dynamic goal on: worked out from your weight change, steps and workouts. Turn it off in Settings to use your activity level instead.'
+          : <>Worked out from your profile and activity level. Change them in your <Text style={styles.link} onPress={onProfile}>profile</Text> and today's goals update automatically.</>}
+      </Hint>
     </Card>
   );
 }

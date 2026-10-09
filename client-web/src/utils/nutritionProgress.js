@@ -111,28 +111,33 @@ export const formatMl = (ml) => (ml >= 1000 ? `${Math.round(ml / 100) / 10} L` :
 export const WATER_PRESETS = [250, 330, 500, 750];
 
 /**
- * What the calorie goal's weight-trend adjustment did, in words (targets
- * basis.adaptive from the server, utils/adaptiveCalories.js), or null when it's
- * off. Weight change in the user's unit ('kg' | 'lb').
+ * What the dynamic calorie goal is based on, in words (targets
+ * basis.adaptive from the server, utils/adaptiveCalories.js), or null when the
+ * dynamic goal is off. Weight change in the user's unit ('kg' | 'lb').
  */
 export function adaptiveText(adaptive, unit = 'kg') {
   if (!adaptive) return null;
+  const meanwhile = "For now your maintenance is your resting burn, and each day's steps, workouts and cardio are added on top when you do them.";
   if (adaptive.reason === 'food') {
-    return `To fine-tune your goal from your real results, log your food on at least ${adaptive.needed} of the last 14 days (${adaptive.foodDays} so far).`;
+    return `${meanwhile} To work it out from your real results, log your food on at least ${adaptive.needed} of the last 14 days (${adaptive.foodDays} so far).`;
   }
   if (adaptive.reason === 'weight') {
     const [a, b] = adaptive.weighIns || [0, 0];
-    return `To fine-tune your goal from your real results, weigh in at least ${adaptive.needed} times in each of the last two weeks (${a} and ${b} so far).`;
+    return `${meanwhile} To work it out from your real results, weigh in at least ${adaptive.needed} times in each of the last two weeks (${a} and ${b} so far).`;
   }
   if (adaptive.reason) return null;
   const change = Math.abs(unit === 'lb' ? adaptive.weightChange / 0.45359237 : adaptive.weightChange);
   const moved = adaptive.weightChange < 0 ? `went down ${change.toFixed(1)} ${unit}` : adaptive.weightChange > 0 ? `went up ${change.toFixed(1)} ${unit}` : 'held steady';
   const balance = adaptive.dailyBalance < 0 ? `a ${Math.abs(adaptive.dailyBalance)} kcal daily deficit` : adaptive.dailyBalance > 0 ? `a ${adaptive.dailyBalance} kcal daily surplus` : 'no surplus or deficit';
-  const verdict = adaptive.offset === 0
-    ? 'which matches the formula, so no change.'
-    : `so your maintenance looks ${Math.abs(adaptive.offset)} kcal ${adaptive.offset > 0 ? 'higher' : 'lower'} than the formula and your goal is adjusted${adaptive.limited ? ' (capped for now; it keeps adjusting as more data comes in)' : ''}.`;
-  const walked = adaptive.avgSteps != null
-    ? ` That already allows for the ${adaptive.avgSteps.toLocaleString()} steps a day you walked; each day's goal adds that day's own steps, so walking less lowers it.`
-    : '';
-  return `Over the last 2 weeks you ate about ${adaptive.avgIntake.toLocaleString()} kcal a day and your weight ${moved} (${balance}), ${verdict}${walked}`;
+  const parts = [
+    adaptive.avgStepCalories ? `steps (about ${adaptive.avgSteps.toLocaleString()} a day, ${adaptive.avgStepCalories.toLocaleString()} kcal)` : '',
+    adaptive.workouts || adaptive.cardio
+      ? `${[adaptive.workouts ? `${adaptive.workouts} workout${adaptive.workouts === 1 ? '' : 's'}` : '', adaptive.cardio ? `${adaptive.cardio} cardio session${adaptive.cardio === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')} (about ${adaptive.workoutCalories.toLocaleString()} kcal a day)`
+      : '',
+  ].filter(Boolean);
+  const steps = parts.length
+    ? ` Your ${parts.join(' and ')} are taken out of that and added back on the days you do them, so walking or training less lowers that day's goal.`
+    : " Each day's steps, workouts and cardio are added on top when you do them.";
+  const capped = adaptive.limited ? ' (Limited for now in case of a logging slip; it keeps adjusting as more data comes in.)' : '';
+  return `Your maintenance comes from your weight change: over the last 2 weeks you ate about ${adaptive.avgIntake.toLocaleString()} kcal a day and your weight ${moved} (${balance}), so you burned about ${adaptive.measured.toLocaleString()} kcal a day.${steps}${capped}`;
 }

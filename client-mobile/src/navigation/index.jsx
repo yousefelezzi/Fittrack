@@ -38,6 +38,7 @@ import CalculatorsScreen   from '../screens/CalculatorsScreen';
 import AboutWNSScreen      from '../screens/AboutWNSScreen';
 import SettingsScreen      from '../screens/SettingsScreen';
 import GetStartedScreen    from '../screens/GetStartedScreen';
+import LogCardioScreen     from '../screens/LogCardioScreen';
 import { House, Dumbbell, Salad, Users, User } from 'lucide-react-native';
 
 // ── Stack / Tab navigators ────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ function AppTabs() {
 // Screens opened on top of the tabs: [route name, component, header title].
 const STACK_SCREENS = [
   ['LogWorkout', LogWorkoutScreen, 'Log Workout'],
+  ['LogCardio', LogCardioScreen, 'Log Cardio'],
   ['FoodLog', NutritionScreen, 'Food Log'],
   ['Hydration', HydrationScreen, 'Hydration'],
   ['Supplements', SupplementsScreen, 'Supplements'],

@@ -64,7 +64,7 @@ export default function Steps() {
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (!data) return <p className="text-sm text-red-500">Could not load your steps.</p>;
 
-  const { goal, baseline, canAdjustCalories } = data;
+  const { goal, dynamic, canAdjustCalories } = data;
   const today = byDate.get(key(new Date()));
   const todaySteps = today?.steps || 0;
   const pct = Math.min(100, Math.round((todaySteps / goal) * 100));
@@ -116,13 +116,12 @@ export default function Steps() {
           <p className="flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <Flame size={13} className="mt-0.5 shrink-0 text-orange-500" />
             {!canAdjustCalories
-              ? <>Add your weight to your <Link to="/profile" className="text-brand-600">profile</Link> so extra steps can raise your calorie target.</>
-              : <>
-                  {today?.burned > 0 && <>About {today.burned.toLocaleString()} kcal burned walking today. </>}
-                  {today?.calories > 0
-                    ? <>+{today.calories} kcal of that is added to today's <Link to="/nutrition" className="text-brand-600">calorie target</Link>; the first {baseline.toLocaleString()} are everyday movement that's already in your maintenance.</>
-                    : <>Steps beyond {baseline.toLocaleString()} (everyday movement, already in your maintenance) raise your calorie target for the day.</>}
-                </>}
+              ? <>Add your weight to your <Link to="/profile" className="text-brand-600">profile</Link> so your steps can count toward your calorie goal.</>
+              : !dynamic
+                ? <>{today?.burned > 0 && <>About {today.burned.toLocaleString()} kcal burned walking today. </>}Steps don't change your calorie goal while the dynamic goal is off (your activity level covers them). Turn it on in <Link to="/settings" className="text-brand-600">Settings</Link>.</>
+                : today?.burned > 0
+                  ? <>About {today.burned.toLocaleString()} kcal burned walking today, all added to today's <Link to="/nutrition" className="text-brand-600">calorie goal</Link>.</>
+                  : <>Every step you walk adds to the day's <Link to="/nutrition" className="text-brand-600">calorie goal</Link>.</>}
           </p>
         </div>
 

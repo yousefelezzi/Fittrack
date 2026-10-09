@@ -21,6 +21,7 @@ import Steps       from './pages/Steps';
 import Feed        from './pages/Feed';
 import Profile     from './pages/Profile';
 import Settings    from './pages/Settings';
+import LogCardio from './pages/LogCardio';
 import GetStarted from './pages/GetStarted';
 import { AccountPassword, AccountEmail } from './pages/AccountLinks';
 import Calculators    from './pages/Calculators';
@@ -65,6 +66,7 @@ export default function App() {
               <Route index           element={<Dashboard />} />
               <Route path="exercises" element={<Exercises />} />
               <Route path="log"       element={<LogWorkout />} />
+              <Route path="cardio"    element={<LogCardio />} />
               <Route path="plans"     element={<Plans />} />
               <Route path="history"   element={<History />} />
               <Route path="progress"  element={<Progress />} />

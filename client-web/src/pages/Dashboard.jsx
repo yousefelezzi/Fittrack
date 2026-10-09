@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { workoutAPI, nutritionAPI, stepsAPI, reminderAPI } from '../api';
 import { todayParams, dueReminders } from '../utils/reminders';
@@ -28,6 +28,11 @@ export default function Dashboard() {
   const [steps, setSteps] = useState(null); // { goal, days: [today?] }
   const [loading, setLoading] = useState(true);
   const [reminderStatus, setReminderStatus] = useState(null);
+  // A message passed along after saving (e.g. a workout logged afterwards, with its calories).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [saved, setSaved] = useState(location.state?.saved || '');
+  useEffect(() => { if (location.state?.saved) navigate('.', { replace: true, state: null }); }, [location.state, navigate]);
   const [, setTick] = useState(0); // re-checks whether a reminder's time has come
 
   useEffect(() => {
@@ -71,6 +76,14 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Good {getGreeting()}, {user?.name?.split(' ')[0]}</h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{format(new Date(), 'EEEE, MMMM d')}</p>
       </div>
+
+      {saved && (
+        <div className="card !py-3 flex items-center gap-3 border-l-4 !border-l-emerald-500">
+          <Flame size={18} className="text-orange-500 shrink-0" />
+          <p className="flex-1 text-sm text-gray-700 dark:text-gray-200">{saved}</p>
+          <button onClick={() => setSaved('')} className="text-xs text-gray-400 hover:text-gray-600">Dismiss</button>
+        </div>
+      )}
 
       {dueReminders(reminderStatus).map(({ kind, text }) => (
         <div key={kind} className="card !py-3 flex items-center gap-3 border-l-4 !border-l-brand-500">
