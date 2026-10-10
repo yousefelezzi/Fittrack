@@ -101,7 +101,7 @@ const exercises = [
   
   {
     name: 'Pull-Up',
-    muscleGroups: ['lats', 'forearms'],
+    muscleGroups: ['lats', 'posterior delt', 'forearms'],
     equipment: 'bodyweight',
     instructions: [
       'Hang from a bar with an overhand grip, slightly wider than shoulder-width.',
@@ -112,7 +112,7 @@ const exercises = [
   },
   {
     name: 'Chin-Up',
-    muscleGroups: ['lats', 'costal pecs', 'elbow flexors', 'forearms'],
+    muscleGroups: ['lats', 'costal pecs', 'elbow flexors', 'posterior delt', 'forearms'],
     equipment: 'bodyweight',
     instructions: [
       'Hang from a bar with an underhand grip at shoulder-width.',
@@ -904,6 +904,7 @@ const SECONDARY = {
   "Reverse Curl": ["biceps"],
   "Dumbbell Pullover": ["posterior delt"],
   "Upright Row": ["posterior delt"],
+  "Pull-Up": ["posterior delt"],
 };
 for (const ex of exercises) ex.secondaryMuscles = SECONDARY[ex.name] || [];
 // Forearms only hold the grip, except on wrist curls and reverse curls.
