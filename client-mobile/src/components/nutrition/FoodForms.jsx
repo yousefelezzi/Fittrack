@@ -11,7 +11,7 @@ import { Chip, ChipRow, Segmented, Label, Hint, ErrorText, LinkText } from '../u
 import { MEAL_TYPES } from '../../../../client-web/src/constants/nutrition';
 import {
   r, r0, servingText, scale, canPickState, storedStateOf, stateOf, stateLabel, foodInState, nameInState, yieldHint,
-  portionIngredients, isEditableCustomFood, LABEL_FIELDS, EXTRA_FIELDS, customFoodInitial,
+  portionIngredients, isEditableCustomFood, LABEL_FIELDS, EXTRA_GROUPS, customFoodInitial,
   sumIngredients, ingredientPayload, fmtCount, useRecipeServing, buildVirtualRecipe, customFoodDraft,
 } from '../../../../client-web/src/utils/foodLogic';
 import { X } from 'lucide-react-native';
@@ -287,8 +287,18 @@ export function CustomFoodForm({ food: editing, onSaved, onCancel }) {
         <Segmented style={{ width: 200 }} value={basis} onChange={setBasis} options={[['serving', 'Per serving'], ['100g', 'Per 100 g']]} />
       </View>
       <View style={styles.grid2}>{LABEL_FIELDS.map(numField)}</View>
-      <LinkText style={{ marginTop: 8 }} onPress={() => setShowExtras(!showExtras)}>{showExtras ? 'Hide' : 'Add'} fiber, sugar & sodium</LinkText>
-      {showExtras && <View style={styles.grid2}>{EXTRA_FIELDS.map(numField)}</View>}
+      <LinkText style={{ marginTop: 8 }} onPress={() => setShowExtras(!showExtras)}>{showExtras ? 'Hide' : 'Add'} saturated fat, fiber, vitamins & minerals (optional)</LinkText>
+      {showExtras ? (
+        <>
+          {EXTRA_GROUPS.map(([title, fields]) => (
+            <View key={title} style={{ marginTop: 10 }}>
+              <Text style={styles.groupTitle}>{title.toUpperCase()}</Text>
+              <View style={styles.grid2}>{fields.map(numField)}</View>
+            </View>
+          ))}
+          <Hint style={{ marginTop: 4 }}>Fill in whatever the label lists; leave the rest empty.</Hint>
+        </>
+      ) : null}
 
       <Label>Raw or cooked? · optional</Label>
       <ChipRow style={{ gap: 6 }}>
@@ -598,4 +608,5 @@ const styles = makeStyles(() => ({
   previewVal:  { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   ingRow:      { backgroundColor: colors.inset, borderRadius: 10, padding: 8 },
   noteBox:     { fontSize: 11, color: colors.textSecondary, backgroundColor: colors.inset, borderRadius: 10, padding: 10, marginTop: 12 },
+  groupTitle: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5 },
 }));

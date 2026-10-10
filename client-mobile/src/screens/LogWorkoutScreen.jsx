@@ -18,6 +18,7 @@ import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../../../client-web/src/utils/logSets';
 import { syncReminders } from '../utils/notifications';
+import { ExerciseEditor } from './ExercisesScreen';
 import { X, Flame, SkipForward, PartyPopper, ArrowLeftRight, Clock, ChevronUp, ChevronDown, ClipboardList, Plus, Play, Check, ListOrdered, Square } from 'lucide-react-native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -324,7 +325,7 @@ function IsometricTimer({ exercise, set, onRecord, onFinish }) {
 // Walks through every exercise's sets one at a time. Between sets a rest timer
 // counts up until the user ends it, and that time is saved as the rest after
 // the set. Reps/weight stay editable in case the set didn't go as planned.
-function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet, onChangeExercises, onSetUnit, onClose, onFinish }) {
+function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet, onChangeExercises, onSetUnit, onClose, onFinish, onExerciseCreated }) {
   const steps = exercises.flatMap((ex, exIdx) => ex.sets.map((_, setIdx) => ({ exIdx, setIdx })));
 
   const [stepIdx, setStepIdx]   = useState(0);
@@ -335,6 +336,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const [, setTick]             = useState(0);
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapping, setSwapping] = useState(false);
+  const [creatingSwap, setCreatingSwap] = useState(null); // starting values for a custom exercise to swap to
   const [endedAt, setEndedAt]   = useState(null); // session seconds when it ended
   const [orderOpen, setOrderOpen] = useState(false);
 
@@ -510,6 +512,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
               <Hint>Replace {currentEx.exercise.name} for the remaining {currentEx.sets.length - setIdx} set{currentEx.sets.length - setIdx !== 1 ? 's' : ''} with:</Hint>
               {swapping ? <Spinner size="small" /> : <SimilarExercises exerciseId={currentEx.exercise._id} onPick={swapExercise} onClose={() => setSwapOpen(false)} />}
               <LinkText onPress={() => setSwapOpen('all')}>…or search all exercises</LinkText>
+              <LinkText onPress={() => setCreatingSwap({ name: '' })}>…or create a custom exercise</LinkText>
             </View>
           ) : (
             <View style={styles.twoBtns}>
@@ -518,7 +521,11 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
             </View>
           )}
           <ExercisePicker visible={swapOpen === 'all'} title="Swap to…" exercises={allExercises.filter((e) => e._id !== currentEx.exercise._id)}
-            onPick={swapExercise} onClose={() => setSwapOpen(false)} />
+            onPick={swapExercise} onClose={() => setSwapOpen(false)}
+            onCreate={(nm) => { setSwapOpen(true); setTimeout(() => setCreatingSwap({ name: nm }), 350); /* one sheet at a time */ }} />
+          {/* A custom exercise made mid-session takes over the rest of this exercise's sets. */}
+          <ExerciseEditor visible={!!creatingSwap} exercise={creatingSwap} onClose={() => setCreatingSwap(null)}
+            onSaved={(saved) => { onExerciseCreated?.(saved); swapExercise(saved); }} />
         </>
       ) : (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
@@ -576,6 +583,7 @@ export default function LogWorkoutScreen({ navigation, route }) {
   const [error, setError] = useState('');
 
   const [allExercises, setAllExercises] = useState([]);
+  const [creating, setCreating] = useState(null); // starting values for a custom exercise made mid-workout
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [plans, setPlans] = useState([]);
@@ -825,7 +833,10 @@ export default function LogWorkoutScreen({ navigation, route }) {
               <TouchableOpacity onPress={() => removeExercise(exIdx)} hitSlop={6} style={styles.icon}><X size={18} color={colors.danger} /></TouchableOpacity>
             </View>
             {replacing === exIdx && (
-              <SimilarExercises exerciseId={ex.exercise._id} onPick={(p) => replaceExercise(exIdx, p)} onClose={() => setReplacing(null)} />
+              <>
+                <SimilarExercises exerciseId={ex.exercise._id} onPick={(p) => replaceExercise(exIdx, p)} onClose={() => setReplacing(null)} />
+                <LinkText style={{ marginBottom: 8 }} onPress={() => setCreating({ name: '', replaceIdx: exIdx })}>Create a custom exercise instead</LinkText>
+              </>
             )}
 
             <View style={styles.setHead}>
@@ -904,7 +915,16 @@ export default function LogWorkoutScreen({ navigation, route }) {
       </ScrollView>
 
       <ExercisePicker visible={pickerOpen} exercises={allExercises} selectedIds={exercises.map((e) => e.exercise._id)}
-        onPick={addExercise} onClose={() => setPickerOpen(false)} />
+        onPick={addExercise} onClose={() => setPickerOpen(false)}
+        onCreate={(name) => { setPickerOpen(false); setTimeout(() => setCreating({ name }), 350); /* one sheet at a time */ }} />
+      {/* A custom exercise made from the picker is added to the workout straight away. */}
+      <ExerciseEditor visible={!!creating} exercise={creating} onClose={() => setCreating(null)}
+        onSaved={(saved) => {
+          setAllExercises((prev) => [saved, ...prev]);
+          // Made from Replace: it takes that exercise's place; from the picker: it's added.
+          if (creating?.replaceIdx != null) { replaceExercise(creating.replaceIdx, saved); setReplacing(null); }
+          else addExercise(saved);
+        }} />
 
       <Sheet visible={templateOpen} title="Use Template" onClose={() => setTemplateOpen(false)}
         subtitle="Pick a day from one of your plans to pre-fill exercises and sets. You can still edit everything before saving.">
@@ -934,6 +954,7 @@ export default function LogWorkoutScreen({ navigation, route }) {
             onUpdateSet={updateSet}
             onChangeExercises={setExercises}
             onSetUnit={setUnit}
+            onExerciseCreated={(saved) => setAllExercises((prev) => [saved, ...prev])}
             onClose={() => setSessionOpen(false)}
             onFinish={(secs) => { setDuration(String(Math.max(1, Math.round(secs / 60)))); setSessionOpen(false); }}
           />

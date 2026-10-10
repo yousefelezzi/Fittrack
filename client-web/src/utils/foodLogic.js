@@ -154,11 +154,15 @@ export const LABEL_FIELDS = [
   { key: 'carbs',    label: 'Carbs',    unit: 'g' },
   { key: 'fat',      label: 'Fat',      unit: 'g' },
 ];
-export const EXTRA_FIELDS = [
-  { key: 'fiber',  label: 'Fiber',  unit: 'g' },
-  { key: 'sugar',  label: 'Sugar',  unit: 'g' },
-  { key: 'sodium', label: 'Sodium', unit: 'mg' },
-];
+// Optional extras on a custom food: every micronutrient the app tracks, in
+// groups (the ones printed on most labels first).
+export const EXTRA_GROUPS = [
+  ['From the label', ['saturatedFat', 'fiber', 'sugar', 'sodium', 'cholesterol']],
+  ['Vitamins', ['vitaminA', 'vitaminC', 'vitaminD', 'vitaminE', 'vitaminK', 'vitaminB1', 'vitaminB2', 'vitaminB3', 'vitaminB6', 'vitaminB12', 'folate']],
+  ['Minerals', ['calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'zinc', 'selenium']],
+  ['Other', ['omega3', 'creatine']],
+].map(([title, keys]) => [title, keys.map((key) => MICRO_CONFIG.find((c) => c.key === key)).filter(Boolean)]);
+export const EXTRA_FIELDS = EXTRA_GROUPS.flatMap(([, fields]) => fields);
 
 // Form values for an existing custom food (label values shown per serving).
 export function customFoodInitial(food) {
@@ -175,9 +179,9 @@ export function customFoodInitial(food) {
     basis: sv ? 'serving' : '100g',
     values: Object.fromEntries([
       ...['calories', 'protein', 'carbs', 'fat'].map((key) => [key, r((p[key] || 0) * (sv ? k : 1))]),
-      ...['fiber', 'sugar', 'sodium'].map((key) => [key, r((m[key] || 0) * (sv ? k : 1))]),
+      ...EXTRA_FIELDS.filter((f) => m[f.key] > 0).map((f) => [f.key, r((m[f.key] || 0) * (sv ? k : 1))]),
     ]),
-    showExtras: ['fiber', 'sugar', 'sodium'].some((key) => m[key] > 0),
+    showExtras: EXTRA_FIELDS.some((f) => m[f.key] > 0),
     cookMode, cookedFrom: food.uncookedLabel || 'raw',
     cookedPer100: food.cookedYield ? Math.round(food.cookedYield * 100) : '',
   };
@@ -326,7 +330,7 @@ export function customFoodDraft({ name, brand, servingLabel, servingGrams, basis
     brand: brand.trim(),
     per100g: {
       calories: per('calories'), protein: per('protein'), carbs: per('carbs'), fat: per('fat'),
-      micros: { fiber: per('fiber'), sugar: per('sugar'), sodium: per('sodium') },
+      micros: Object.fromEntries(EXTRA_FIELDS.map((f) => [f.key, per(f.key)])),
     },
     servings: [{ label, grams }],
     ...(cookMode !== 'none'

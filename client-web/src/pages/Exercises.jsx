@@ -96,21 +96,21 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
 }
 
 /** Create a custom exercise, or edit one when `exercise` is passed. */
-function ExerciseModal({ open, exercise, onClose, onSaved }) {
+export function ExerciseModal({ open, exercise, onClose, onSaved }) {
   const [form, setForm]     = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   // Until the user picks a type themselves, suggest one from the name.
   const [typeChosen, setTypeChosen] = useState(false);
 
-  // `exercise` with isNew is just starting values for a new one.
+  // `exercise` with isNew is just starting values for a new one (e.g. a name typed in a search).
   const isEdit = !!exercise && !exercise.isNew;
 
   useEffect(() => {
     if (!open) return;
     setError('');
     setTypeChosen(isEdit);
-    setForm(exercise?.isNew ? { ...EMPTY_FORM } : exercise
+    setForm(exercise?.isNew ? { ...EMPTY_FORM, name: exercise.name || '' } : exercise
       ? {
           name: exercise.name,
           muscleGroups: exercise.muscleGroups || [],

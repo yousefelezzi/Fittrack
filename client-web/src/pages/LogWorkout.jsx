@@ -13,6 +13,7 @@ import {
   buildSessionReport, pickPreviousWorkout, loggingCalories, formatChange, changeTone, reportEntryText, amountSuffix, showsWeight,
 } from '../utils/sessionReport';
 import { formatRest } from '../utils/workoutCalories';
+import { ExerciseModal } from './Exercises';
 import {
   SIDES, isUnilateral, makeSet, setBasics, makeWarmup, warmupInsertIndex, withUnit, setNumber,
 } from '../utils/logSets';
@@ -405,7 +406,7 @@ function IsometricTimer({ exercise, set, onRecord, onFinish }) {
   );
 }
 
-function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet, onChangeExercises, onSetUnit, onClose, onFinish }) {
+function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet, onChangeExercises, onSetUnit, onClose, onFinish, onExerciseCreated }) {
   // Flatten to a single ordered list of {exIdx, setIdx} steps across all exercises.
   const steps = exercises.flatMap((ex, exIdx) => ex.sets.map((_, setIdx) => ({ exIdx, setIdx })));
 
@@ -420,6 +421,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const [orderOpen, setOrderOpen] = useState(false);
   const [swapId, setSwapId]     = useState('');
   const [swapping, setSwapping] = useState(false);
+  const [creatingSwap, setCreatingSwap] = useState(false); // making a custom exercise to swap to
 
   // Re-render twice a second. Times are worked out from timestamps rather than
   // counted ticks, so they stay right even if the tab was in the background.
@@ -489,8 +491,8 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
 
   // Machine taken? Replace the rest of this exercise with another one.
   // Sets already done stay logged under the original exercise.
-  const swapExercise = async () => {
-    const newEx = allExercises.find((e) => e._id === swapId);
+  const swapExercise = async (picked) => {
+    const newEx = picked || allExercises.find((e) => e._id === swapId);
     if (!newEx) return;
     setSwapping(true);
     const lastWeight = await lastWeightFor(newEx._id);
@@ -634,9 +636,12 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
                   onChange={setSwapId}
                   placeholder="…or search all exercises"
                 />
+                <button type="button" onClick={() => setCreatingSwap(true)} className="text-xs font-medium text-brand-600 hover:underline inline-flex items-center gap-1">
+                  <Plus size={13} /> Create a custom exercise instead
+                </button>
                 <div className="flex gap-2">
                   <button onClick={() => { setSwapOpen(false); setSwapId(''); }} className="btn-secondary flex-1 justify-center text-sm">Cancel</button>
-                  <button onClick={swapExercise} disabled={!swapId || swapping} className="btn-primary flex-1 justify-center text-sm">
+                  <button onClick={() => swapExercise()} disabled={!swapId || swapping} className="btn-primary flex-1 justify-center text-sm">
                     {swapping ? 'Swapping…' : 'Swap'}
                   </button>
                 </div>
@@ -695,6 +700,9 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
           </div>
         )}
       </div>
+      {/* A custom exercise made mid-session takes over the rest of this exercise's sets. */}
+      <ExerciseModal open={creatingSwap} exercise={creatingSwap ? { isNew: true, name: '' } : null} onClose={() => setCreatingSwap(false)}
+        onSaved={(saved) => { onExerciseCreated?.(saved); setCreatingSwap(false); swapExercise(saved); }} />
     </div>
   );
 }
@@ -720,6 +728,7 @@ export default function LogWorkout() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [allExercises, setAllExercises] = useState([]);
+  const [creating, setCreating] = useState(null); // starting values for a custom exercise made mid-workout
 
   const [plans, setPlans] = useState([]);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -1045,8 +1054,14 @@ export default function LogWorkout() {
             </button>
           </div>
           {replacing === exIdx && (
-            <SimilarExercises exerciseId={ex.exercise._id} compact
-              onPick={(picked) => replaceExercise(exIdx, picked)} onClose={() => setReplacing(null)} />
+            <>
+              <SimilarExercises exerciseId={ex.exercise._id} compact
+                onPick={(picked) => replaceExercise(exIdx, picked)} onClose={() => setReplacing(null)} />
+              <button type="button" onClick={() => setCreating({ isNew: true, name: '', replaceIdx: exIdx })}
+                className="text-xs font-medium text-brand-600 hover:underline inline-flex items-center gap-1 mt-1 mb-2">
+                <Plus size={13} /> Create a custom exercise instead
+              </button>
+            </>
           )}
 
           <table className="w-full text-sm">
@@ -1203,6 +1218,13 @@ export default function LogWorkout() {
               </div>
             </div>
             <ul className="overflow-y-auto max-h-72 divide-y divide-gray-50 dark:divide-gray-800">
+              {/* Not in the list? Make it here, without leaving the workout. */}
+              <li>
+                <button onClick={() => setCreating({ isNew: true, name: search.trim() })}
+                  className="w-full text-left px-4 py-3 hover:bg-brand-50 dark:hover:bg-brand-900/20 flex items-center gap-2 text-sm font-medium text-brand-600">
+                  <Plus size={16} /> {search.trim() ? <>Create “{search.trim()}” as a custom exercise</> : 'Create a custom exercise'}
+                </button>
+              </li>
               {filteredExercises.map(ex => (
                 <li key={ex._id}>
                   <button onClick={() => addExercise(ex)} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between">
@@ -1222,6 +1244,15 @@ export default function LogWorkout() {
         </div>
       )}
 
+      {/* A custom exercise made from the picker is added to the workout straight away. */}
+      <ExerciseModal open={!!creating} exercise={creating} onClose={() => setCreating(null)}
+        onSaved={(saved) => {
+          setAllExercises((prev) => [saved, ...prev]);
+          // Made from Replace: it takes that exercise's place; from the picker: it's added.
+          if (creating?.replaceIdx != null) { replaceExercise(creating.replaceIdx, saved); setReplacing(null); }
+          else { addExercise(saved); setPickerOpen(false); setSearch(''); }
+        }} />
+
       <div className="card">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
         <textarea className="input resize-none" rows={3} placeholder="How did it feel?" value={notes} onChange={e => setNotes(e.target.value)} />
@@ -1240,6 +1271,7 @@ export default function LogWorkout() {
           onUpdateSet={updateSet}
           onChangeExercises={setExercises}
           onSetUnit={setUnit}
+          onExerciseCreated={(saved) => setAllExercises((prev) => [saved, ...prev])}
           onClose={() => setSessionOpen(false)}
           onFinish={(elapsedSeconds) => {
             setDuration(Math.max(1, Math.round(elapsedSeconds / 60)));

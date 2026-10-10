@@ -65,7 +65,7 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
 }
 
 /** Create a custom exercise, or edit one when `exercise` has an _id. */
-function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
+export function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
   const isEdit = !!exercise?._id;
   const [form, setForm] = useState(EMPTY_FORM);
   const [typeChosen, setTypeChosen] = useState(false);
@@ -85,7 +85,7 @@ function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       laterality: exercise.laterality || 'bilateral',
       type: typeOf(exercise),
       instructions: exercise.instructions?.length ? exercise.instructions : [''],
-    } : { ...EMPTY_FORM });
+    } : { ...EMPTY_FORM, name: exercise?.name || '' }); // a new one can start with a name (e.g. typed in a search)
   }, [visible, exercise]);
 
   // Until the user picks a type themselves, suggest one from the name.

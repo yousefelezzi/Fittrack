@@ -4,16 +4,17 @@ import { Sheet, Chip } from './ui';
 import { MUSCLE_FILTERS, filterByMuscle } from '../../../client-web/src/utils/exerciseFilters';
 import ExerciseImage from './ExerciseImage';
 import { colors, makeStyles } from './tokens';
-import { Check } from 'lucide-react-native';
+import { Check, Plus } from 'lucide-react-native';
 
 /**
  * Searchable exercise list in a bottom sheet. `selectedIds` get a check mark;
  * `onPick` gets the chosen exercise. `header` renders above the list (e.g.
  * similar exercises when swapping). `muscleFilter` adds a row of muscle chips
  * that narrow the list to exercises training that muscle. `disabledIds` are
- * shown greyed out as already added and can't be picked.
+ * shown greyed out as already added and can't be picked. With `onCreate`, a
+ * row at the top makes a custom exercise (it gets the search text as its name).
  */
-export default function ExercisePicker({ visible, title = 'Add Exercise', exercises, selectedIds = [], disabledIds = [], onPick, onClose, header, muscleFilter = false }) {
+export default function ExercisePicker({ visible, title = 'Add Exercise', exercises, selectedIds = [], disabledIds = [], onPick, onClose, header, muscleFilter = false, onCreate }) {
   const [q, setQ] = useState('');
   const [muscle, setMuscle] = useState('');
   const shown = useMemo(() => {
@@ -39,6 +40,12 @@ export default function ExercisePicker({ visible, title = 'Add Exercise', exerci
           </View>
         </ScrollView>
       )}
+      {onCreate ? (
+        <TouchableOpacity style={styles.create} onPress={() => { const name = q.trim(); setQ(''); setMuscle(''); onCreate(name); }}>
+          <Plus size={16} color={colors.brand} />
+          <Text style={styles.createText} numberOfLines={1}>{q.trim() ? `Create “${q.trim()}” as a custom exercise` : 'Create a custom exercise'}</Text>
+        </TouchableOpacity>
+      ) : null}
       <FlatList
         data={shown}
         keyExtractor={(e) => e._id}
@@ -76,4 +83,6 @@ const styles = makeStyles(() => ({
   tag:    { fontSize: 11, color: colors.brand, fontWeight: '400' },
   meta:   { fontSize: 12, color: colors.textMuted, textTransform: 'capitalize', marginTop: 1 },
   empty:  { textAlign: 'center', color: colors.textMuted, paddingVertical: 24 },
+  create: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.subtle },
+  createText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.brand },
 }));

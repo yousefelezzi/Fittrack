@@ -10,7 +10,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import {
   MACRO_COLORS, r, r0, servingText, scale, MICRO_CONFIG, sumMicros, addMicros,
   canPickState, storedStateOf, stateOf, stateLabel, foodInState, nameInState, yieldHint,
-  portionIngredients, isEditableCustomFood, LABEL_FIELDS, EXTRA_FIELDS, customFoodInitial,
+  portionIngredients, isEditableCustomFood, LABEL_FIELDS, EXTRA_GROUPS, customFoodInitial,
   sumIngredients, ingredientPayload, useRecipeServing, GOAL_NAMES,
   buildVirtualRecipe, customFoodDraft, fmtCount,
 } from '../utils/foodLogic';
@@ -565,9 +565,19 @@ function CustomFoodForm({ food: editing, onSaved, onCancel }) {
         </div>
         <div className="grid grid-cols-2 gap-3">{LABEL_FIELDS.map(numberInput)}</div>
         <button type="button" onClick={() => setShowExtras(!showExtras)} className="text-xs text-brand-600 font-medium mt-2">
-          {showExtras ? 'Hide' : 'Add'} fiber, sugar & sodium
+          {showExtras ? 'Hide' : 'Add'} saturated fat, fiber, vitamins & minerals <span className="font-normal text-gray-400">· optional</span>
         </button>
-        {showExtras && <div className="grid grid-cols-3 gap-3 mt-2">{EXTRA_FIELDS.map(numberInput)}</div>}
+        {showExtras && (
+          <div className="space-y-3 mt-2">
+            {EXTRA_GROUPS.map(([title, fields]) => (
+              <div key={title}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1.5">{title}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{fields.map(numberInput)}</div>
+              </div>
+            ))}
+            <p className="text-[11px] text-gray-400 dark:text-gray-500">Fill in whatever the label lists; leave the rest empty.</p>
+          </div>
+        )}
       </div>
 
       <div>
