@@ -1612,9 +1612,9 @@ export default function Nutrition() {
         ) : (
           Object.entries(mealsByType).map(([type, meals]) => (
             <div key={type}>
-              <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
+              <div className="flex items-baseline gap-x-2 flex-wrap mb-2">
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">{type}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">{mealTotalsText(meals)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">· {mealTotalsText(meals)}</p>
               </div>
               <div className="space-y-1">
                 {meals.map((m) => (

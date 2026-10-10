@@ -506,7 +506,7 @@ export default function NutritionScreen({ navigation }) {
               <View key={type} style={{ marginTop: 10 }}>
                 <View style={styles.mealHead}>
                   <Text style={styles.capsLabel}>{type.toUpperCase()}</Text>
-                  <Text style={styles.mealTotals}>{mealTotalsText(list)}</Text>
+                  <Text style={styles.mealTotals}>· {mealTotalsText(list)}</Text>
                 </View>
                 {list.map((m) => (
                   <View key={m._id} style={styles.mealRow}>
@@ -553,6 +553,6 @@ const styles = makeStyles(() => ({
   notice:    { fontSize: 12, color: colors.brandDark, backgroundColor: colors.brandLight, borderRadius: 8, padding: 8, marginBottom: 10 },
   planMeal:  { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, marginTop: 10 },
   totalBox:  { flex: 1, alignItems: 'center', backgroundColor: colors.inset, borderRadius: 10, paddingVertical: 6 },
-  mealHead:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: 10 },
+  mealHead:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
   mealTotals: { fontSize: 12, color: colors.textSecondary, fontVariant: ['tabular-nums'] },
 }));
