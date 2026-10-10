@@ -8,7 +8,7 @@ import { format, subDays, parseISO, isToday } from 'date-fns';
 import { Plus, Trash2, Search, X, ChevronDown, ChefHat, Pencil, Check, Sparkles, Salad } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import {
-  MACRO_COLORS, r, r0, servingText, scale, MICRO_CONFIG, sumMicros, addMicros,
+  MACRO_COLORS, mealTotalsText, r, r0, servingText, scale, MICRO_CONFIG, sumMicros, addMicros,
   canPickState, storedStateOf, stateOf, stateLabel, foodInState, nameInState, yieldHint,
   portionIngredients, isEditableCustomFood, LABEL_FIELDS, EXTRA_GROUPS, customFoodInitial,
   sumIngredients, ingredientPayload, useRecipeServing, GOAL_NAMES,
@@ -1612,7 +1612,10 @@ export default function Nutrition() {
         ) : (
           Object.entries(mealsByType).map(([type, meals]) => (
             <div key={type}>
-              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">{type}</p>
+              <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">{type}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">{mealTotalsText(meals)}</p>
+              </div>
               <div className="space-y-1">
                 {meals.map((m) => (
                   <div key={m._id}

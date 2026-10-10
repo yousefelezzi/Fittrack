@@ -339,3 +339,11 @@ export function customFoodDraft({ name, brand, servingLabel, servingGrams, basis
   };
   return { grams, num, toPer100, toServing, label, valid, hasCalories, rawWord, body };
 }
+
+/** Calories and macros of some meals added up (e.g. one meal type's), as "520 kcal · P 35g · C 60g · F 15g". */
+export function mealTotalsText(meals = []) {
+  const t = meals.reduce((a, m) => ({
+    calories: a.calories + (m.calories || 0), protein: a.protein + (m.protein || 0), carbs: a.carbs + (m.carbs || 0), fat: a.fat + (m.fat || 0),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return `${r0(t.calories).toLocaleString()} kcal · P ${r0(t.protein)}g · C ${r0(t.carbs)}g · F ${r0(t.fat)}g`;
+}

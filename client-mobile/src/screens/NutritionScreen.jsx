@@ -9,7 +9,7 @@ import {
   FoodSearch, PortionSelector, ManualEntry, CustomFoodForm, RecipeBuilder, RecipeEditor, RecipeMealEditor, QuickAddEditor, Btn,
 } from '../components/nutrition/FoodForms';
 import { MEAL_TYPES, DIETS, PROFILE_FIELD_NAMES } from '../../../client-web/src/constants/nutrition';
-import { MACRO_COLORS, MICRO_CONFIG, sumMicros, addMicros, r, r0, GOAL_NAMES } from '../../../client-web/src/utils/foodLogic';
+import { MACRO_COLORS, MICRO_CONFIG, sumMicros, addMicros, r, r0, GOAL_NAMES, mealTotalsText } from '../../../client-web/src/utils/foodLogic';
 import { formatServing } from '../../../client-web/src/utils/servings';
 import { ChefHat, Plus, Sparkles, RefreshCw, Salad, X } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
@@ -504,7 +504,10 @@ export default function NutritionScreen({ navigation }) {
             if (!list.length) return null;
             return (
               <View key={type} style={{ marginTop: 10 }}>
-                <Text style={styles.capsLabel}>{type.toUpperCase()}</Text>
+                <View style={styles.mealHead}>
+                  <Text style={styles.capsLabel}>{type.toUpperCase()}</Text>
+                  <Text style={styles.mealTotals}>{mealTotalsText(list)}</Text>
+                </View>
                 {list.map((m) => (
                   <View key={m._id} style={styles.mealRow}>
                     <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingMeal(m)}>
@@ -550,4 +553,6 @@ const styles = makeStyles(() => ({
   notice:    { fontSize: 12, color: colors.brandDark, backgroundColor: colors.brandLight, borderRadius: 8, padding: 8, marginBottom: 10 },
   planMeal:  { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, marginTop: 10 },
   totalBox:  { flex: 1, alignItems: 'center', backgroundColor: colors.inset, borderRadius: 10, paddingVertical: 6 },
+  mealHead:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: 10 },
+  mealTotals: { fontSize: 12, color: colors.textSecondary, fontVariant: ['tabular-nums'] },
 }));
