@@ -239,4 +239,4 @@ For issues, questions, or suggestions, please open an issue on the repository.
 
 ---
 
-**Happy tracking! 💪**
+**Happy tracking!**
