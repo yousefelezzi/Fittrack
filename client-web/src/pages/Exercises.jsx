@@ -105,6 +105,9 @@ export function ExerciseModal({ open, exercise, onClose, onSaved }) {
 
   // `exercise` with isNew is just starting values for a new one (e.g. a name typed in a search).
   const isEdit = !!exercise && !exercise.isNew;
+  // The form is filled when it opens (or for a different exercise), not on every
+  // redraw of the page behind it, so what's typed isn't wiped.
+  const formFor = open ? (exercise?._id || `new:${exercise?.name || ''}`) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -122,7 +125,7 @@ export function ExerciseModal({ open, exercise, onClose, onSaved }) {
           instructions: exercise.instructions?.length ? exercise.instructions : [''],
         }
       : EMPTY_FORM);
-  }, [open, exercise, isEdit]);
+  }, [formFor]); // only when it opens, or for a different exercise
 
   const setName = (name) => setForm(f => ({
     ...f, name,

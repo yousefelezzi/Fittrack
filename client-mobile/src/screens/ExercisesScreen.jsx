@@ -67,6 +67,9 @@ function ExerciseCard({ ex, onEdit, onDelete }) {
 /** Create a custom exercise, or edit one when `exercise` has an _id. */
 export function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
   const isEdit = !!exercise?._id;
+  // The form is filled when it opens (or for a different exercise), not on every
+  // redraw of the screen behind it, so what's typed isn't wiped.
+  const formFor = visible ? (exercise?._id || `new:${exercise?.name || ''}`) : null;
   const [form, setForm] = useState(EMPTY_FORM);
   const [typeChosen, setTypeChosen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -86,7 +89,7 @@ export function ExerciseEditor({ visible, exercise, onClose, onSaved }) {
       type: typeOf(exercise),
       instructions: exercise.instructions?.length ? exercise.instructions : [''],
     } : { ...EMPTY_FORM, name: exercise?.name || '' }); // a new one can start with a name (e.g. typed in a search)
-  }, [visible, exercise]);
+  }, [formFor]); // only when it opens, or for a different exercise
 
   // Until the user picks a type themselves, suggest one from the name.
   const setName = (name) => setForm((f) => ({ ...f, name, ...(!typeChosen && { laterality: UNILATERAL_NAME_PATTERN.test(name) ? 'unilateral' : 'bilateral' }) }));

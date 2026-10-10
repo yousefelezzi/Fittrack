@@ -421,7 +421,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
   const [orderOpen, setOrderOpen] = useState(false);
   const [swapId, setSwapId]     = useState('');
   const [swapping, setSwapping] = useState(false);
-  const [creatingSwap, setCreatingSwap] = useState(false); // making a custom exercise to swap to
+  const [creatingSwap, setCreatingSwap] = useState(null); // starting values for a custom exercise to swap to
 
   // Re-render twice a second. Times are worked out from timestamps rather than
   // counted ticks, so they stay right even if the tab was in the background.
@@ -636,7 +636,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
                   onChange={setSwapId}
                   placeholder="…or search all exercises"
                 />
-                <button type="button" onClick={() => setCreatingSwap(true)} className="text-xs font-medium text-brand-600 hover:underline inline-flex items-center gap-1">
+                <button type="button" onClick={() => setCreatingSwap({ isNew: true, name: '' })} className="text-xs font-medium text-brand-600 hover:underline inline-flex items-center gap-1">
                   <Plus size={13} /> Create a custom exercise instead
                 </button>
                 <div className="flex gap-2">
@@ -701,8 +701,8 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
         )}
       </div>
       {/* A custom exercise made mid-session takes over the rest of this exercise's sets. */}
-      <ExerciseModal open={creatingSwap} exercise={creatingSwap ? { isNew: true, name: '' } : null} onClose={() => setCreatingSwap(false)}
-        onSaved={(saved) => { onExerciseCreated?.(saved); setCreatingSwap(false); swapExercise(saved); }} />
+      <ExerciseModal open={!!creatingSwap} exercise={creatingSwap} onClose={() => setCreatingSwap(null)}
+        onSaved={(saved) => { onExerciseCreated?.(saved); setCreatingSwap(null); swapExercise(saved); }} />
     </div>
   );
 }
