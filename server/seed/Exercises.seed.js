@@ -403,7 +403,7 @@ const exercises = [
   },
   {
     name: 'Close-Grip Bench Press',
-    muscleGroups: ['medial/lateral triceps', 'clavicular pecs'],
+    muscleGroups: ['medial/lateral triceps', 'clavicular pecs', 'anterior delt'],
     equipment: 'barbell',
     instructions: [
       'Lie on a bench and grip the bar with hands shoulder-width apart.',
@@ -413,7 +413,7 @@ const exercises = [
   },
   {
     name: 'Diamond Push-Up',
-    muscleGroups: ['medial/lateral triceps', 'clavicular pecs'],
+    muscleGroups: ['medial/lateral triceps', 'clavicular pecs', 'anterior delt'],
     equipment: 'bodyweight',
     instructions: [
       'Form a diamond shape with your index fingers and thumbs on the floor.',
