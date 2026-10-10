@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { View, ScrollView, Switch, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { userAPI, authAPI } from '../api';

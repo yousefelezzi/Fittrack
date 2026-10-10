@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Image, Modal, PanResponder, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Image, Modal, PanResponder, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import { Text } from './AppText';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { colors, makeStyles } from './tokens';
 
@@ -35,22 +36,50 @@ export default function AvatarCropper({ image, onCancel, onSave, saving }) {
     setOffset((o) => clamp(o, next));
   };
 
+  // Where the crop area's centre is on screen, for zooming around the fingers.
+  const viewRef = useRef(null);
+  const center = useRef({ x: 0, y: 0 });
+  const measure = () => viewRef.current?.measureInWindow((x, y, w, h) => { center.current = { x: x + w / 2, y: y + h / 2 }; });
+
+  // Each move is worked out from where the gesture (or its current finger
+  // count) started, so it doesn't drift; adding or lifting a finger starts afresh.
   const gesture = useRef({});
+  const begin = (touches) => {
+    const { zoom: z, offset: o } = state.current;
+    if (touches.length >= 2) {
+      const [a, b] = touches;
+      gesture.current = {
+        count: 2, zoom: z, offset: o,
+        d: Math.max(1, Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY)),
+        mid: { x: (a.pageX + b.pageX) / 2 - center.current.x, y: (a.pageY + b.pageY) / 2 - center.current.y },
+      };
+    } else if (touches.length === 1) {
+      gesture.current = { count: 1, offset: o, x: touches[0].pageX, y: touches[0].pageY };
+    }
+  };
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => { gesture.current = { from: state.current.offset, zoom: state.current.zoom, pinch: null }; },
-    onPanResponderMove: (e, g) => {
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: (e) => { measure(); begin(e.nativeEvent.touches); },
+    onPanResponderMove: (e) => {
       const touches = e.nativeEvent.touches;
-      if (touches.length >= 2) {
-        // Pinch: zoom by how far apart the fingers are compared with the start.
-        const d = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
-        if (!gesture.current.pinch) gesture.current.pinch = { d, zoom: state.current.zoom };
-        setZoomTo(gesture.current.pinch.zoom * (d / gesture.current.pinch.d));
+      const count = Math.min(touches.length, 2);
+      if (!count) return;
+      if (count !== gesture.current.count) { begin(touches); return; }
+      const g = gesture.current;
+      if (count === 2) {
+        // Pinch: zoom by how far apart the fingers are, keeping the spot between them under them.
+        const [a, b] = touches;
+        const d = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+        const z = Math.min(MAX_ZOOM, Math.max(1, g.zoom * (d / g.d)));
+        const mid = { x: (a.pageX + b.pageX) / 2 - center.current.x, y: (a.pageY + b.pageY) / 2 - center.current.y };
+        const k = z / g.zoom;
+        setZoom(z);
+        setOffset(clamp({ x: mid.x - (g.mid.x - g.offset.x) * k, y: mid.y - (g.mid.y - g.offset.y) * k }, z));
         return;
       }
-      if (gesture.current.pinch) return; // ignore the leftover finger after a pinch
-      setOffset(clamp({ x: gesture.current.from.x + g.dx, y: gesture.current.from.y + g.dy }, state.current.zoom));
+      setOffset(clamp({ x: g.offset.x + touches[0].pageX - g.x, y: g.offset.y + touches[0].pageY - g.y }, state.current.zoom));
     },
   }), [image?.uri]);
 
@@ -84,14 +113,14 @@ export default function AvatarCropper({ image, onCancel, onSave, saving }) {
       <View style={styles.overlay}>
         <View style={styles.box}>
           <Text style={styles.title}>Profile picture</Text>
-          <View style={styles.view} {...pan.panHandlers}>
+          <View ref={viewRef} onLayout={measure} style={styles.view} {...pan.panHandlers}>
             <Image source={{ uri: image.uri }} style={{ position: 'absolute', left, top, width: w, height: h }} />
             {/* Dim everything outside the circle: that's what the avatar shows. */}
             <View pointerEvents="none" style={styles.ring} />
           </View>
           <View style={styles.zoomRow}>
             <TouchableOpacity onPress={() => setZoomTo(zoom - 0.25)} style={styles.zoomBtn}><Text style={styles.zoomText}>−</Text></TouchableOpacity>
-            <Text style={styles.hint}>Drag to position · pinch or tap to zoom</Text>
+            <Text style={styles.hint}>Drag to move · pinch or tap − / + to zoom</Text>
             <TouchableOpacity onPress={() => setZoomTo(zoom + 0.25)} style={styles.zoomBtn}><Text style={styles.zoomText}>+</Text></TouchableOpacity>
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}

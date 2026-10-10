@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, RefreshControl, Image, TextInput, Alert, Modal, FlatList,
-  KeyboardAvoidingView, Platform, Dimensions,
-} from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Image, Alert, Modal, FlatList, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, postAPI, authAPI, uploadUrl } from '../api';
@@ -30,7 +28,7 @@ function UsernameStatus({ check }) {
   return <Text style={{ fontSize: 12, color, marginTop: -6, marginBottom: 10 }}>{check.status === 'idle' ? USERNAME_HINT : check.message}</Text>;
 }
 
-function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children }) {
+function EditModal({ visible, profile, onClose, onSave, onChangePhoto, pendingAvatar, children }) {
   const { user: me } = useAuth();
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -121,7 +119,8 @@ function EditModal({ visible, profile, onClose, onSave, onChangePhoto, children 
           {/* Tap the picture (or its camera badge) to change it. */}
           <TouchableOpacity onPress={onChangePhoto} style={styles.photoRow} activeOpacity={0.8} accessibilityLabel="Change profile picture">
             <View>
-              <Avatar user={profile} size={76} />
+              {/* A new picture shows here until Save changes uploads it (Cancel drops it). */}
+              <Avatar user={pendingAvatar ? { ...profile, avatar: pendingAvatar } : profile} size={76} />
               <View style={styles.cameraBadge}><Camera size={15} color="#fff" /></View>
             </View>
           </TouchableOpacity>
@@ -229,7 +228,7 @@ export default function ProfileScreen({ route, navigation }) {
   const [followModal, setFollowModal] = useState(null);
   const [followUsers, setFollowUsers] = useState([]);
   const [cropImage, setCropImage] = useState(null); // picked photo being cropped
-  const [uploading, setUploading] = useState(false);
+  const [pendingAvatar, setPendingAvatar] = useState(null); // cropped photo, uploaded on Save changes
   const [statsKey, setStatsKey] = useState(0);
   const [viewingAvatar, setViewingAvatar] = useState(false);
   const postActions = usePostActions(setPosts, me);
@@ -261,6 +260,7 @@ export default function ProfileScreen({ route, navigation }) {
   };
 
   const handleSaveProfile = async (data) => {
+    if (pendingAvatar) await uploadAvatar(pendingAvatar);
     const { data: updated } = await userAPI.updateMe(data);
     setProfile((p) => ({ ...p, ...updated }));
     updateUser(updated);
@@ -276,17 +276,18 @@ export default function ProfileScreen({ route, navigation }) {
     if (result.canceled) return;
     setCropImage(result.assets[0]);
   };
+  // Uploaded when the profile is saved (throws so the save stops if it fails).
   const uploadAvatar = async (uri) => {
     const form = new FormData();
     form.append('avatar', { uri, name: 'avatar.jpg', type: 'image/jpeg' });
-    setUploading(true);
     try {
       const { data } = await userAPI.uploadAvatar(form);
       setProfile((p) => ({ ...p, avatar: data.avatar }));
       updateUser({ avatar: data.avatar });
-      setCropImage(null);
-    } catch { Alert.alert('Error', 'Could not upload avatar'); }
-    finally { setUploading(false); }
+      setPendingAvatar(null);
+    } catch (err) {
+      throw Object.assign(err, { response: { data: { message: 'Could not upload your new profile picture' } } });
+    }
   };
 
   // Follow, unfollow, or (for a private account) request / cancel the request.
@@ -409,8 +410,10 @@ export default function ProfileScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      <EditModal visible={editVisible} profile={profile} onClose={() => setEditVisible(false)} onSave={handleSaveProfile} onChangePhoto={handleAvatarPress}>
-        {cropImage && <AvatarCropper image={cropImage} saving={uploading} onCancel={() => setCropImage(null)} onSave={uploadAvatar} />}
+      <EditModal visible={editVisible} profile={profile} pendingAvatar={pendingAvatar} onSave={handleSaveProfile} onChangePhoto={handleAvatarPress}
+        onClose={() => { setEditVisible(false); setPendingAvatar(null); }}>
+        {cropImage && <AvatarCropper image={cropImage} onCancel={() => setCropImage(null)}
+          onSave={(uri) => { setPendingAvatar(uri); setCropImage(null); }} />}
       </EditModal>
       <Modal visible={viewingAvatar} transparent animationType="fade" onRequestClose={() => setViewingAvatar(false)}>
         <TouchableOpacity activeOpacity={1} style={styles.avatarViewer} onPress={() => setViewingAvatar(false)}>

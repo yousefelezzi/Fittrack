@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { Text } from './AppText';
 import { colors, makeStyles } from './tokens';
 import { Hint } from './ui';
 import { RECOVERY_LABELS, unitLabel, regionLabel, wnsStatus, groupUnits } from '../../../client-web/src/utils/planAnalysis';
@@ -22,8 +23,8 @@ function StimRow({ label, wns, color, sets, sessions, recovery, bold, rir, inden
         {rir ? <Text style={[styles.tMuted, { color: colors.warning }]}> · {rir} RIR</Text> : null}
       </View>
       <Text style={[styles.tNum, { color }]}>{wns.toFixed(1)}</Text>
-      <Text style={[styles.tNum, { width: 70, color: colors.textSecondary }]}>{+sets.toFixed(1)} · {sessions}×</Text>
-      <Text style={[styles.tNum, { width: 64, color: colors[RECOVERY_COLOR[recovery?.level]] || colors.textMuted }]}>{RECOVERY_LABELS[recovery?.level] || '–'}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.tNum, { width: 70, color: colors.textSecondary }]}>{+sets.toFixed(1)} · {sessions}×</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.tNum, { width: 64, color: colors[RECOVERY_COLOR[recovery?.level]] || colors.textMuted }]}>{RECOVERY_LABELS[recovery?.level] || '–'}</Text>
     </TouchableOpacity>
   );
 }
@@ -41,8 +42,8 @@ export default function StimulusTable({ units }) {
   <View style={[styles.tRow, { borderTopWidth: 0 }]}>
     <Text style={[styles.tHead, { flex: 1 }]}>Muscle</Text>
     <Text style={[styles.tHead, styles.tNumW]}>WNS</Text>
-    <Text style={[styles.tHead, { width: 70, textAlign: 'right' }]}>Sets/wk</Text>
-    <Text style={[styles.tHead, { width: 64, textAlign: 'right' }]}>Recovery</Text>
+    <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.tHead, { width: 70, textAlign: 'right' }]}>Sets/wk</Text>
+    <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.tHead, { width: 64, textAlign: 'right' }]}>Recovery</Text>
   </View>
   {groupUnits(units).map((g) => {
     const canOpen = g.regions.length > 0;

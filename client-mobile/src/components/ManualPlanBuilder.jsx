@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { exerciseAPI, planAPI } from '../api';
 import { colors, makeStyles, cardSurface } from './tokens';
 import { Chip, ChipRow, Stepper, Label, Hint, ErrorText, LinkText, Segmented } from './ui';
@@ -280,7 +281,7 @@ export default function ManualPlanBuilder({ onSaved }) {
 }
 
 const styles = makeStyles(() => ({
-  field:       { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  field:       { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
   small:       { fontSize: 12, color: colors.textSecondary },
   title:       { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   schedule:    { fontSize: 12, color: colors.textSecondary, backgroundColor: colors.subtle, borderRadius: 10, padding: 10, marginTop: 14, lineHeight: 17 },
@@ -294,7 +295,7 @@ const styles = makeStyles(() => ({
   tag:         { fontSize: 11, color: colors.brand },
   icon:        { fontSize: 16, color: colors.textMuted },
   reps:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  repBox:      { width: 40, height: 32, borderWidth: 1, borderColor: colors.border, borderRadius: 8, textAlign: 'center', fontSize: 13, color: colors.textPrimary },
+  repBox:      { width: 40, minHeight: 32, borderWidth: 1, borderColor: colors.border, borderRadius: 8, textAlign: 'center', fontSize: 13, color: colors.textPrimary },
   stimHead:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 6 },
   btn:         { minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.brand },
   btnText:     { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' },

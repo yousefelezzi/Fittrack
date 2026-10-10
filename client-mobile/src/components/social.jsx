@@ -3,9 +3,8 @@
  * the post composer, the people finder and direct messages.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, Image, FlatList, ScrollView, KeyboardAvoidingView, Platform, Alert,
-} from 'react-native';
+import { View, TouchableOpacity, Image, FlatList, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Text, TextInput } from './AppText';
 import * as ImagePicker from 'expo-image-picker';
 import { format, isToday, formatDistanceToNow, formatDistanceToNowStrict } from 'date-fns';
 import { messageAPI, workoutAPI, userAPI, postAPI, planAPI, exerciseAPI, foodAPI, uploadUrl } from '../api';
@@ -472,7 +471,7 @@ export function Composer({ me, initialWorkout, onPosted, onCancel }) {
   return (
     <View style={styles.card}>
       <View style={styles.row}><Avatar user={me} /><Text style={styles.bold}>{me?.name}</Text></View>
-      <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top', marginTop: 10, paddingTop: 8 }]} multiline maxLength={500} autoFocus
+      <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', marginTop: 10, paddingTop: 8 }]} multiline maxLength={500} autoFocus
         placeholder={workoutId ? 'How did it go?' : 'Share a workout, progress or motivation…'} placeholderTextColor={colors.textMuted}
         value={caption} onChangeText={setCaption} />
       <View style={[styles.row, { marginTop: 10, marginBottom: 6, gap: 6 }]}><Dumbbell size={14} color={colors.textMuted} /><Text style={styles.muted}>Attach a workout</Text></View>

@@ -4,7 +4,8 @@
  * The maths lives in client-web/src/utils/foodLogic.js, shared with the web app.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../AppText';
 import { foodAPI } from '../../api';
 import { colors, makeStyles } from '../tokens';
 import { Chip, ChipRow, Segmented, Label, Hint, ErrorText, LinkText } from '../ui';
@@ -591,7 +592,7 @@ const styles = makeStyles(() => ({
   btnPrimary:  { backgroundColor: colors.brand },
   btnSecondary:{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   btnText:     { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  field:       { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  field:       { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
   results:     { borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginTop: 6, maxHeight: 300, overflow: 'hidden' },
   resultRow:   { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.subtle },
   empty:       { textAlign: 'center', color: colors.textMuted, paddingVertical: 12, fontSize: 12 },

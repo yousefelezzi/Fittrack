@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView } from 'react-native';
+import { View, TouchableOpacity, FlatList, ScrollView } from 'react-native';
+import { Text, TextInput } from './AppText';
 import { Sheet, Chip } from './ui';
 import { MUSCLE_FILTERS, filterByMuscle } from '../../../client-web/src/utils/exerciseFilters';
 import ExerciseImage from './ExerciseImage';
@@ -76,7 +77,7 @@ export default function ExercisePicker({ visible, title = 'Add Exercise', exerci
 }
 
 const styles = makeStyles(() => ({
-  search: { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, marginBottom: 8 },
+  search: { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, marginBottom: 8 },
   row:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.subtle, gap: 10 },
   thumb:  { width: 46, height: 36 },
   name:   { fontSize: 14, fontWeight: '500', color: colors.textPrimary },

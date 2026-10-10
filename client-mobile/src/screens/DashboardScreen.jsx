@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, ScrollView, RefreshControl, TouchableOpacity,
-} from 'react-native';
+import { View, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { Text } from '../components/AppText';
 import { useAuth } from '../context/AuthContext';
 import { workoutAPI, nutritionAPI, stepsAPI } from '../api';
 import { Card, Spinner, MacroBar, colors, makeStyles, cardSurface } from '../components';
@@ -16,8 +15,8 @@ function StatCard({ icon: Icon, label, value, color }) {
     <View style={styles.statCard}>
       <View style={[styles.statIcon, { backgroundColor: color }]}><Icon size={18} color="#fff" /></View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
-        <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
+        <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>{label}</Text>
+        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       </View>
     </View>
   );
@@ -172,7 +171,7 @@ export default function DashboardScreen({ navigation }) {
 
 const styles = makeStyles(() => ({
   root:        { flex: 1, backgroundColor: colors.bg },
-  content:     { padding: 16 },
+  content:     { padding: 16, paddingBottom: 40 },
   centered:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:      { marginBottom: 20 },
   greeting:    { fontSize: 22, fontWeight: '700', color: colors.textPrimary },

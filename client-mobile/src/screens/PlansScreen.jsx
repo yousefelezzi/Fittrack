@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { planAPI, exerciseAPI } from '../api';
 import {
   Card, Button, Spinner, Badge, colors, makeStyles, Sheet, Chip, ChipRow, Label, Hint, ErrorText, LinkText, EmptyState, ExercisePicker, SimilarExercises, confirm,
@@ -335,8 +336,8 @@ const styles = makeStyles(() => ({
   cap:       { fontSize: 10, color: colors.textMuted, textAlign: 'center' },
   capRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: 9, marginBottom: 2 },
   unitToggle:{ flexDirection: 'row', width: UNIT_W, borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' },
-  unitBtn:   { flex: 1, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  unitBtn:   { flex: 1, minHeight: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   unitBtnActive: { backgroundColor: colors.brand },
   unitText:  { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-  numBox:    { height: 34, borderWidth: 1, borderColor: colors.border, borderRadius: 8, textAlign: 'center', fontSize: 14, color: colors.textPrimary },
+  numBox:    { minHeight: 34, borderWidth: 1, borderColor: colors.border, borderRadius: 8, textAlign: 'center', fontSize: 14, color: colors.textPrimary },
 }));

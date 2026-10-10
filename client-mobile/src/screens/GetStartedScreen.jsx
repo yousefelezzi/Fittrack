@@ -5,7 +5,8 @@
  * the tabs until it's finished or skipped.
  */
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { Check, ChevronLeft } from 'lucide-react-native';
@@ -210,7 +211,7 @@ const styles = makeStyles(() => ({
   stepLabel:  { fontSize: 11, color: colors.textMuted, marginTop: 4 },
   row:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
   between:    { justifyContent: 'space-between', marginBottom: 6 },
-  input:      { height: 46, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
+  input:      { minHeight: 46, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
   choice:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 2, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 8 },
   choiceOn:   { borderColor: colors.brand, backgroundColor: colors.brandLight },
   choiceTitle:{ fontSize: 15, fontWeight: '600', color: colors.textPrimary },

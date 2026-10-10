@@ -124,7 +124,6 @@ export default function Profile() {
   const [statsKey, setStatsKey] = useState(0); // bump to refetch stats after profile edits
   const avatarRef = useRef();
   const [cropSrc, setCropSrc] = useState(null); // picked photo being cropped
-  const [uploading, setUploading] = useState(false);
   const [viewingAvatar, setViewingAvatar] = useState(false);
 
   // Load profile + posts
@@ -167,7 +166,10 @@ export default function Profile() {
     setEditing(true);
   };
 
-  const cancelEdit = () => setEditing(false);
+  // A new picture waits until Save (Cancel drops it).
+  const [pendingAvatar, setPendingAvatar] = useState(null); // { blob, url }
+  const dropPendingAvatar = () => { if (pendingAvatar) URL.revokeObjectURL(pendingAvatar.url); setPendingAvatar(null); };
+  const cancelEdit = () => { dropPendingAvatar(); setEditing(false); };
 
   const saveEdit = async () => {
     if (!form.name?.trim()) { setFormErr('Name is required'); return; }
@@ -199,6 +201,14 @@ export default function Profile() {
         activityLevel: form.activityLevel === '' ? null : Number(form.activityLevel),
         stepGoal: Math.round(stepGoal),
       };
+      if (pendingAvatar) {
+        const pic = new FormData();
+        pic.append('avatar', pendingAvatar.blob, 'avatar.jpg');
+        const { data: up } = await userAPI.uploadAvatar(pic).catch(() => { throw { response: { data: { message: 'Could not upload your new profile picture' } } }; });
+        setProfile((p) => ({ ...p, avatar: up.avatar }));
+        updateUser({ avatar: up.avatar });
+        dropPendingAvatar();
+      }
       const { data } = await userAPI.updateMe(payload);
       setProfile((p) => ({ ...p, ...data }));
       updateUser(data);
@@ -218,20 +228,11 @@ export default function Profile() {
     if (file) setCropSrc(URL.createObjectURL(file));
   };
   const closeCropper = () => { if (cropSrc) URL.revokeObjectURL(cropSrc); setCropSrc(null); };
-  const uploadAvatar = async (blob) => {
-    const form = new FormData();
-    form.append('avatar', blob, 'avatar.jpg');
-    setUploading(true);
-    try {
-      const { data } = await userAPI.uploadAvatar(form);
-      setProfile((p) => ({ ...p, avatar: data.avatar }));
-      updateUser({ avatar: data.avatar });
-      closeCropper();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUploading(false);
-    }
+  // The cropped picture is kept until the profile is saved.
+  const keepCropped = (blob) => {
+    dropPendingAvatar();
+    setPendingAvatar({ blob, url: URL.createObjectURL(blob) });
+    closeCropper();
   };
 
   // Follow, unfollow, or (for a private account) request / cancel the request.
@@ -290,7 +291,7 @@ export default function Profile() {
           <div className="relative shrink-0">
             {/* Tap to see it full size; it's changed from Edit. */}
             <button type="button" onClick={() => profile.avatar && setViewingAvatar(true)} className={profile.avatar ? 'cursor-zoom-in' : 'cursor-default'} title={profile.avatar ? 'View photo' : undefined}>
-              <Avatar user={profile} size="lg" />
+              <Avatar user={editing && pendingAvatar ? { ...profile, avatar: pendingAvatar.url } : profile} size="lg" />
             </button>
             {isOwn && editing && (
               <>
@@ -503,7 +504,7 @@ export default function Profile() {
           <button className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Close"><X size={20} /></button>
         </div>
       )}
-      {cropSrc && <AvatarCropper src={cropSrc} saving={uploading} onCancel={closeCropper} onSave={uploadAvatar} />}
+      {cropSrc && <AvatarCropper src={cropSrc} onCancel={closeCropper} onSave={keepCropped} />}
     </div>
   );
 }

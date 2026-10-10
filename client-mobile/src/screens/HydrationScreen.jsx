@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { format, subDays } from 'date-fns';
 import { GlassWater, Trash2, Pencil } from 'lucide-react-native';
 import { nutritionAPI, userAPI } from '../api';
@@ -161,7 +162,7 @@ const styles = makeStyles(() => ({
   fill:      { height: '100%', borderRadius: 999 },
   quick:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   quickText: { fontSize: 13, fontWeight: '600', color: colors.brand },
-  input:     { minWidth: 80, height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  input:     { minWidth: 80, minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
   typeOption:   { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 6 },
   typeOptionOn: { borderColor: colors.brand, backgroundColor: colors.brandLight },
   drink:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.subtle },

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { exerciseAPI } from '../api';
 import {
   Card, Button, Spinner, colors, makeStyles, Sheet, Chip, ChipRow, Segmented, Label, Hint, ErrorText, LinkText, ExerciseImage, confirm,
@@ -303,7 +304,7 @@ const styles = makeStyles(() => ({
   steps:      { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, gap: 4 },
   step:       { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   customRow:  { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  field:      { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  field:      { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
   empty:      { textAlign: 'center', color: colors.textMuted, paddingVertical: 40 },
   small:      { fontSize: 12, color: colors.textSecondary },
   weightBox:  { backgroundColor: colors.inset, borderRadius: 12, padding: 10, marginTop: 10, gap: 6 },

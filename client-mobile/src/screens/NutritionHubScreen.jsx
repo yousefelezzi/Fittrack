@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Text } from '../components/AppText';
 import { format } from 'date-fns';
 import { Utensils, GlassWater, Pill, ChartLine, History, Scale } from 'lucide-react-native';
 import { syncReminders } from '../utils/notifications';

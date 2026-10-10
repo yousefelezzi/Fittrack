@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Linking } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
+import { Info as InfoIcon } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, colors, makeStyles, Segmented, Chip, Label, Hint, LinkText, isDark } from '../components';
 import { calcFFMI, ffmiCategory, ffmiScale, calcBMR, calcTDEE, ACTIVITY_LEVELS, calcOneRepMax, repMaxTable, ONE_RM_MAX_REPS } from '../../../client-web/src/utils/calculators';
@@ -9,26 +11,98 @@ import {
   validateRepsValue, validateRirValue, effectiveSetFactor,
 } from '../../../client-web/src/utils/wnsCalculations';
 
-function Field({ label, value, onChange, placeholder, error, onBlur, keyboardType = 'decimal-pad' }) {
+function Field({ label, value, onChange, placeholder, error, onBlur, keyboardType = 'decimal-pad', tip }) {
   return (
     <View style={{ flex: 1 }}>
-      <Label>{label}{error ? <Text style={styles.err}>  {error}</Text> : null}</Label>
+      {tip ? <View style={styles.tipLabelWrap}><TipLabel id={tip} error={error}>{label}</TipLabel></View> : <Label>{label}{error ? <Text style={styles.err}>  {error}</Text> : null}</Label>}
       <TextInput style={[styles.field, error && { borderColor: colors.danger }]} value={value === '' || value == null ? '' : String(value)}
         onChangeText={onChange} onBlur={onBlur} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboardType} />
     </View>
   );
 }
 
-/** Info text that opens on tap (the web shows these as tooltips). */
-function Info({ title, children }) {
-  const [open, setOpen] = useState(false);
+// ── Info tips (the web shows these as tooltips) ──────────────────────────────
+// One is open at a time; its text shows full width under the row it belongs to.
+const TipContext = React.createContext({ open: null, setOpen: () => {} });
+const TIPS = {
+  dataset: () => (
+    <>
+      <Text style={styles.tipText}>The reference dataset for the volume–stimulus relationship.</Text>
+      <Text style={styles.tipText}><ExtLink url="https://doi.org/10.1080/02640414.2016.1210197">Schoenfeld</ExtLink>: pronouncedly diminishing returns (6 sets = 2× the stimulus of 1 set).</Text>
+      <Text style={styles.tipText}><ExtLink url="https://doi.org/10.51224/SRXIV.460">Pelland</ExtLink>: subtly diminishing returns (6 sets = 4× the stimulus of 1 set).</Text>
+    </>
+  ),
+  maintenance: () => (
+    <>
+      <Text style={styles.tipText}>Number of sets per week (once a week) to maintain a muscle.</Text>
+      <Text style={styles.tipText}><ExtLink url="https://journals.lww.com/acsm-msse/fulltext/2011/07000/exercise_dosing_to_retain_resistance_training.7.aspx">This study finds maintenance is at 3 sets.</ExtLink></Text>
+      <Text style={styles.tipText}><ExtLink url="https://doi.org/10.3390/sports12070198">This study finds maintenance is at 4 sets.</ExtLink></Text>
+    </>
+  ),
+  stim: () => (
+    <>
+      <Text style={styles.tipText}>How long the stimulus period lasts before atrophy begins.</Text>
+      <Text style={styles.tipText}><ExtLink url="https://www.instagram.com/p/DKRS63yskPg/?utm_source=ig_web_copy_link&igsh=NWxxZHNjd29tcHZv">Research shows it likely lasts 36–48 hours.</ExtLink></Text>
+    </>
+  ),
+  unit: () => (
+    <>
+      <Text style={styles.tipText}>Specifies the format used for training frequency.</Text>
+      <Text style={styles.tipText}>× / week: traditional workout routines.</Text>
+      <Text style={styles.tipText}>Every x days / hours: evenly spaced workouts.</Text>
+    </>
+  ),
+  freq: () => (
+    <>
+      <Text style={styles.tipText}>How often a muscle is trained (3× per week, every 48 hours, etc.).</Text>
+      <Text style={styles.tipText}>Choose the matching frequency unit above.</Text>
+    </>
+  ),
+  sets: () => (
+    <>
+      <Text style={styles.tipText}>Number of effective sets per workout per muscle. If it varies by session, enter the average (2 one day, 3 another = 2.5).</Text>
+      <Text style={styles.tipText}><ExtLink url="https://www.patreon.com/posts/strength-102633917">See volume recovery data here.</ExtLink></Text>
+    </>
+  ),
+  reps: () => (
+    <>
+      <Text style={styles.tipText}>How many reps you do in each set.</Text>
+      <Text style={styles.tipText}>Very low-rep sets (under 5) count for a little less than a full set. Leave blank to count every set in full.</Text>
+    </>
+  ),
+  rir: () => (
+    <>
+      <Text style={styles.tipText}>Reps in reserve: how many more reps you could have done before reaching failure.</Text>
+      <Text style={styles.tipText}>The closer to failure, the more a set counts; sets stopped far from failure barely count. Leave blank if you train to failure.</Text>
+    </>
+  ),
+};
+const tipKind = (id) => id.replace(/[AB]$/, ''); // 'setsA' → 'sets'
+
+/** A field label with an info button that opens its tip. */
+function TipLabel({ id, error, children }) {
+  const { open, setOpen } = React.useContext(TipContext);
+  const on = open === id;
   return (
-    <View>
-      <TouchableOpacity onPress={() => setOpen(!open)} hitSlop={6}><Text style={styles.infoBtn}>ⓘ {title}</Text></TouchableOpacity>
-      {open ? <View style={styles.infoBox}>{children}</View> : null}
+    <TouchableOpacity onPress={() => setOpen(on ? null : id)} hitSlop={6} style={styles.tipLabel} accessibilityLabel={`About ${children}`}>
+      <InfoIcon size={14} color={on ? colors.brand : colors.textMuted} />
+      <Label style={{ marginTop: 0, marginBottom: 0 }}>{children}{error ? <Text style={styles.err}>  {error}</Text> : null}</Label>
+    </TouchableOpacity>
+  );
+}
+
+/** The open tip, if it's one of `ids`, shown full width. */
+function TipBox({ ids }) {
+  const { open, setOpen } = React.useContext(TipContext);
+  if (!open || !ids.includes(open)) return null;
+  return (
+    <View style={styles.tipBox}>
+      {TIPS[tipKind(open)]()}
+      <TouchableOpacity onPress={() => setOpen(null)} hitSlop={6} style={{ alignSelf: 'flex-end' }}><Text style={styles.tipClose}>Close</Text></TouchableOpacity>
     </View>
   );
 }
+
 const ExtLink = ({ url, children }) => <Text style={styles.extLink} onPress={() => Linking.openURL(url)}>{children}</Text>;
 
 // ── FFMI ──────────────────────────────────────────────────────────────────────
@@ -173,21 +247,19 @@ function Program({ id, program, errors, onChange, onBlur, onCalculate, result, b
   return (
     <View style={boxed && styles.programBox}>
       {boxed ? <Text style={styles.bold}>Program {id}</Text> : null}
-      <Label>Frequency unit</Label>
+      <View style={styles.tipLabelWrap}><TipLabel id={`unit${id}`}>Frequency unit</TipLabel></View>
+      <TipBox ids={[`unit${id}`]} />
       <Segmented value={program.unit} onChange={(v) => onChange(id, 'unit', v)} options={[['T', '× / week'], ['D', 'every x days'], ['H', 'every x hours']]} />
       <View style={styles.row}>
-        <Field label="Frequency" value={program.freq} onChange={(v) => onChange(id, 'freq', v)} placeholder="e.g. 2" error={errors[`freq${id}`]} onBlur={() => onBlur(id, 'freq')} />
-        <Field label="Sets per workout" value={program.sets} onChange={(v) => onChange(id, 'sets', v)} placeholder="e.g. 3" error={errors[`sets${id}`]} onBlur={() => onBlur(id, 'sets')} />
+        <Field tip={`freq${id}`} label="Frequency" value={program.freq} onChange={(v) => onChange(id, 'freq', v)} placeholder="e.g. 2" error={errors[`freq${id}`]} onBlur={() => onBlur(id, 'freq')} />
+        <Field tip={`sets${id}`} label="Sets per workout" value={program.sets} onChange={(v) => onChange(id, 'sets', v)} placeholder="e.g. 3" error={errors[`sets${id}`]} onBlur={() => onBlur(id, 'sets')} />
       </View>
+      <TipBox ids={[`freq${id}`, `sets${id}`]} />
       <View style={styles.row}>
-        <Field label="Reps" value={program.reps} onChange={(v) => onChange(id, 'reps', v)} placeholder="Optional, e.g. 10" error={errors[`reps${id}`]} keyboardType="number-pad" />
-        <Field label="RIR" value={program.rir} onChange={(v) => onChange(id, 'rir', v)} placeholder="Optional, e.g. 1" error={errors[`rir${id}`]} />
+        <Field tip={`reps${id}`} label="Reps" value={program.reps} onChange={(v) => onChange(id, 'reps', v)} placeholder="Optional, e.g. 10" error={errors[`reps${id}`]} keyboardType="number-pad" />
+        <Field tip={`rir${id}`} label="RIR" value={program.rir} onChange={(v) => onChange(id, 'rir', v)} placeholder="Optional, e.g. 1" error={errors[`rir${id}`]} />
       </View>
-      <Info title="About reps and RIR">
-        <Text style={styles.hintText}><Text style={styles.bold}>Reps:</Text> how many reps you do in each set. Very low-rep sets (under 5) count for a little less than a full set.</Text>
-        <Text style={styles.hintText}><Text style={styles.bold}>RIR</Text> (reps in reserve): how many more reps you could have done before reaching failure. The closer to failure, the more a set counts; sets stopped far from failure barely count.</Text>
-        <Text style={styles.hintText}>Leave both blank to count every set in full.</Text>
-      </Info>
+      <TipBox ids={[`reps${id}`, `rir${id}`]} />
       <Button title="Calculate" onPress={() => onCalculate(id)} style={{ marginTop: 12 }} />
       {result && (
         <View style={{ marginTop: 10, gap: 6 }}>
@@ -242,33 +314,26 @@ function WNS({ onAbout }) {
     setCompare((c) => !c);
   };
   const shared = { errors, onChange, onBlur, onCalculate: calculate };
+  const [openTip, setOpenTip] = useState(null);
 
   return (
-    <>
+    <TipContext.Provider value={{ open: openTip, setOpen: setOpenTip }}>
       <Hint style={{ marginBottom: 8 }}>Estimate the weekly hypertrophy effect of a training program by balancing training stimulus against atrophy.</Hint>
       <Card>
         <View style={[styles.row, { alignItems: 'center', justifyContent: 'space-between' }]}>
           <Text style={styles.bold}>Training parameters</Text>
           <Chip small label={compare ? 'Close comparison' : 'Compare programs'} active={compare} onPress={toggleCompare} />
         </View>
-        <Label>Dataset</Label>
+        <View style={styles.tipLabelWrap}><TipLabel id="dataset">Dataset</TipLabel></View>
+        <TipBox ids={['dataset']} />
         <Segmented value={dataset} onChange={setDataset} options={[['S', 'Schoenfeld'], ['P', 'Pelland'], ['A', 'Average']]} />
-        <Info title="About the datasets">
-          <Text style={styles.hintText}>The reference dataset for the volume–stimulus relationship.</Text>
-          <Text style={styles.hintText}><ExtLink url="https://doi.org/10.1080/02640414.2016.1210197">Schoenfeld</ExtLink>: pronouncedly diminishing returns (6 sets = 2× the stimulus of 1 set).</Text>
-          <Text style={styles.hintText}><ExtLink url="https://doi.org/10.51224/SRXIV.460">Pelland</ExtLink>: subtly diminishing returns (6 sets = 4× the stimulus of 1 set).</Text>
-        </Info>
         <View style={styles.row}>
-          <Field label="Maintenance" value={maintenance} onChange={(v) => { setMaintenance(v); setErrors((e) => ({ ...e, maintenance: null })); }}
+          <Field tip="maintenance" label="Maintenance" value={maintenance} onChange={(v) => { setMaintenance(v); setErrors((e) => ({ ...e, maintenance: null })); }}
             placeholder="1–5 sets, 1×/wk" error={errors.maintenance} onBlur={() => setErrors((e) => ({ ...e, maintenance: validateMaintValue(maintenance) }))} />
-          <Field label="Stimulus (h)" value={stim} onChange={(v) => { setStim(v); setErrors((e) => ({ ...e, stim: null })); }}
+          <Field tip="stim" label="Stimulus (h)" value={stim} onChange={(v) => { setStim(v); setErrors((e) => ({ ...e, stim: null })); }}
             placeholder="12–72 hours" error={errors.stim} onBlur={() => setErrors((e) => ({ ...e, stim: validateStimValue(stim) }))} />
         </View>
-        <Info title="About these inputs">
-          <Text style={styles.hintText}>Maintenance: sets per week (once a week) to maintain a muscle. Studies find <ExtLink url="https://journals.lww.com/acsm-msse/fulltext/2011/07000/exercise_dosing_to_retain_resistance_training.7.aspx">3 sets</ExtLink> or <ExtLink url="https://doi.org/10.3390/sports12070198">4 sets</ExtLink>.</Text>
-          <Text style={styles.hintText}>Stimulus duration: how long growth lasts before atrophy begins; research suggests 36–48 hours.</Text>
-          <Text style={styles.hintText}>Sets per workout are per muscle; if they vary, enter the average (2 one day, 3 another = 2.5).</Text>
-        </Info>
+        <TipBox ids={['maintenance', 'stim']} />
 
         <View style={{ marginTop: 10, gap: 12 }}>
           <Program id="A" boxed={compare} program={programs.A} result={results.A} {...shared} />
@@ -278,12 +343,13 @@ function WNS({ onAbout }) {
       <Card>
         <Text style={styles.body}><Text style={styles.bold}>Weekly Net Stimulus</Text> weighs the hypertrophy stimulus from your training against the muscle lost to atrophy between sessions, so a program with more volume isn't automatically scored higher if it's poorly timed.</Text>
         <Text style={[styles.body, { marginTop: 8 }]}>A result of N/A means the program was found unrecoverable before a score could be calculated.</Text>
-        <View style={[styles.row, { marginTop: 10, gap: 16 }]}>
+        {/* Stacked, so both fit on a phone. */}
+        <View style={{ marginTop: 10, gap: 8 }}>
           <LinkText onPress={onAbout}>How this works →</LinkText>
-          <LinkText onPress={() => Linking.openURL('https://payhip.com/b/NeuDm')}>Full Training Program Guide</LinkText>
+          <LinkText onPress={() => Linking.openURL('https://payhip.com/b/NeuDm')}>Full Training Program Guide →</LinkText>
         </View>
       </Card>
-    </>
+    </TipContext.Provider>
   );
 }
 
@@ -327,9 +393,9 @@ function OneRepMax({ user }) {
           <Hint style={{ marginBottom: 6 }}>What you could lift for each number of reps to failure, rounded to the nearest {unit === 'lb' ? '5 lb' : '2.5 kg'}.</Hint>
           {repMaxTable(oneRm).map((row) => (
             <View key={row.reps} style={styles.repRow}>
-              <Text style={[styles.body, { width: 60 }]}>{row.reps} rep{row.reps !== 1 ? 's' : ''}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.body, { width: 60 }]}>{row.reps} rep{row.reps !== 1 ? 's' : ''}</Text>
               <Text style={[styles.bold, { flex: 1, textAlign: 'right' }]}>{roundToPlates(row.weight, unit)} {unit}</Text>
-              <Text style={[styles.hintText, { width: 50, textAlign: 'right' }]}>{row.percent}%</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.hintText, { width: 50, textAlign: 'right' }]}>{row.percent}%</Text>
             </View>
           ))}
         </Card>
@@ -357,7 +423,7 @@ export default function CalculatorsScreen({ navigation, route }) {
 const styles = makeStyles(() => ({
   row:        { flexDirection: 'row', gap: 10 },
   repRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.subtle },
-  field:      { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 15, color: colors.textPrimary },
+  field:      { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 15, color: colors.textPrimary },
   err:        { fontSize: 11, color: colors.danger, fontWeight: '400' },
   result:     { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
   stat:       { flex: 1, alignItems: 'center' },
@@ -379,7 +445,10 @@ const styles = makeStyles(() => ({
   boxVal:     { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   programBox: { backgroundColor: colors.inset, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border },
   resultPill: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '700', overflow: 'hidden' },
-  infoBtn:    { fontSize: 12, color: colors.brand, marginTop: 8 },
-  infoBox:    { backgroundColor: colors.inset, borderRadius: 10, padding: 10, marginTop: 6, gap: 4 },
   extLink:    { color: colors.brand, textDecorationLine: 'underline' },
+  tipLabel:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tipLabelWrap: { marginTop: 14, marginBottom: 6 },
+  tipBox:     { backgroundColor: colors.inset, borderRadius: 10, padding: 10, marginTop: 8, marginBottom: 10, gap: 6, borderWidth: 1, borderColor: colors.border },
+  tipText:    { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  tipClose:   { fontSize: 12, fontWeight: '600', color: colors.brand },
 }));

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, Alert, Vibration,
-} from 'react-native';
+import { View, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, Alert, Vibration } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { exerciseAPI, workoutAPI, planAPI, userAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -219,9 +218,9 @@ function SessionReport({ exercises, seconds, name, volumeUnit, onDone }) {
                   <Text style={styles.exName}>{e.name}{e.isFirst ? <Text style={styles.small}>  first time</Text> : null}</Text>
                   {e.setRows.flatMap((row) => row.entries.map((en, k) => (
                     <View key={`${row.number}-${k}`} style={styles.setReportRow}>
-                      <Text style={[styles.small, { width: 44 }]}>{k === 0 ? `Set ${row.number}` : ''}</Text>
+                      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.small, { width: 44 }]}>{k === 0 ? `Set ${row.number}` : ''}</Text>
                       {e.setRows.some((r) => r.entries.some((x) => x.side)) ? (
-                        <Text style={[styles.small, { width: 14, fontWeight: '700' }]}>{en.side ? (en.side === 'left' ? 'L' : 'R') : ''}</Text>
+                        <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.small, { width: 14, fontWeight: '700' }]}>{en.side ? (en.side === 'left' ? 'L' : 'R') : ''}</Text>
                       ) : null}
                       <Text style={[styles.small, { flex: 1, color: colors.textPrimary }]}>{reportEntryText(e, en)}</Text>
                       {en.change ? (
@@ -548,7 +547,7 @@ function SessionPlayer({ exercises, allExercises, name, volumeUnit, onUpdateSet,
           </TouchableOpacity>
           {orderOpen && exercises.map((ex, i) => (i < firstMovable ? null : (
             <View key={`${ex.exercise._id}-${i}`} style={[styles.orderRow, i === exIdx && phase === 'active' && { backgroundColor: colors.brandLight }]}>
-              <Text style={[styles.small, { width: 20 }]}>{i + 1}</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.small, { width: 20 }]}>{i + 1}</Text>
               <Text style={[styles.small, { flex: 1, color: colors.textPrimary }]} numberOfLines={1}>{ex.exercise.name}</Text>
               <Text style={styles.small}>{ex.sets.length} set{ex.sets.length !== 1 ? 's' : ''}</Text>
               <TouchableOpacity onPress={() => moveExercise(i, -1)} disabled={i === firstMovable} hitSlop={6} style={i === firstMovable && { opacity: 0.25 }}>
@@ -840,14 +839,14 @@ export default function LogWorkoutScreen({ navigation, route }) {
             )}
 
             <View style={styles.setHead}>
-              <Text style={[styles.headCell, { width: 34 }]}>Set</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.headCell, { width: 34 }]}>Set</Text>
               {/* Columns follow the exercise type; kg/lb sits right above the weights. */}
               {fieldsOf(ex.exercise).map((f) => (f.weight ? (
                 <View key={f.key} style={{ flex: 1, alignItems: 'center' }}><UnitToggle value={ex.unit || 'kg'} onChange={(u) => setUnit(exIdx, u)} /></View>
               ) : (
                 <Text key={f.key} style={f.effort ? [styles.headCell, { width: 46 }] : styles.headCellFlex}>{f.short || f.label}</Text>
               )))}
-              <Text style={[styles.headCell, { width: 56 }]}>Rest</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.headCell, { width: 56 }]}>Rest</Text>
               <View style={{ width: 22 }} />
             </View>
             {ex.sets.map((set, setIdx) => {
@@ -876,7 +875,7 @@ export default function LogWorkoutScreen({ navigation, route }) {
                   </View>
                   {mode === 'past'
                     ? <RestInput value={set.restTime} onChange={(secs) => updateSet(exIdx, setIdx, 'restTime', secs ?? '')} />
-                    : <Text style={[styles.small, { width: 56, textAlign: 'center' }]}>{set.restTime != null && set.restTime !== '' ? fmtClock(Number(set.restTime)) : '—'}</Text>}
+                    : <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.small, { width: 56, textAlign: 'center' }]}>{set.restTime != null && set.restTime !== '' ? fmtClock(Number(set.restTime)) : '—'}</Text>}
                   <TouchableOpacity onPress={() => removeSet(exIdx, setIdx)} style={{ width: 22, alignItems: 'center' }} hitSlop={6}>
                     <X size={16} color={colors.textMuted} />
                   </TouchableOpacity>
@@ -907,7 +906,7 @@ export default function LogWorkoutScreen({ navigation, route }) {
 
         <Card style={{ marginTop: 12 }}>
           <Label style={{ marginTop: 0 }}>Notes</Label>
-          <TextInput style={[styles.field, { height: 70, textAlignVertical: 'top' }]} placeholder="How did it feel?" placeholderTextColor={colors.textMuted}
+          <TextInput style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]} placeholder="How did it feel?" placeholderTextColor={colors.textMuted}
             value={notes} onChangeText={setNotes} multiline />
         </Card>
 
@@ -1004,8 +1003,8 @@ const styles = makeStyles(() => ({
   setNoCell:   { width: 34, flexDirection: 'row', alignItems: 'center' },
   setNo:       { width: 18, fontSize: 12, color: colors.textMuted },
   sideTag:     { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-  cell:        { height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 8, textAlign: 'center', fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
-  bigBox:      { height: 50, borderWidth: 1, borderColor: colors.border, borderRadius: 10, textAlign: 'center', fontSize: 20, fontWeight: '600', color: colors.textPrimary },
+  cell:        { minHeight: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 8, textAlign: 'center', fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  bigBox:      { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: 10, textAlign: 'center', fontSize: 20, fontWeight: '600', color: colors.textPrimary },
   twoBtns:     { flexDirection: 'row', gap: 10, marginTop: 12 },
   templateRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.inset, borderRadius: 10, padding: 12, marginTop: 6 },
   empty:       { textAlign: 'center', color: colors.textMuted, paddingVertical: 20 },

@@ -4,6 +4,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import { colors, isDark } from '../components';
@@ -59,6 +60,9 @@ const TABS = [
 ];
 
 function AppTabs() {
+  // Room for the home indicator on newer phones, so the bar doesn't sit over the page.
+  const insets = useSafeAreaInsets();
+  const bottom = Math.max(insets.bottom, 6);
   return (
     <AppTab.Navigator
       screenOptions={{
@@ -68,9 +72,11 @@ function AppTabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          paddingBottom: 6,
-          height: 62,
+          paddingBottom: bottom,
+          height: 56 + bottom,
         },
+        // Short labels under icons: kept at their size so the bar keeps its shape.
+        tabBarAllowFontScaling: false,
         tabBarLabelStyle: { fontSize: 11, marginTop: 2 },
       }}
     >

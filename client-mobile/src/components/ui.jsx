@@ -4,9 +4,8 @@
  * ./index.js.
  */
 import React from 'react';
-import {
-  View, Text, TouchableOpacity, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert,
-} from 'react-native';
+import { View, TouchableOpacity, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Text } from './AppText';
 import { colors, makeStyles } from './tokens';
 import { X, ChevronRight } from 'lucide-react-native';
 
@@ -76,7 +75,7 @@ export function Segmented({ options, value, onChange, style }) {
     <View style={[styles.segmented, style]}>
       {options.map(([v, label, hint]) => (
         <TouchableOpacity key={String(v)} onPress={() => onChange(v)} style={[styles.segment, value === v && styles.segmentActive]}>
-          <Text style={[styles.segmentText, value === v && { color: colors.textPrimary }]}>{label}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.segmentText, value === v && { color: colors.textPrimary }]}>{label}</Text>
           {hint ? <Text style={styles.segmentHint}>{hint}</Text> : null}
         </TouchableOpacity>
       ))}

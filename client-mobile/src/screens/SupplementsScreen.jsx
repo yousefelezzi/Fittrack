@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { format, subDays, parseISO } from 'date-fns';
 import { Pill, Trash2, Pencil, Plus, Minus, Sun, Copy, Layers, X, Check, CheckCheck } from 'lucide-react-native';
 import { supplementAPI, nutritionAPI } from '../api';
@@ -321,7 +322,7 @@ const styles = makeStyles(() => ({
   small:   { fontSize: 12, color: colors.textSecondary },
   bold:    { fontWeight: '700', color: colors.textPrimary },
   link:    { fontSize: 14, fontWeight: '600', color: colors.brand },
-  input:   { height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  input:   { minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
   item:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderTopWidth: 1, borderTopColor: colors.subtle },
   name:    { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   micros:  { fontSize: 11, color: '#0ea5e9', marginTop: 1 },

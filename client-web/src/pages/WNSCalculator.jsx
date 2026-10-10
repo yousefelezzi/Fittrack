@@ -345,7 +345,6 @@ function ProgramForm({
               <div className="mt-1 text-gray-400 dark:text-gray-500">If set number varies by session, enter the average (2 one day, 3 another = 2.5)</div>
               <div className="mt-2 space-y-1">
                 <a href="https://www.patreon.com/posts/strength-102633917" target="_blank" rel="noreferrer" className="block text-brand-600 dark:text-brand-400 underline hover:text-brand-700 dark:hover:text-brand-300">See volume recovery data here.</a>
-                <a href="https://effectivesets.netlify.app" target="_blank" rel="noreferrer" className="block text-brand-600 dark:text-brand-400 underline hover:text-brand-700 dark:hover:text-brand-300">Calculate effective sets here.</a>
               </div>
             </InfoTooltip>
             <label htmlFor={`sets${id}`} className="text-sm font-medium text-gray-700 dark:text-gray-300">Sets per workout</label>

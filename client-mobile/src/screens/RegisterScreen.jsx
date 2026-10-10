@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View, Text, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView, } from 'react-native';
+import { View, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Text } from '../components/AppText';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage, authAPI } from '../api';
 import { Button, Input, colors, makeStyles, cardSurface } from '../components';

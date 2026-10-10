@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { planAPI, exerciseAPI } from '../api';
+import { planAPI, exerciseAPI, reminderAPI } from '../api';
 import ExerciseCombobox from '../components/ExerciseCombobox';
 import { formatPlanWeight } from '../utils/planAnalysis';
 import PlanGenerator from '../components/PlanGenerator';
@@ -7,11 +7,11 @@ import SimilarExercises from '../components/SimilarExercises';
 import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Check, Pencil, Sparkles, Repeat, ClipboardList, Bell } from 'lucide-react';
 import ReminderControl, { saveReminder } from '../components/ReminderControl';
 import { useAuth } from '../context/AuthContext';
-import { remindersOf, formatTime } from '../utils/reminders';
+import { remindersOf, formatTime, todayParams } from '../utils/reminders';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function PlanCard({ plan, onActivate, onDelete, onStart, onEdit }) {
+function PlanCard({ plan, onActivate, onDelete, onStart, onEdit, trainedToday }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -76,9 +76,12 @@ function PlanCard({ plan, onActivate, onDelete, onStart, onEdit }) {
                 <Check size={13} /> Set Active
               </button>
             )}
-            <button onClick={() => onStart(plan._id)} className="btn-primary text-xs py-1.5 flex-1 justify-center">
-              <Zap size={13} /> Start Today
-            </button>
+            {/* Not needed once today's workout is logged. */}
+            {!trainedToday && (
+              <button onClick={() => onStart(plan._id)} className="btn-primary text-xs py-1.5 flex-1 justify-center">
+                <Zap size={13} /> Start Today
+              </button>
+            )}
             <button onClick={() => onEdit(plan)} className="btn-secondary text-xs py-1.5 px-3">
               <Pencil size={13} />
             </button>
@@ -109,6 +112,10 @@ export default function Plans() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', description: '', days: [] });
+
+  // Whether a workout is already logged today (then "Start Today" isn't needed).
+  const [trainedToday, setTrainedToday] = useState(false);
+  useEffect(() => { reminderAPI.today(todayParams()).then(({ data }) => setTrainedToday(!!data.workedOut)).catch(() => {}); }, []);
 
   useEffect(() => {
     Promise.all([planAPI.getAll(), exerciseAPI.getAll()])
@@ -249,7 +256,7 @@ export default function Plans() {
       )}
 
       {plans.map((plan) => (
-        <PlanCard key={plan._id} plan={plan} onActivate={handleActivate} onDelete={handleDelete} onStart={handleStart} onEdit={openEdit} />
+        <PlanCard key={plan._id} plan={plan} onActivate={handleActivate} onDelete={handleDelete} onStart={handleStart} onEdit={openEdit} trainedToday={trainedToday} />
       ))}
 
       {creating && (

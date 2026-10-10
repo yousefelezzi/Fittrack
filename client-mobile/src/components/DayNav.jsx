@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, PanResponder } from 'react-native';
+import { View, TouchableOpacity, PanResponder } from 'react-native';
+import { Text } from './AppText';
 import { format, addDays, addMonths, parseISO, isToday, isYesterday, isTomorrow, startOfMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react-native';
 import { colors, makeStyles, cardSurface } from './tokens';

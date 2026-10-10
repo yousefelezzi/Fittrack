@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View, Text, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView, TextInput, } from 'react-native';
+import { View, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage, authAPI } from '../api';
 import { Button, Input, colors, makeStyles, cardSurface } from '../components';
@@ -168,7 +167,7 @@ const styles = makeStyles(() => ({
   linkBold:  { color: colors.brand, fontWeight: '600' },
   codeIntro: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 14 },
   codeText:  { flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-  codeInput: { height: 56, borderWidth: 1, borderColor: colors.border, borderRadius: 12, textAlign: 'center', fontSize: 26, fontWeight: '700', letterSpacing: 10, color: colors.textPrimary, backgroundColor: colors.surface, marginBottom: 10 },
+  codeInput: { minHeight: 56, borderWidth: 1, borderColor: colors.border, borderRadius: 12, textAlign: 'center', fontSize: 26, fontWeight: '700', letterSpacing: 10, color: colors.textPrimary, backgroundColor: colors.surface, marginBottom: 10 },
   notice:    { fontSize: 13, color: colors.success, marginBottom: 6 },
   codeLinks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
   sentBox:   { backgroundColor: colors.successLight, borderRadius: 10, padding: 12 },

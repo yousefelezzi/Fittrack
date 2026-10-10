@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, RefreshControl } from 'react-native';
+import { View, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { format } from 'date-fns';
 import { workoutAPI, nutritionAPI } from '../api';
 import { MEAL_TYPES } from '../../../client-web/src/constants/nutrition';
@@ -273,5 +274,5 @@ const styles = makeStyles(() => ({
   icon:     { paddingHorizontal: 4 },
   small:    { fontSize: 13, color: colors.textSecondary },
   danger:   { fontSize: 13, color: colors.danger, fontWeight: '600' },
-  field:    { height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: colors.textPrimary, marginTop: 6 },
+  field:    { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: colors.textPrimary, marginTop: 6 },
 }));

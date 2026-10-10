@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { Text } from '../components/AppText';
 import { format, addDays, subDays, parseISO, isToday } from 'date-fns';
 import DayNav, { useDaySwipe } from '../components/DayNav';
 import { nutritionAPI, foodAPI } from '../api';
@@ -42,7 +43,7 @@ function MacroCard({ totals, meals, supplementMicros, waterMicros }) {
             {['protein', 'carbs', 'fat'].map((k) => (
               <View key={k} style={styles.legendRow}>
                 <View style={[styles.dot, { backgroundColor: MACRO_COLORS[k] }]} />
-                <Text style={[styles.small, { width: 56, textTransform: 'capitalize' }]}>{k}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.small, { width: 56, textTransform: 'capitalize' }]}>{k}</Text>
                 <Text style={styles.bold}>{r0(totals[k])}g</Text>
                 <Text style={[styles.muted, { marginLeft: 'auto' }]}>{Math.round((kcal[k] / kcalTotal) * 100)}%</Text>
               </View>
@@ -469,9 +470,9 @@ export default function NutritionScreen({ navigation }) {
               return (
                 <View key={m}>
                   <View style={styles.legendRow}>
-                    <Text style={[styles.small, { width: 56, textTransform: 'capitalize' }]}>{m}</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.small, { width: 56, textTransform: 'capitalize' }]}>{m}</Text>
                     <View style={[styles.track, { flex: 1 }]}><View style={[styles.fill, { width: `${Math.min(100, Math.round((val / goal) * 100))}%`, backgroundColor: MACRO_COLORS[m] }]} /></View>
-                    <Text style={[styles.muted, { width: 78, textAlign: 'right' }]}>{val}g / {goal}g</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.muted, { width: 78, textAlign: 'right' }]}>{val}g / {goal}g</Text>
                   </View>
                   {/* Like a nutrition label: the saturated part of the fat, against the 20 g daily limit. */}
                   {m === 'fat' ? (

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { Text } from '../components/AppText';
 import { format } from 'date-fns';
 import { workoutAPI, exerciseAPI } from '../api';
 import { Card, Spinner, colors, makeStyles, BarChart, LineChart, HBarList, ExercisePicker, Hint, SectionTitle, Segmented, LinkText } from '../components';
@@ -168,6 +169,6 @@ const styles = makeStyles(() => ({
   centered:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty:      { textAlign: 'center', color: colors.textMuted, paddingVertical: 20 },
   sub:        { fontSize: 11, color: colors.textSecondary },
-  picker:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, height: 42, marginBottom: 12 },
+  picker:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, minHeight: 42, marginBottom: 12 },
   pickerText: { fontSize: 14, color: colors.textPrimary, flex: 1 },
 }));

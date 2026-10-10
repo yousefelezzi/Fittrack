@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { format } from 'date-fns';
 import { Trash2 } from 'lucide-react-native';
 import { weightAPI, userAPI } from '../api';
@@ -111,7 +112,7 @@ const styles = makeStyles(() => ({
   big:   { fontSize: 30, fontWeight: '700', color: colors.textPrimary, marginVertical: 4 },
   title: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: 8 },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 16, color: colors.textPrimary, backgroundColor: colors.surface },
+  input: { minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 16, color: colors.textPrimary, backgroundColor: colors.surface },
   entry: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.subtle },
   value: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
 }));

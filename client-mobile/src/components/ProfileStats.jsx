@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { Text } from './AppText';
 import { format } from 'date-fns';
 import { userAPI } from '../api';
 import { colors, makeStyles, cardSurface } from './tokens';
@@ -134,9 +135,9 @@ export default function ProfileStats({ userId, refreshKey, onEditProfile, onNavi
               <Hint>{s.split.workoutsPerWeek} workouts/week · {s.split.totalSets} sets in the last {s.split.periodDays} days</Hint>
               {s.split.breakdown.map((b) => (
                 <View key={b.region} style={styles.barRow}>
-                  <Text style={[styles.muted, { width: 72 }]}>{b.region}</Text>
+                  <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.muted, { width: 72 }]}>{b.region}</Text>
                   <View style={styles.track}><View style={[styles.fill, { width: `${b.percent}%` }]} /></View>
-                  <Text style={[styles.muted, { width: 36, textAlign: 'right' }]}>{b.percent}%</Text>
+                  <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.muted, { width: 36, textAlign: 'right' }]}>{b.percent}%</Text>
                 </View>
               ))}
             </View>

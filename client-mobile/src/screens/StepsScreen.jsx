@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View, Text, ScrollView, RefreshControl, TextInput, TouchableOpacity, } from 'react-native';
+import { View, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import { stepsAPI } from '../api';
 import { Card, Button, Spinner, colors, makeStyles } from '../components';
 import StepSources from '../components/StepSources';
@@ -200,5 +200,5 @@ const styles = makeStyles(() => ({
   barCol:     { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   bar:        { width: '60%', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   barSelected:{ borderWidth: 2, borderColor: colors.brandDark },
-  barLabel:   { fontSize: 10, color: colors.textMuted, marginTop: 4, height: 14 },
+  barLabel:   { fontSize: 10, color: colors.textMuted, marginTop: 4, minHeight: 14 },
 }));

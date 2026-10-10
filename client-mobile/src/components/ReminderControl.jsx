@@ -4,7 +4,8 @@
  * active plan and the Supplements page.
  */
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Switch } from 'react-native';
+import { View, TouchableOpacity, Switch } from 'react-native';
+import { Text } from './AppText';
 import { Bell, Clock } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../api';

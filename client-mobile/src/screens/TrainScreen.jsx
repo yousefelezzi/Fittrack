@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text } from 'react-native';
-import { planAPI } from '../api';
+import { ScrollView, View } from 'react-native';
+import { Text } from '../components/AppText';
+import { planAPI, reminderAPI } from '../api';
+import { todayParams } from '../../../client-web/src/utils/reminders';
 import { Card, Button, ListRow, colors, makeStyles, Title, Hint } from '../components';
-import { CirclePlus, ClipboardList, Dumbbell, ChartColumn, History, Calculator, HeartPulse } from 'lucide-react-native';
+import { CirclePlus, ClipboardList, Dumbbell, ChartColumn, History, Calculator, HeartPulse, CircleCheck } from 'lucide-react-native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** Everything about training in one place (the web app's "Workouts" menu). */
 export default function TrainScreen({ navigation }) {
   const [active, setActive] = useState(null);
+  const [trainedToday, setTrainedToday] = useState(false);
 
-  // The active plan's workout for today, to start it in one tap.
+  // The active plan's workout for today, to start it in one tap (unless a workout's already logged today).
   useEffect(() => navigation.addListener('focus', () => {
     planAPI.getAll().then(({ data }) => setActive(data.find((p) => p.isActive) || null)).catch(() => {});
+    reminderAPI.today(todayParams()).then(({ data }) => setTrainedToday(!!data.workedOut)).catch(() => {});
   }), [navigation]);
 
   const today = active?.schedule !== 'rotation' ? active?.days.find((d) => d.dayOfWeek === new Date().getDay()) : null;
@@ -25,7 +29,14 @@ export default function TrainScreen({ navigation }) {
           <Text style={styles.cap}>TODAY · {active.name}</Text>
           <Text style={styles.big}>{today.label || DAYS[today.dayOfWeek]}</Text>
           <Hint style={{ marginBottom: 10 }}>{today.exercises.length} exercises · {today.exercises.reduce((n, e) => n + (e.targetSets || 0), 0)} sets</Hint>
-          <Button title="▶ Start today's workout" onPress={() => navigation.navigate('LogWorkout', { template: { plan: active, day: today } })} />
+          {trainedToday ? (
+            <View style={styles.done}>
+              <CircleCheck size={18} color={colors.success} />
+              <Text style={styles.doneText}>Today's workout is logged. Nice work.</Text>
+            </View>
+          ) : (
+            <Button title="▶ Start today's workout" onPress={() => navigation.navigate('LogWorkout', { template: { plan: active, day: today } })} />
+          )}
         </Card>
       )}
       <Card style={{ paddingVertical: 4 }}>
@@ -46,4 +57,6 @@ export default function TrainScreen({ navigation }) {
 const styles = makeStyles(() => ({
   cap: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5 },
   big: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+  done: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  doneText: { fontSize: 14, fontWeight: '600', color: colors.success },
 }));

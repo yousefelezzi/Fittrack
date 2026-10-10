@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, Text, View, Linking } from 'react-native';
+import { ScrollView, View, Linking } from 'react-native';
+import { Text } from '../components/AppText';
 import { Card, colors, makeStyles } from '../components';
 
 const L = ({ url, children }) => <Text style={styles.link} onPress={() => Linking.openURL(url)}>{children}</Text>;

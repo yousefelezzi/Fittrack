@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { Text } from '../components/AppText';
 import { planAPI } from '../api';
 import {
   Card, Button, colors, makeStyles, Chip, ChipRow, Segmented, Stepper, Label, Hint, ErrorText, SimilarExercises,

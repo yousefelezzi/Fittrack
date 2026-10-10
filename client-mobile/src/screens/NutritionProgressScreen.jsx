@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, ScrollView } from 'react-native';
+import { Text } from '../components/AppText';
 import { format } from 'date-fns';
 import { nutritionAPI } from '../api';
 import { Card, BarChart, MacroDonut, Segmented, colors, makeStyles, Hint, ErrorText, Spinner } from '../components';

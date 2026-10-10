@@ -3,14 +3,8 @@
  * All components are plain React Native — no third-party UI library required.
  */
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  Image,
-  TextInput,
-} from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { Text, TextInput } from './AppText';
 
 import { colors, makeStyles, cardSurface } from './tokens';
 import { uploadUrl } from '../api';
@@ -143,8 +137,8 @@ export function MacroBar({ label, current, goal, unit = 'g', color = colors.bran
   return (
     <View style={{ marginBottom: 10 }}>
       <View style={styles.macroRow}>
-        <Text style={styles.macroLabel}>{label}</Text>
-        <Text style={styles.macroValue}>{show(current)} / {show(goal)} {unit}</Text>
+        <Text style={[styles.macroLabel, { flexShrink: 1 }]} numberOfLines={1}>{label}</Text>
+        <Text style={styles.macroValue} numberOfLines={1} adjustsFontSizeToFit>{show(current)} / {show(goal)} {unit}</Text>
       </View>
       <View style={styles.barBg}>
         <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: color }]} />
@@ -195,7 +189,7 @@ const styles = makeStyles(() => ({
   btnTextSecondary: { color: colors.textPrimary },
   inputLabel:   { fontSize: 13, fontWeight: '500', color: colors.textSecondary, marginBottom: 4 },
   input: {
-    height: 44,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,

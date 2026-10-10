@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { Text, TextInput } from './AppText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { workoutAPI } from '../api';
 import { wnsFromSessions, WNS_DEFAULTS } from '../../../client-web/src/utils/wnsCalculations';
@@ -138,7 +139,7 @@ const styles = makeStyles(() => ({
   title:    { fontSize: 14, fontWeight: '500', color: colors.textPrimary },
   small:    { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
   settings: { backgroundColor: colors.inset, borderRadius: 12, padding: 10, marginTop: 10 },
-  input:    { height: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
+  input:    { minHeight: 36, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.surface },
   row:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.subtle },
   neg:      { fontSize: 14, fontWeight: '700', color: colors.danger, fontVariant: ['tabular-nums'] },
 }));

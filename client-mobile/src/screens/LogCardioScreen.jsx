@@ -4,7 +4,8 @@
  * own. With the dynamic calorie goal active, a day's cardio adds to that day's goal.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text, TextInput } from '../components/AppText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, startOfWeek } from 'date-fns';
 import { Flame, Trash2, Check, Play, Pause, Square, Plus, X, HeartPulse } from 'lucide-react-native';
@@ -325,7 +326,7 @@ const styles = makeStyles(() => ({
   row:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
   group:     { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, marginTop: 12 },
   link:      { fontSize: 13, fontWeight: '600' },
-  input:     { height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
+  input:     { minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
   text:      { fontSize: 14, color: colors.textPrimary },
   muted:     { fontSize: 12, color: colors.textSecondary },
   error:     { fontSize: 13, color: colors.danger, marginTop: 6 },

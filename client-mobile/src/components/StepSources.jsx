@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Platform, Switch } from 'react-native';
+import { View, Platform, Switch } from 'react-native';
+import { Text } from './AppText';
 import { Pedometer } from 'expo-sensors';
 import { formatDistanceToNow } from 'date-fns';
 import { stepsAPI } from '../api';
