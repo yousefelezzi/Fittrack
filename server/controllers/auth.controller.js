@@ -256,25 +256,51 @@ exports.disableTwoFactor = async (req, res, next) => {
 
 // ── Changing the password (by email link) ─────────────────────────────────────
 
-// POST /api/auth/password/request  — emails a link to change the password
+/** Emails `user` a link to choose a new password (works for 1 hour). */
+async function sendPasswordLink(user, forgot = false) {
+  const token = newToken();
+  user.passwordResetHash = hashToken(token);
+  user.passwordResetExpires = new Date(Date.now() + HOUR);
+  user.passwordResetSentAt = new Date();
+  await user.save();
+  await sendMail({
+    to: user.email,
+    subject: forgot ? 'Reset your FitTrack password' : 'Change your FitTrack password',
+    heading: forgot ? 'Reset your password' : 'Change your password',
+    paragraphs: [`Hi ${user.name}, use the button below to choose a new password for your FitTrack account.`, 'The link works for 1 hour.'],
+    button: { label: forgot ? 'Reset password' : 'Change password', url: `${APP_URL()}/account/password?token=${token}` },
+    footer: "If you didn't ask for this, you can ignore this email; your password stays the same.",
+  });
+}
+
+// POST /api/auth/password/request  — emails a link to change the password (signed in)
 exports.requestPasswordChange = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('+passwordResetSentAt');
     if (tooSoon(user.passwordResetSentAt)) return res.status(429).json({ message: 'We just sent you a link. Wait a minute before asking for another.' });
-    const token = newToken();
-    user.passwordResetHash = hashToken(token);
-    user.passwordResetExpires = new Date(Date.now() + HOUR);
-    user.passwordResetSentAt = new Date();
-    await user.save();
-    await sendMail({
-      to: user.email,
-      subject: 'Change your FitTrack password',
-      heading: 'Change your password',
-      paragraphs: [`Hi ${user.name}, use the button below to choose a new password for your FitTrack account.`, 'The link works for 1 hour.'],
-      button: { label: 'Change password', url: `${APP_URL()}/account/password?token=${token}` },
-      footer: "If you didn't ask for this, you can ignore this email; your password stays the same.",
-    });
+    await sendPasswordLink(user);
     res.json({ message: `We sent a link to ${user.email}. Open it to choose your new password (it works for 1 hour).` });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/password/forgot { login }  — "Forgot password?" on sign-in (email or username).
+// Always answers the same, so it doesn't show which accounts exist.
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const login = String(req.body.login || '').trim().toLowerCase();
+    const query = login.indexOf('@') > 0 ? { email: login } : { username: normalizeUsername(login) };
+    const user = login ? await User.findOne(query).select('+passwordResetSentAt') : null;
+    if (user && !tooSoon(user.passwordResetSentAt)) {
+      try {
+        await sendPasswordLink(user, true);
+      } catch (err) {
+        console.error('Reset email failed:', err.message);
+        return res.status(503).json({ message: "We couldn't send the email just now. Try again in a moment." });
+      }
+    }
+    res.json({ message: "If there's a FitTrack account for that, we've emailed it a link to choose a new password. It works for 1 hour; check your spam folder too." });
   } catch (err) {
     next(err);
   }

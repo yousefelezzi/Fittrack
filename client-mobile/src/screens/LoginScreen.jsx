@@ -5,7 +5,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { errorMessage, authAPI } from '../api';
 import { Button, Input, colors, makeStyles, cardSurface } from '../components';
-import { Dumbbell, ShieldCheck } from 'lucide-react-native';
+import { Dumbbell, ShieldCheck, KeyRound } from 'lucide-react-native';
 
 export default function LoginScreen({ navigation }) {
   const { login, verifyLogin } = useAuth();
@@ -14,6 +14,20 @@ export default function LoginScreen({ navigation }) {
   const [notice, setNotice]   = useState('');
   const [loading, setLoading] = useState(false);
   const [twoFactor, setTwoFactor] = useState(null); // { challenge, email } while waiting for the emailed code
+  const [forgot, setForgot] = useState(null);       // { login, sent } on "Forgot password?"
+
+  const sendReset = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const { data } = await authAPI.forgotPassword(forgot.login.trim());
+      setForgot((f) => ({ ...f, sent: data.message }));
+    } catch (err) {
+      setError(errorMessage(err, 'Could not send the email'));
+    } finally {
+      setLoading(false);
+    }
+  };
   const [code, setCode]       = useState('');
 
   const submitCode = async () => {
@@ -64,7 +78,26 @@ export default function LoginScreen({ navigation }) {
             </View>
           ) : null}
 
-          {twoFactor ? (
+          {forgot ? (
+            <>
+              <View style={styles.codeIntro}>
+                <KeyRound size={22} color={colors.brand} />
+                <Text style={styles.codeText}>Enter your email or username and we'll email you a link to choose a new password.</Text>
+              </View>
+              {forgot.sent ? (
+                <View style={styles.sentBox}><Text style={styles.sentText}>{forgot.sent}</Text></View>
+              ) : (
+                <>
+                  <Input placeholder="you@example.com or yourname" value={forgot.login} autoCapitalize="none" autoCorrect={false} keyboardType="email-address"
+                    autoComplete="username" onChangeText={(v) => { setForgot({ ...forgot, login: v }); setError(''); }} />
+                  <Button title="Email me a link" onPress={sendReset} loading={loading} disabled={!forgot.login.trim()} />
+                </>
+              )}
+              <TouchableOpacity onPress={() => { setForgot(null); setError(''); }} hitSlop={8} style={{ marginTop: 14 }}>
+                <Text style={styles.linkText}>Back to sign in</Text>
+              </TouchableOpacity>
+            </>
+          ) : twoFactor ? (
             <>
               <View style={styles.codeIntro}>
                 <ShieldCheck size={22} color={colors.brand} />
@@ -100,6 +133,9 @@ export default function LoginScreen({ navigation }) {
             secureTextEntry
             autoComplete="password"
           />
+          <TouchableOpacity onPress={() => { setForgot({ login: form.email, sent: '' }); setError(''); }} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: -4, marginBottom: 10 }}>
+            <Text style={styles.linkBold}>Forgot password?</Text>
+          </TouchableOpacity>
 
           <Button title="Sign in" onPress={handleLogin} loading={loading} style={{ marginTop: 4 }} />
           </>
@@ -135,4 +171,6 @@ const styles = makeStyles(() => ({
   codeInput: { height: 56, borderWidth: 1, borderColor: colors.border, borderRadius: 12, textAlign: 'center', fontSize: 26, fontWeight: '700', letterSpacing: 10, color: colors.textPrimary, backgroundColor: colors.surface, marginBottom: 10 },
   notice:    { fontSize: 13, color: colors.success, marginBottom: 6 },
   codeLinks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
+  sentBox:   { backgroundColor: colors.successLight, borderRadius: 10, padding: 12 },
+  sentText:  { fontSize: 14, color: colors.success, lineHeight: 20 },
 }));

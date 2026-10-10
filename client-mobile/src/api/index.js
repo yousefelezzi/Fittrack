@@ -135,6 +135,7 @@ export const authAPI = {
   disableTwoFactor: (password) => api.post('/auth/2fa/disable', { password }),
   // Password: a link is emailed; the new password is set on the page it opens.
   requestPasswordChange: () => api.post('/auth/password/request'),
+  forgotPassword: (login) => api.post('/auth/password/forgot', { login }), // signed out: email or username
   checkPasswordToken: (token) => api.get('/auth/password/check', { params: { token } }),
   resetPassword: (token, newPassword) => api.post('/auth/password/reset', { token, newPassword }),
   // Email: needs the password, then a link sent to the new address confirms it.

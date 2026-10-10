@@ -10,6 +10,7 @@ const {
   logout,
   getMe,
   requestPasswordChange,
+  forgotPassword,
   checkPasswordToken,
   resetPassword,
   requestEmailChange,
@@ -64,6 +65,7 @@ router.get('/me', protect, getMe);
 // Changing the password: a link is emailed, the new password is set on the page it opens.
 router.post('/password/request', protect, requestPasswordChange);
 router.get('/password/check', checkPasswordToken);
+router.post('/password/forgot', [body('login').isString().trim().notEmpty().withMessage('Enter your email or username')], validate, forgotPassword);
 router.post(
   '/password/reset',
   [
